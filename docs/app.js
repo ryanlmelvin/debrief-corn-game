@@ -156,6 +156,7 @@ function updateUI(force=false) {
   $('tower-hud').hidden=!active;
   $('hud-ammo').textContent=`${game.rounds} / ${game.reserve} · .22`;
   $('hud-reload').disabled=paused||game.reload>0||game.rounds===6||game.reserve===0;
+  $('hud-reload').classList.toggle('needs-reload',active&&!$('hud-reload').disabled&&game.rounds===0);
   $('hud-reload').textContent=game.reload>0?'↻ Reloading…':'↻ Reload';
   $('hud-reload').setAttribute('aria-label',`Reload rifle. ${game.rounds} rounds loaded, ${game.reserve} in reserve.`);
   $('controls').hidden=active||field;
@@ -331,7 +332,7 @@ canvas.addEventListener('pointerdown',event=>{
     fire(p,event.pointerType==='touch'?22/Math.max(.1,renderer.view.scale):0);
   }
 });
-function fire(p,padding=0) {const result=game.phase==='guide'?fireGuide(game,p.x,p.y):shoot(game,p.x,p.y,padding);if(!['blocked','empty'].includes(result))shotSound(result==='hit');else if(result==='empty')toast('Rifle empty. Press R or tap Reload.');updateUI();save();}
+function fire(p,padding=0) {const result=game.phase==='guide'?fireGuide(game,p.x,p.y):shoot(game,p.x,p.y,padding);if(!['blocked','empty'].includes(result))shotSound(result==='hit');updateUI();save();}
 document.addEventListener('keydown',event=>{
   if(!game||dialog.open||menuOpen()||event.ctrlKey||event.metaKey||event.altKey||['INPUT','SELECT','TEXTAREA'].includes(event.target.tagName))return;
   const k=event.key.toLowerCase();
