@@ -37,8 +37,9 @@ function save() {
   catch { $('save-status').textContent='SAVING UNAVAILABLE';if(!storageWarned){toast('Your browser is blocking local saves. Keep this tab open to retain your progress.');storageWarned=true;} }
 }
 function toast(message) { $('toast').textContent=message;$('toast').hidden=false;clearTimeout(toastTimer);toastTimer=setTimeout(()=>$('toast').hidden=true,5000); }
+const REDACTED_TOWN = '<span class="censor-bar" role="img" aria-label="Town name redacted"></span>';
 function paper(title,body,tag='PERSONNEL COPY',footer='DEPARTMENT OF AGRICULTURAL CONTAINMENT') {
-  return `<article class="paper"><button id="dialog-update" class="secondary" data-update hidden>Update ready. Download?</button><div class="paper-top"><span>STATION 04 / ILLINOIS<br>RESTRICTED FIELD OPERATIONS</span><span>${tag}<br>FILE NO. 04–${game?String(game.shift+1).padStart(2,'0'):'00'}</span></div><h2 id="dialog-title" tabindex="-1">${title}</h2>${body}<div class="paper-footer"><span>${footer}</span><span>KEEP FOR YOUR RECORDS</span></div></article>`;
+  return `<article class="paper"><button id="dialog-update" class="secondary" data-update hidden>Update ready. Download?</button><div class="paper-top"><span>STATION 04 / ${REDACTED_TOWN}, ILLINOIS<br>RESTRICTED FIELD OPERATIONS</span><span>${tag}<br>FILE NO. 04–${game?String(game.shift+1).padStart(2,'0'):'00'}</span></div><h2 id="dialog-title" tabindex="-1">${title}</h2>${body}<div class="paper-footer"><span>${footer}</span><span>KEEP FOR YOUR RECORDS</span></div></article>`;
 }
 function showModal(kind,html) {
   modalKind=kind;$('dialog-content').innerHTML=html;
@@ -61,7 +62,7 @@ function sceneDialog() {
   lastModalKey=key;
   if(game.phase==='briefing') {
     const b=BRIEFINGS[game.shift];
-    showModal('briefing',paper(b.title,`<p class="eyebrow">SHIFT ${game.shift+1} / ${DATES[game.shift]}, <span class="redacted-text">19XX</span></p><p>${b.text}</p><ol class="orders">${b.orders.map((o,i)=>`<li><span>0${i+1}</span>${o}</li>`).join('')}</ol><p class="note">${b.note}</p>${game.shift===0?'<p class="small">Click or tap to fire. <b>X</b> aims, <b>Space</b> fires, <b>R</b> reloads.</p>':''}<button class="primary" data-action="start">Take your post <span>↗</span></button>`, 'SHIFT ORDERS'));
+    showModal('briefing',paper(b.title,`<p class="eyebrow">SHIFT ${game.shift+1} / ${DATES[game.shift]}, <span class="redacted-text">19XX</span></p><p>${esc(b.text).replaceAll('██████', REDACTED_TOWN)}</p><ol class="orders">${b.orders.map((o,i)=>`<li><span>0${i+1}</span>${o}</li>`).join('')}</ol><p class="note">${b.note}</p>${game.shift===0?'<p class="small">Click or tap to fire. <b>X</b> aims, <b>Space</b> fires, <b>R</b> reloads.</p>':''}<button class="primary" data-action="start">Take your post <span>↗</span></button>`, 'SHIFT ORDERS'));
   } else if(game.phase==='tower' && game.incident && !game.incidentPrompted) {
     game.incidentPrompted=true;
     showModal('sighting',paper('Movement in the field.', '<p>A human entered the field. Investigate now or after relief comes.</p><p class="small">Leaving now means any loose crops can cross the perimeter.</p><div class="paper-actions"><button class="primary" data-action="confirm-enter">Investigate now ↗</button><button class="secondary" data-action="close">Wait for relief</button></div>', 'FIELD OBSERVATION'));

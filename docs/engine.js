@@ -17,7 +17,7 @@ export const EVIDENCE = {
 };
 const WATCH_ORDERS = ['Watch the corn. Shoot any that try to escape.', 'Remain in the watchtower.', 'Remember any irregularities for your debrief at the end of the night.'];
 export const BRIEFINGS = [
-  { title: 'Watch the corn.', text: 'Your post overlooks an experimental crop outside a small Illinois town. The night shift is quiet. Usually.', orders: WATCH_ORDERS, note: 'Your relief comes at the end of the night.' },
+  { title: 'Watch the corn.', text: 'Your post overlooks an experimental crop outside ██████, Illinois. The night shift is quiet. Usually.', orders: WATCH_ORDERS, note: 'Your relief comes at the end of the night.' },
   { title: 'Watch the corn.', text: 'You have been reassigned to the same post. The previous report has been filed.', orders: WATCH_ORDERS, note: 'The tower key is where you left it.' },
   { title: 'Watch the corn.', text: 'The wind has dropped. You are due at the tower before dark.', orders: WATCH_ORDERS, note: 'The lights on the neighboring farm went out at 18:40.' }
 ];
