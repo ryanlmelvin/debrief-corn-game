@@ -195,8 +195,8 @@ export function beginDebrief(s) {
 export function getQuestion(s) {
   if (s.question === 3 && s.shift < 2) return {
     prompt: s.reports.at(-1).supervisorReply,
-    context: 'He closes the folder before you can answer. His hand stays on the cover. The interview is over.',
-    options: [{ id: 'return', label: 'Return to your post.', detail: 'Leave the office. Your next shift orders are waiting.' }]
+    context: 'He closes the folder before you can answer. His hand stays on the cover.',
+    options: [{ id: 'return', label: 'Return to your post.' }]
   };
   const testimony = s.reports.filter(r => r.shift === s.shift);
   const concealedSighting = testimony[0]?.redacted;
@@ -206,10 +206,10 @@ export function getQuestion(s) {
   const sighting = ['a figure in a white dress', 'a recovery team light', 'three lights going out'][s.shift];
   if (s.question === 0) return {
     prompt: s.departure === 'compelled' ? 'Your relief says you went down the ladder without answering him. Why did you enter the field?' : s.entered ? 'Your log shows you left the tower. What prompted you to investigate?' : 'Before we close the shift log, what did you observe in the northeast corner?',
-    context: `This interview concerns the watch you just completed. You saw ${sighting} near the northeast corner.${s.departure === 'compelled' ? ' You waited for relief. The thought kept repeating until your body obeyed it.' : ''}`,
+    context: s.departure === 'compelled' ? 'Your hands still ache from the ladder. He waits for an explanation you do not have.' : 'He adjusts the microphone. Close enough to catch your breathing.',
     options: [
-      { id: 'truth', label: s.departure === 'compelled' ? `I saw ${sighting}. I tried to stay. I could not stop myself from going down.` : s.entered ? `I saw ${sighting}. I went into the field to investigate.` : `I saw ${sighting}. I stayed at my post.`, detail: 'Put the sighting and your response on record.', honesty: 1, trust: -1 },
-      { id: 'comply', label: s.entered ? 'I was checking the perimeter, sir.' : 'Routine crop movement. Nothing further.', detail: 'Leave the sighting out of the official account.', honesty: -1, trust: 1 }
+      { id: 'truth', label: s.departure === 'compelled' ? `I saw ${sighting}. I tried to stay. I could not stop myself from going down.` : s.entered ? `I saw ${sighting}. I went into the field to investigate.` : `I saw ${sighting}. I stayed at my post.`, honesty: 1, trust: -1 },
+      { id: 'comply', label: s.entered ? 'I was checking the perimeter, sir.' : 'Routine crop movement. Nothing further.', honesty: -1, trust: 1 }
     ]
   };
   if (s.question === 1) {
@@ -218,10 +218,10 @@ export function getQuestion(s) {
       : s.departure === 'compelled' ? 'I will record that you went in to investigate. What were you able to establish?' : s.entered ? 'You went in to investigate. What were you able to establish?' : 'You stayed in the tower. What could you establish from there?';
     const background = ['We have no other report of anyone entering the field tonight.', 'The recovery team sent to that corner has not returned.', 'Another recovery team is overdue. We need to account for those lights.'][s.shift];
     return { prompt: `${followup} ${background}`,
-      context: found ? `You recorded this in your private notebook: ${EVIDENCE[latest].text}` : s.entered ? 'You returned without an exhibit from the northeast corner. You can report that limit without inventing a finding.' : 'You did not search the corner. The sighting alone does not tell you what happened there.',
+      context: found ? `From your notebook: ${EVIDENCE[latest].text}` : s.entered ? 'The notebook has no entry for the northeast corner.' : 'From the tower, you could not see what happened between the rows.',
       options: [
-        { id: 'evidence', label: found ? ['I found white fabric in the corner. A stalk had grown through it.', 'I found a recovery team badge. Something shaped like an ear of corn was growing through the clip.', 'I found an ear of corn with teeth where the kernels should be.'][s.shift] : s.entered ? 'I cannot say what happened there. I did not recover anything from the corner.' : 'I cannot say. I did not reach the corner.', detail: found ? 'Add this finding to the report.' : 'Record the limits of your observation.', honesty: 1, trust: found ? -1 : 0 },
-        { id: 'redact', label: 'Nothing outside the expected growth pattern.', detail: 'Approve the routine-growth wording, without recording uncertainty or unusual findings.', honesty: -1, trust: 1 }
+        { id: 'evidence', label: found ? ['I found white fabric in the corner. A stalk had grown through it.', 'I found a recovery team badge. Something shaped like an ear of corn was growing through the clip.', 'I found an ear of corn with teeth where the kernels should be.'][s.shift] : s.entered ? 'I cannot say what happened there. I did not recover anything from the corner.' : 'I cannot say. I did not reach the corner.', honesty: 1, trust: found ? -1 : 0 },
+        { id: 'redact', label: 'Nothing outside the expected growth pattern.', honesty: -1, trust: 1 }
       ] };
   }
   const response = correctedObservation
@@ -229,16 +229,16 @@ export function getQuestion(s) {
     : found ? 'I have noted your description. It will be reviewed separately.' : 'Then the record will show that you could not establish what happened in the corner.';
   if (s.shift < 2) return {
     prompt: `${response} The report for signature describes routine crop movement and recommends continuing the watch. Will you sign it?`,
-    context: 'The supervisor places the report in front of you. Signing approves that wording. You may instead raise an objection before the interview closes.',
+    context: 'He turns the report toward you. The pen is already uncapped.',
     options: [
-      { id: 'question', label: s.evidence.includes('ledger') ? 'Before I sign: I found a treatment ledger in the pump house. The application amounts keep increasing. What are you putting on this crop?' : s.evidence.includes('sample') ? 'Before I sign: I found a sealed sample beside the treatment drums. Something inside it was moving. What is the treatment supposed to do?' : 'I cannot approve this as routine. If the crop has to be kept inside a perimeter, why are we continuing the watch instead of closing the field?', detail: 'Withhold your signature and retain your private notes.', honesty: 1, trust: -1 },
-      { id: 'sign', label: 'I will sign the report and return to the watchtower.', detail: 'Approve the routine-growth account and the continuing watch.', honesty: -1, trust: 1 }
+      { id: 'question', label: s.evidence.includes('ledger') ? 'Before I sign: I found a treatment ledger in the pump house. The application amounts keep increasing. What are you putting on this crop?' : s.evidence.includes('sample') ? 'Before I sign: I found a sealed sample beside the treatment drums. Something inside it was moving. What is the treatment supposed to do?' : 'I cannot approve this as routine. If the crop has to be kept inside a perimeter, why are we continuing the watch instead of closing the field?', honesty: 1, trust: -1 },
+      { id: 'sign', label: 'I will sign the report and return to the watchtower.', honesty: -1, trust: 1 }
     ]
   };
-  return { prompt: `${response} I am authorizing another search of the northeast corner. Will you assist the team, or sign the report and return to your post?`, context: 'The supervisor opens a field map and puts the final report beside it. You can also refuse the assignment and take your private record outside the department, if you have enough evidence.', options: [
-    { id: 'expose', label: 'No more teams. I will take my evidence outside the department.', detail: 'Release your evidence. Requires 3 exhibits, including the application record or sealed sample.', disabled: s.evidence.length < 3 || !s.evidence.some(e => ['ledger', 'sample'].includes(e)) },
-    { id: 'guide', label: s.searched.some(place => /^shift-/.test(place)) ? 'I have been inside the field. I will lead the team to the northeast corner.' : 'I will go in with the team and help search the northeast corner.', detail: 'Enter the field with the next recovery team.' },
-    { id: 'sign', label: 'I will sign the report and return to the watchtower.', detail: 'Approve the final report and continue containment duty.' }
+  return { prompt: `${response} I am authorizing another search of the northeast corner. Will you assist the team, or sign the report and return to your post?`, context: 'He unfolds a field map over the report. Three names are penciled along its edge.', options: [
+    { id: 'expose', label: 'No more teams. I will take my evidence outside the department.', detail: 'Requires 3 exhibits, including the application record or sealed sample.', disabled: s.evidence.length < 3 || !s.evidence.some(e => ['ledger', 'sample'].includes(e)) },
+    { id: 'guide', label: s.searched.some(place => /^shift-/.test(place)) ? 'I have been inside the field. I will lead the team to the northeast corner.' : 'I will go in with the team and help search the northeast corner.' },
+    { id: 'sign', label: 'I will sign the report and return to the watchtower.' }
   ] };
 }
 

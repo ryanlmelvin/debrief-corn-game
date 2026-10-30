@@ -19,7 +19,7 @@ export const SPECIMENS = {
 export function scenePlate(site, caption = FIELD_ART[site]?.caption) {
   const art = FIELD_ART[site];
   if (!art) return '';
-  return `<figure class="scene-plate"><img src="./assets/${art.file}.webp" alt="${art.alt}" width="1200" height="800"><figcaption>${escape(caption)}</figcaption></figure>`;
+  return `<figure class="scene-plate"><img src="./assets/${art.file}.webp" alt="${art.alt}" width="1200" height="800">${caption?`<figcaption>${escape(caption)}</figcaption>`:''}</figure>`;
 }
 
 export function specimenStudy(id) {
@@ -35,7 +35,7 @@ export function evidenceMount(id) {
 }
 
 export function dialogArtwork(kind, shift = 0) {
-  if (kind === 'debrief') return `<div class="interview-scene">${scenePlate('debrief')}<span class="recording-label"><i></i> REC / TAPE 0${shift + 1}</span></div>`;
+  if (kind === 'debrief') return `<div class="interview-scene">${scenePlate('debrief', '')}<span class="recording-label"><i></i> REC / TAPE 0${shift + 1}</span></div>`;
   if (['briefing', 'manual', 'guide-intro'].includes(kind)) return scenePlate('tower');
   if (kind === 'sighting') return scenePlate('sighting');
   if (['ending', 'records'].includes(kind)) return scenePlate('debrief', 'Station archive / retained copy');
@@ -59,11 +59,11 @@ export function notebookMarkup(game, requestedPage = 0) {
   if (!pages.length) pages.push('empty');
   const page = Math.max(0, Math.min(pages.length - 1, Number(requestedPage) || 0)), id = pages[page];
   let content;
-  if (id === 'empty') content = `${scenePlate('tower')}<h3>A place for what you saw.</h3><p>The pages are still empty. Investigate the field to keep observations here.</p><p class="pencil-note">Keep this out of the official file.</p>`;
-  else if (id === 'testimony') content = `<p class="eyebrow">PERSONAL COPY / PREVIOUS TESTIMONY</p><h3>What went on record.</h3><div class="notebook-testimony">${game.reports.map(r => `<section><p class="eyebrow">SHIFT 0${r.shift + 1}</p><h4>${escape(r.question)}</h4><p>${r.redacted ? '<span class="withheld-note">Observation withheld</span> ' : ''}${escape(r.answer)}</p>${r.supervisorReply ? `<p class="pencil-note">Supervisor: ${escape(r.supervisorReply)}</p>` : ''}</section>`).join('')}</div>`;
+  if (id === 'empty') content = `${scenePlate('tower')}<h3>A place for what you saw.</h3><p>The pages are still empty.</p>`;
+  else if (id === 'testimony') content = `<h3>What went on record.</h3><div class="notebook-testimony">${game.reports.map(r => `<section><p class="eyebrow">SHIFT 0${r.shift + 1}</p><h4>${escape(r.question)}</h4><p>${r.redacted ? '<span class="withheld-note">Observation withheld</span> ' : ''}${escape(r.answer)}</p>${r.supervisorReply ? `<p class="pencil-note">Supervisor: ${escape(r.supervisorReply)}</p>` : ''}</section>`).join('')}</div>`;
   else {
     const e = EVIDENCE[id];
-    content = `<p class="eyebrow">${escape(e.code)} / ${escape(e.where)}</p><h3>${escape(e.title)}</h3>${evidenceMount(id)}<p class="handwritten-observation">${escape(e.text)}</p><p class="pencil-note">Retained privately. Not submitted as testimony.</p>`;
+    content = `<p class="eyebrow">${escape(e.code)} / ${escape(e.where)}</p><h3>${escape(e.title)}</h3>${evidenceMount(id)}<p class="handwritten-observation">${escape(e.text)}</p>`;
   }
   return `<article class="field-notebook"><header class="notebook-header"><div><p class="eyebrow">STATION 04 / PERSONAL EFFECTS</p><h2 id="dialog-title" tabindex="-1">Private notebook.</h2></div><button class="notebook-close" data-action="close" aria-label="Close notebook">×</button></header><button id="dialog-update" class="secondary" data-update hidden>Update ready. Download?</button><div class="notebook-spread"><aside class="notebook-index"><span class="notebook-label">FIELD NOTES</span><p class="pencil-note">Write it down.<br>Before it changes.</p><nav aria-label="Notebook pages">${pages.map((entry, i) => `<button data-action="notebook-page" data-value="${i}" ${i === page ? 'aria-current="page"' : ''}><span>${String(i + 1).padStart(2, '0')}</span>${entry === 'empty' ? 'Unwritten' : entry === 'testimony' ? 'Previous testimony' : escape(EVIDENCE[entry].title)}</button>`).join('')}</nav><span class="notebook-private">DO NOT FILE</span></aside><section class="notebook-leaf">${content}<footer class="notebook-pagination"><button data-action="notebook-page" data-value="${page - 1}" ${page === 0 ? 'disabled' : ''} aria-label="Previous notebook page">← Previous</button><span>PAGE ${String(page + 1).padStart(2, '0')} / ${String(pages.length).padStart(2, '0')}</span><button data-action="notebook-page" data-value="${page + 1}" ${page === pages.length - 1 ? 'disabled' : ''} aria-label="Next notebook page">Next →</button></footer></section></div></article>`;
 }

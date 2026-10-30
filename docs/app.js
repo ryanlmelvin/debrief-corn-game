@@ -34,7 +34,7 @@ $('records').addEventListener('click',()=>{
   archiveRun();
   const collection=Object.entries(ENDINGS).map(([id,e])=>`<li class="ending-slot ${history.collected.includes(id)?'collected':''}"><span>${e.code}</span> ${history.collected.includes(id)?esc(e.title):'Unrecorded'}</li>`).join('');
   const runs=history.runs.map(r=>`<details class="past-run"><summary>${esc(r.title)} · ${esc(new Date(r.date).toLocaleDateString())}</summary><p>${esc(r.text)}</p><p class="note">${esc(r.last)}</p>${r.reports.map(t=>`<p class="small"><b>SHIFT ${Number(t.shift)+1}</b><br>${esc(t.question)}<br>YOU: ${esc(t.answer)}${t.supervisorReply?`<br>SUPERVISOR: ${esc(t.supervisorReply)}`:''}</p>`).join('')}</details>`).join('');
-  showModal('records',paper('Your records.',`<p class="small">${history.collected.length} of 6 endings recorded on this device.</p><ol class="ending-collection">${collection}</ol>${runs||'<p class="small">Completed assignments and their testimony will appear here.</p>'}<button class="primary" data-action="close">Close records ↗</button>`,'PRIVATE ARCHIVE'));
+  showModal('records',paper('Your records.',`<p class="small">${history.collected.length} of 6 endings recorded on this device.</p><ol class="ending-collection">${collection}</ol>${runs||'<p class="small">No testimony on file.</p>'}<button class="primary" data-action="close">Close records ↗</button>`,'PRIVATE ARCHIVE'));
 });
 let saved=readSave();
 $('resume').hidden=!saved;
@@ -86,13 +86,13 @@ function sceneDialog() {
     save();
   } else if(game.phase==='debrief') {
     const q=getQuestion(game);
-    showModal('debrief',paper('For the record.',`<p class="eyebrow">${REPORT_DATES[game.shift]}, <span class="redacted-text">19XX</span> / RECORDED INTERVIEW</p><span class="question-num">${game.question === 3 ? 'INTERVIEW CLOSED' : `QUESTION 0${game.question+1} / 03`}</span><p><strong>[SUPERVISOR]</strong><br>${esc(q.prompt)}</p><p class="note">${esc(q.context)}</p><div class="choices">${q.options.map(o=>`<button class="choice" data-action="answer" data-value="${o.id}" ${o.disabled?'disabled':''}>${esc(o.label)}<small>${esc(o.detail)}</small></button>`).join('')}</div>`, 'DEBRIEF TRANSCRIPT'));
+    showModal('debrief',paper('For the record.',`<p class="eyebrow">${REPORT_DATES[game.shift]}, <span class="redacted-text">19XX</span></p><span class="question-num">${game.question === 3 ? 'INTERVIEW CLOSED' : `QUESTION 0${game.question+1} / 03`}</span><p><strong>[SUPERVISOR]</strong><br>${esc(q.prompt)}</p><p class="note">${esc(q.context)}</p><div class="choices">${q.options.map(o=>`<button class="choice" data-action="answer" data-value="${o.id}" ${o.disabled?'disabled':''}>${esc(o.label)}${o.detail?`<small>${esc(o.detail)}</small>`:''}</button>`).join('')}</div>`, 'DEBRIEF TRANSCRIPT'));
   } else if(game.phase==='guide' && game.guide.steps === 0) {
-    showModal('guide-intro',paper('Between the rows.', '<p>Three recovery personnel wait beneath the tower. You take the rifle. They take lamps.</p><p class="note">“You know the way,” one of them says.</p><p class="small">Walk with W/S or ↑/↓. Turn with A/D or ←/→. E examines what your light finds. On a phone, use the controls beside the field.</p><button class="primary" data-action="close">Lead them in ↗</button>', 'RECOVERY DETAIL'));
+    showModal('guide-intro',paper('Between the rows.', '<p>Three recovery personnel wait beneath the tower. You take the rifle. They take lamps.</p><p class="note">“You know the way,” one of them says.</p><p class="small"><b>W/S</b> or <b>↑/↓</b> walk · <b>A/D</b> or <b>←/→</b> turn · <b>E</b> examine.</p><button class="primary" data-action="close">Lead them in ↗</button>', 'RECOVERY DETAIL'));
   } else if(game.phase==='ending') {
     archiveRun();
     const e=getEnding(game);
-    showModal('ending',paper(e.title,`<p class="eyebrow">ENDING ${e.code} / 06</p><p>${e.text}</p><p class="note">${e.last}</p><div class="stamp">${e.stamp}</div><div class="receipt-stats"><span>CROPS CONTAINED<strong>${game.kills}</strong></span><span>EXHIBITS RETAINED<strong>${game.evidence.length}</strong></span><span>PERIMETER BREACHES<strong>${game.breaches}</strong></span></div><p class="small">Based on <i>Debrief</i> by Ryan L. Melvin. Game scenes and alternate outcomes expand on the original story.</p><div class="paper-actions"><button class="primary" data-action="restart">Another assignment ↗</button><button class="secondary" data-action="export">Keep the transcript ↓</button><button class="secondary" data-action="records">View records · ${history.collected.length}/6</button></div>`, 'FINAL DISPOSITION'));
+    showModal('ending',paper(e.title,`<p class="eyebrow">ENDING ${e.code} / 06</p><p>${e.text}</p><p class="note">${e.last}</p><div class="stamp">${e.stamp}</div><div class="receipt-stats"><span>CROPS CONTAINED<strong>${game.kills}</strong></span><span>EXHIBITS RETAINED<strong>${game.evidence.length}</strong></span><span>PERIMETER BREACHES<strong>${game.breaches}</strong></span></div><p class="small">Based on <i>Debrief</i> by Ryan L. Melvin.</p><div class="paper-actions"><button class="primary" data-action="restart">Another assignment ↗</button><button class="secondary" data-action="export">Keep the transcript ↓</button><button class="secondary" data-action="records">View records · ${history.collected.length}/6</button></div>`, 'FINAL DISPOSITION'));
   }
 }
 function stat(label,value,sub='',percent=null,warning=false) {return `<div class="stat ${warning?'warning':''}"><label>${label}</label><strong>${value}</strong><small> ${sub}</small>${percent!==null?`<div class="meter"><span style="width:${Math.min(100,Math.max(0,percent))}%"></span></div>`:''}</div>`;}
@@ -206,7 +206,7 @@ function act(action,value) {
   if(action==='eat-crop' && eatCrop(game))closeModal();
   if(action==='inspect'){
     const id=inspect(game);
-    if(id){const e=EVIDENCE[id];showModal('evidence',paper(e.title,`<p class="eyebrow">${e.code} / ${e.where.toUpperCase()}</p>${evidenceMount(id)}<p>${e.text}</p><p class="small">Retained in your private notebook. You decide what goes into the official record.</p>${canEatCrop(game)?'<button class="primary" data-action="corn">A pot is boiling on the stove. Look closer.</button>':''}<button class="primary" data-action="close">Close notebook ↗</button>`,'PRIVATE OBSERVATION'));}
+    if(id){const e=EVIDENCE[id];showModal('evidence',paper(e.title,`<p class="eyebrow">${e.code} / ${e.where.toUpperCase()}</p>${evidenceMount(id)}<p>${e.text}</p>${canEatCrop(game)?'<button class="primary" data-action="corn">Examine the boiling corn</button>':''}<button class="primary" data-action="close">Close notebook ↗</button>`,'PRIVATE OBSERVATION'));}
   }
   if(action==='debrief')beginDebrief(game);
   if(action==='restart'){closeModal();begin(game.mode);return;}
@@ -296,7 +296,7 @@ function refreshInstallGuide() {
   if(modalKind !== 'install' || !dialog.open)return;
   const button=$('install-now');
   button.hidden=isInstalled() || !installPrompt;
-  $('install-status').textContent=isInstalled() ? 'Debrief is running as an installed app.' : installPrompt ? 'Your browser is ready. Use Install now, then confirm in its installation window.' : 'Use the steps below if your browser does not offer an install button.';
+  $('install-status').textContent=isInstalled() ? 'Debrief is running as an installed app.' : installPrompt ? 'Ready to install.' : 'Install through your browser menu:';
 }
 function showInstallGuide() {
   save();
@@ -309,12 +309,12 @@ function showInstallGuide() {
       <li><b>Android:</b> Open the browser menu and choose Install app or Add to Home screen, then confirm.</li>
       <li><b>Computer:</b> Look for the install icon in the address bar or Install app in the browser menu. In Safari on Mac, use File → Add to Dock. If unavailable, try a browser that supports installation.</li>
     </ul>
-    <p class="small">Open Debrief from its new icon, then return to Settings → Install on device to protect storage there. Saves may be separate between browsers and installed apps. Let the game finish loading online before playing offline.</p>
+    <p class="small">Open the new icon once online to prepare for offline play. Browsers and installed apps may keep separate saves.</p>
     <h3>2. Protect local storage</h3>
-    <p class="small">Ask your browser to keep this site's data when freeing space. It may decide automatically without showing a permission prompt.</p>
+    <p class="small">Keep saves during automatic browser cleanup. Your browser may decide without a prompt.</p>
     <button id="protect-storage" class="secondary">Request persistent storage</button>
     <p id="storage-status" class="small" role="status" aria-live="polite">Storage protection has not been checked.</p>
-    <p class="note"><b>Your saves live only on this device.</b> Clearing browser data that includes this site's data deletes your progress and records, even with persistent storage. Clearing cached files alone normally does not erase saves. Installation is not a backup; private browsing may discard data when closed.</p>
+    <p class="note"><b>Installation is not a backup.</b> Clearing this site’s data deletes saves even with storage protection. Private browsing may discard them when closed.</p>
     <button class="primary" data-action="close">Done ↗</button>`, 'DEVICE SETUP'));
   refreshInstallGuide();
   const status=$('storage-status'), protect=$('protect-storage');
@@ -324,7 +324,7 @@ function showInstallGuide() {
   } else {
     navigator.storage.persisted().then(granted=>{
       if(!status.isConnected || protect.disabled)return;
-      status.textContent=granted ? 'Persistent storage is enabled. Manually clearing site data still deletes saves.' : 'Persistent storage is not enabled. You can request it below.';
+      status.textContent=granted ? 'Persistent storage is enabled.' : 'Persistent storage is not enabled.';
       if(granted){protect.disabled=true;protect.textContent='Storage protected';}
     }).catch(()=>{if(status.isConnected)status.textContent='Storage status could not be checked. You can try requesting protection.';});
   }
@@ -333,7 +333,7 @@ function showInstallGuide() {
     status.textContent='Requesting storage protection…';
     try {
       const granted=await navigator.storage.persist();
-      status.textContent=granted ? 'Persistent storage is enabled. Manually clearing site data still deletes saves.' : 'The browser did not grant persistent storage. You can keep playing; try again after installing and opening the app.';
+      status.textContent=granted ? 'Persistent storage is enabled.' : 'The browser did not grant persistent storage. You can keep playing; try again after installing and opening the app.';
       protect.textContent=granted ? 'Storage protected' : 'Try again';
       protect.disabled=granted;
     } catch {
@@ -349,7 +349,7 @@ function showInstallGuide() {
     try {
       await prompt.prompt();
       const choice=await prompt.userChoice;
-      if(modalKind==='install' && dialog.open)$('install-status').textContent=choice.outcome==='accepted' ? 'Installation accepted. Open the app from its icon, then request persistent storage there.' : 'Installation canceled. You can install later using your browser menu.';
+      if(modalKind==='install' && dialog.open)$('install-status').textContent=choice.outcome==='accepted' ? 'Installed. Open the new icon to play.' : 'Installation canceled. You can install later using your browser menu.';
     } catch {
       if(modalKind==='install' && dialog.open)$('install-status').textContent='Installation could not start. Follow the browser steps below.';
     }
@@ -357,7 +357,7 @@ function showInstallGuide() {
 }
 window.addEventListener('beforeinstallprompt',event=>{event.preventDefault();installPrompt=event;refreshInstallGuide();});
 $('install').addEventListener('click',showInstallGuide);
-window.addEventListener('appinstalled',()=>{installPrompt=null;refreshInstallGuide();toast('Debrief installed. Open it from its icon to protect storage.');});
+window.addEventListener('appinstalled',()=>{installPrompt=null;refreshInstallGuide();toast('Debrief installed.');});
 if ('serviceWorker' in navigator && ['https:', 'http:'].includes(location.protocol)) {
   let waitingWorker = null, applyingUpdate = false, refreshing = false;
   const showUpdate = () => {
