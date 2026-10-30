@@ -17,11 +17,17 @@
     <a class="wordmark" href="./" aria-label="Debrief home"><svg viewBox="0 0 24 32" aria-hidden="true"><path d="M12 30V5M12 14Q1 13 2 6Q12 7 12 14M12 21Q23 20 22 13Q12 14 12 21M12 28Q1 27 2 20Q12 21 12 28M12 7L8 1M12 7V0M12 7L16 1"/></svg> DEBRIEF<span class="edition">FIELD EDITION / 0.1</span></a>
     <nav aria-label="Game settings">
       <button id="update-game" class="secondary" data-update hidden>Update ready. Download?</button>
-      <button id="sound" class="quiet" aria-pressed="false">Sound off</button>
-      <button id="records" class="quiet">Records · 0/6</button>
-      <button id="manual" class="quiet">Field manual</button>
       <button id="pause" class="quiet" hidden>Pause</button>
-      <button id="install" class="quiet" hidden>Install</button>
+      <button id="game-menu-toggle" class="quiet menu-toggle" popovertarget="game-menu" aria-label="Game menu" aria-controls="game-menu"><span aria-hidden="true">⚙</span></button>
+      <div id="game-menu" popover aria-label="Game menu">
+        <div class="menu-heading">GAME MENU <button class="quiet" popovertarget="game-menu" popovertargetaction="hide" aria-label="Close game menu">✕</button></div>
+        <button id="sound" class="quiet" aria-pressed="false">Sound off</button>
+        <button id="records" class="quiet">Records · 0/6</button>
+        <button id="manual" class="quiet">Field manual</button>
+        <button id="install" class="quiet" hidden>Install</button>
+        <button id="notebook" class="notebook-button" hidden>Private notebook <span id="evidence-count">00</span></button>
+        <details class="radio" id="menu-radio" hidden><summary class="panel-heading">Radio / field notes <span class="radio-wave">＋</span></summary><ol id="radio-log"></ol></details>
+      </div>
     </nav>
   </header>
   <main>
@@ -51,8 +57,6 @@
           <div class="assignment"><p class="eyebrow">CURRENT ASSIGNMENT</p><h2 id="objective">Watch the corn.</h2><p id="objective-detail">Shoot any that try to escape.</p></div>
           <div id="stats" class="stats"></div>
           <div id="controls" class="controls"></div>
-          <details class="radio"><summary class="panel-heading">Radio / field notes <span class="radio-wave">＋</span></summary><ol id="radio-log"></ol></details>
-          <button id="notebook" class="notebook-button">Private notebook <span id="evidence-count">00</span></button>
         </aside>
       </div>
       <footer class="statusbar"><span id="control-hint">CONTAINMENT IS A MATTER OF PROCEDURE.</span><span id="save-status">LOCAL SAVE / NO ACCOUNT REQUIRED</span></footer>

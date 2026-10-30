@@ -26,3 +26,16 @@
 .tower-hud{position:absolute;right:28px;bottom:12px}.tower-hud button{padding:7px 10px;background:#20291f;color:#d8d5b4;border-color:#687052;font-size:11px}.controls:empty{display:none}
 
 .investigate-urge{position:absolute;top:23%;left:50%;transform:translateX(-50%);z-index:1;border:0;background:transparent;padding:14px 24px;color:#b05c50;font-family:Georgia,serif;font-size:var(--urge-size,26px);font-weight:var(--urge-weight,400);letter-spacing:.08em;opacity:var(--urge-opacity,0);text-shadow:0 2px 12px #100603;transition:opacity .8s linear,font-size .8s linear;font-style:normal}.investigate-urge:hover:not(:disabled),.investigate-urge:focus-visible{opacity:1;filter:none}.investigate-urge:focus-visible{outline:1px solid #b05c50;outline-offset:0}@media(prefers-reduced-motion:reduce){.investigate-urge{transition:none;font-size:34px}}
+
+/* Secondary tools stay out of the field until requested. */
+.menu-toggle{font-size:24px;line-height:1;min-width:44px;min-height:44px;border-color:var(--border)}
+#game-menu{position:fixed;inset:76px 16px auto auto;margin:0;width:300px;max-width:calc(100vw - 24px);max-height:calc(100dvh - 100px);overflow:auto;padding:12px;background:var(--surface);color:var(--ink);border:1px solid var(--border);box-shadow:0 15px 50px #0008}
+#game-menu::backdrop{background:#050e0b66}
+.menu-heading{display:flex;align-items:center;justify-content:space-between;padding-left:12px;font-size:10px;letter-spacing:1px;color:var(--muted)}
+#game-menu button{min-height:44px}
+#game-menu>.quiet{display:block;width:100%;text-align:left;font-size:12px;padding:12px}
+#game-menu .notebook-button{width:100%;margin:8px 0 0;font-size:12px}
+#game-menu .radio{min-height:0;margin-top:8px}
+#game-menu .panel-heading{min-height:44px;padding:14px 12px}
+#game-menu #radio-log{max-height:220px;padding:12px}
+@media(max-width:760px){.masthead{gap:8px}.masthead nav{align-items:center;justify-content:flex-end}.masthead .quiet{min-height:44px;min-width:44px}#game-menu{top:72px}.tower-hud button,.dpad button{min-height:44px}}

@@ -4,6 +4,10 @@ import { Renderer } from './renderer.js';
 
 const $ = id => document.getElementById(id);
 const canvas=$('field'), renderer=new Renderer(canvas), dialog=$('paper-dialog');
+const menu=$('game-menu');
+const menuOpen=()=>menu.matches(':popover-open');
+menu.addEventListener('toggle',()=>{syncAudio();if(menuOpen())save();});
+menu.addEventListener('click',event=>{if(event.target.closest('button')&&!event.target.closest('[popovertarget]'))menu.hidePopover();});
 const HISTORY_KEY=`debrief-history-v1:${new URL('.',location.href).pathname}`;
 const SAVE_KEY=`debrief-save-v1:${new URL('.',location.href).pathname}`;
 let game=null, paused=false, modalKind='', lastModalKey='', lastControlsKey='', lastLog='', lastFrame=0, lastSave=0, lastUI=0, toastTimer, installPrompt=null;
@@ -42,6 +46,7 @@ function paper(title,body,tag='PERSONNEL COPY',footer='DEPARTMENT OF AGRICULTURA
   return `<article class="paper"><button id="dialog-update" class="secondary" data-update hidden>Update ready. Download?</button><div class="paper-top"><span>STATION 04 / ${REDACTED_TOWN}, ILLINOIS<br>RESTRICTED FIELD OPERATIONS</span><span>${tag}<br>FILE NO. 04–${game?String(game.shift+1).padStart(2,'0'):'00'}</span></div><h2 id="dialog-title" tabindex="-1">${title}</h2>${body}<div class="paper-footer"><span>${footer}</span><span>KEEP FOR YOUR RECORDS</span></div></article>`;
 }
 function showModal(kind,html) {
+  if(menuOpen())menu.hidePopover();
   modalKind=kind;$('dialog-content').innerHTML=html;
   if(!dialog.open)dialog.showModal();
   $('dialog-title')?.focus({preventScroll:true});
@@ -52,6 +57,7 @@ function begin(mode,fromSave=false) {
   game=fromSave?readSave():createGame(mode);
   if(!game){toast('The saved shift could not be read. You can start a new one.');return;}
   paused=false;lastModalKey='';lastControlsKey='';lastLog='';
+  $('notebook').hidden=false;$('menu-radio').hidden=false;
   $('welcome').hidden=true;$('sidebar').hidden=false;$('pause').hidden=false;document.body.classList.add('playing');
   if(dialog.open)closeModal();updateUI(true);save();
 }
@@ -184,7 +190,7 @@ $('notebook').addEventListener('click',()=>{
 });
 canvas.addEventListener('pointermove',event=>{if(['tower','guide'].includes(game?.phase)){renderer.pointer=renderer.coords(event);game.focused=null;}});
 canvas.addEventListener('pointerdown',event=>{
-  if(!game||paused||dialog.open)return;
+  if(!game||paused||dialog.open||menuOpen())return;
   canvas.focus({preventScroll:true});
   if(game.phase==='guide'){renderer.pointer=renderer.coords(event);fire(renderer.pointer);}
   else if(game.phase==='tower'){
@@ -201,7 +207,7 @@ canvas.addEventListener('pointerdown',event=>{
 });
 function fire(p,padding=0) {const result=game.phase==='guide'?fireGuide(game,p.x,p.y):shoot(game,p.x,p.y,padding);if(!['blocked','empty'].includes(result))shotSound(result==='hit');else if(result==='empty')toast('Rifle empty. Press R or tap Reload.');updateUI();save();}
 document.addEventListener('keydown',event=>{
-  if(!game||dialog.open||event.ctrlKey||event.metaKey||event.altKey||['INPUT','SELECT','TEXTAREA'].includes(event.target.tagName))return;
+  if(!game||dialog.open||menuOpen()||event.ctrlKey||event.metaKey||event.altKey||['INPUT','SELECT','TEXTAREA'].includes(event.target.tagName))return;
   const k=event.key.toLowerCase();
   if(k==='p'||k==='escape'){event.preventDefault();togglePause();return;}
   if(paused)return;
@@ -239,7 +245,7 @@ async function initAudio() {
   }
   await audioContext.resume();return true;
 }
-function syncAudio(){if(!audioContext)return;if(!soundEnabled||paused||dialog.open||document.hidden)audioContext.suspend();else audioContext.resume().catch(()=>{});}
+function syncAudio(){if(!audioContext)return;if(!soundEnabled||paused||dialog.open||menuOpen()||document.hidden)audioContext.suspend();else audioContext.resume().catch(()=>{});}
 $('sound').addEventListener('click',async()=>{
   if(!soundEnabled){try{if(!await initAudio())return;}catch{toast('Sound could not start. You can keep playing silently.');return;}}
   soundEnabled=!soundEnabled;$('sound').textContent=soundEnabled?'Sound on':'Sound off';$('sound').setAttribute('aria-pressed',String(soundEnabled));syncAudio();
@@ -304,7 +310,7 @@ if ('serviceWorker' in navigator && ['https:', 'http:'].includes(location.protoc
 
 function frame(now) {
   const dt=lastFrame?Math.min((now-lastFrame)/1000,.1):0;lastFrame=now;
-  if(game&&!paused&&!dialog.open&&!document.hidden){
+  if(game&&!paused&&!dialog.open&&!menuOpen()&&!document.hidden){
     advance(game,dt);
     const focused=game.targets.find(t=>t.id===game.focused);if(focused)renderer.pointer={x:focused.x,y:focused.y-34};
     if(now-lastUI>100){updateUI();lastUI=now;}
