@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Update Debrief</title>
+<style>body{background:#141d18;color:#eeead2;font:18px Georgia,serif;max-width:34em;margin:15vh auto;padding:24px;line-height:1.6}button{background:#c6bd80;color:#242a1d;border:0;padding:16px;font:inherit;cursor:pointer}a{color:#c6bd80}</style>
+<h1>Update Debrief</h1>
+<p id="status" role="status">Load the latest game. Your saved shift stays on this device.</p>
+<button id="update">Load latest game</button>
+<p><a href="./">Return to the game</a></p>
+<script>
+const button = document.getElementById('update');
+const status = document.getElementById('status');
+button.onclick = async () => {
+  button.disabled = true;
+  status.textContent = 'Downloading the latest game…';
+  try {
+    const reg = await navigator.serviceWorker.register('./sw.js', { updateViaCache: 'none' });
+    await reg.update();
+    if (reg.installing) {
+      const worker = reg.installing;
+      await new Promise((resolve, reject) => {
+        const check = () => {
+          if (worker.state === 'installed' || worker.state === 'activated') resolve();
+          else if (worker.state === 'redundant') reject(new Error('Installation failed'));
+        };
+        worker.addEventListener('statechange', check);
+        check();
+      });
+    }
+    if (reg.waiting) {
+      navigator.serviceWorker.addEventListener('controllerchange', () => location.replace('./'), { once: true });
+      reg.waiting.postMessage({ type: 'SKIP_WAITING' });
+    } else location.replace('./');
+  } catch {
+    status.textContent = 'The update could not download. Check your connection and try again.';
+    button.disabled = false;
+  }
+};
+</script>
+</html>
