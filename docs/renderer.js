@@ -107,7 +107,7 @@ export class Renderer {
     for(let x=0;x<W;x+=130)line(c,x,561,x-15,600,'#080f0b',2);
     c.strokeStyle='#68705250';c.lineWidth=1;c.strokeRect(31,30,898,501);
     c.fillStyle='#bdc19d';c.font='10px monospace';c.textAlign='left';c.fillText('STATION 04  /  NORTH FIELD',47,51);
-    c.textAlign='right';c.fillText('41° —′ N   89° —′ W',913,51);
+    c.textAlign='right';c.fillText('38°00′17″ N   89°14′12″ W',913,51);
     c.textAlign='left';c.fillStyle='#a8b38d';c.fillText('N',477,42);line(c,480,49,480,62,'#a8b38d');
     if(s?.phase==='tower'&&!title) {
       const {x,y}=this.pointer;
