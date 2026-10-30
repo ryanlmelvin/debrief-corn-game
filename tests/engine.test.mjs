@@ -37,11 +37,11 @@ test('holding the post enters the map immediately with a saved notice and no aba
     assert.equal(resumed.breaches,0);
   }
 });
-test('all three standard shifts are defendable with supplied ammunition',()=>{const s=watch();for(let i=0;i<3;i++){safeWatch(s);assert.equal(s.phase,'field');assert.equal(s.breaches,0);report(s);if(s.phase==='briefing')startShift(s);}assert.equal(s.phase,'ending');});
+test('all three Story shifts are defendable with supplied ammunition',()=>{const s=watch();for(let i=0;i<3;i++){safeWatch(s);assert.equal(s.phase,'field');assert.equal(s.breaches,0);report(s);if(s.phase==='briefing')startShift(s);}assert.equal(s.phase,'ending');});
 test('movement is bounded, cardinal, and costs exposure',()=>{const s=watch();advance(s,13);enterField(s);assert.equal(move(s,-1,0),true);assert.equal(move(s,-1,0),false);assert.equal(move(s,1,1),false);assert.ok(s.exposure>0);});
 test('exhibits require reaching their location, and cannot be duplicated',()=>{const s=watch('story');safeWatch(s);enterField(s);assert.equal(inspect(s),null);walkTo(s,3,3);assert.equal(inspect(s),'ledger');assert.equal(inspect(s),null);assert.deepEqual(s.evidence,['ledger']);assert.equal(beginDebrief(s),false);walkTo(s,1,7);assert.equal(beginDebrief(s),false);investigateAll(s);assert.equal(beginDebrief(s),true);});
 test('exposure ends the investigation at 100',()=>{const s=watch();advance(s,13);enterField(s);s.exposure=99.5;move(s,1,0);assert.equal(s.ending,'assimilation');});
-test('story mode lowers crop speed and exploration costs',()=>{const a=watch('standard'),b=watch('story');advance(a,4);advance(b,4);assert.ok(b.targets[0].speed<a.targets[0].speed);advance(a,9);advance(b,9);enterField(a);enterField(b);move(a,1,0);move(b,1,0);assert.ok(b.exposure<a.exposure);});
+test('Hard mode raises crop speed and exploration costs above Story',()=>{const a=watch('hard'),b=watch('story');advance(a,4);advance(b,4);assert.ok(b.targets[0].speed<a.targets[0].speed);advance(a,9);advance(b,9);enterField(a);enterField(b);move(a,1,0);move(b,1,0);assert.ok(b.exposure<a.exposure);});
 test('debrief reports reflect actual findings',()=>{const s=watch();safeWatch(s);s.phase='debrief';answer(s,'truth');assert.match(getQuestion(s).options[0].label,/did not recover/);s.evidence.push('dress');assert.match(getQuestion(s).options[0].label,/white fabric/i);});
 test('invalid or locked responses cannot advance a debrief',()=>{const s=createGame();s.phase='debrief';s.shift=2;s.question=2;assert.equal(answer(s,'bogus'),false);assert.equal(answer(s,'expose'),false);assert.equal(s.question,2);});
 test('evidence ending requires both quantity and treatment evidence',()=>{const s=createGame();s.phase='debrief';s.shift=2;s.question=2;s.evidence=['dress','badge','teeth'];assert.equal(answer(s,'expose'),false);s.evidence.push('ledger');assert.equal(answer(s,'expose'),true);assert.equal(s.ending,'witness');});
@@ -175,7 +175,7 @@ test('old end-of-watch saves skip the removed scene and resume on the map',()=>{
 
 
 test('required nightly routes remain survivable in both modes, while detours can exhaust exposure',()=>{
-  for(const mode of ['standard','story']){
+  for(const mode of ['story','hard']){
     const s=watch(mode);
     for(let night=0;night<3;night++){safeWatch(s);investigateAll(s);assert.equal(s.phase,'field');report(s,'truth');if(s.phase==='briefing')startShift(s);}
     assert.equal(s.phase,'ending');assert.notEqual(s.ending,'assimilation');

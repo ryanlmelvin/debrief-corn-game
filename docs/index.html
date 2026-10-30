@@ -49,14 +49,12 @@
               <h1>DEBRIEF<span class="title-period">.</span></h1>
               <p class="opening">Watch the corn.<br>Shoot any that try to escape.</p>
               <div class="start-actions"><button id="new-game" class="primary">Report for duty <span>↗</span></button><button id="resume" class="secondary" hidden>Continue shift</button></div>
-              <label class="difficulty">SHIFT INTENSITY <select id="difficulty"><option value="standard">Standard</option><option value="story">Story · slower targets, lower exposure</option></select></label>
+              <label class="difficulty">SHIFT INTENSITY <select id="difficulty"><option value="story" selected>Story</option><option value="hard">Hard · faster crops, higher exposure</option></select></label>
             </div>
 
           </div>
           <div id="pause-layer" class="pause-layer" hidden><h2>Shift paused.</h2><button id="unpause" class="primary">Resume duty ↗</button></div>
           <div id="investigation-pressure" class="investigation-pressure" hidden>
-            <div class="pressure-roots" aria-hidden="true"></div>
-            <div class="pressure-echo" aria-hidden="true"><span>investigate</span><span>investigate</span></div>
             <div class="pressure-thought">
               <button id="investigate-urge" class="investigate-urge" data-action="confirm-enter" aria-label="Investigate the field now"><span>investigate</span></button>
             </div>

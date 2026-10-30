@@ -2,7 +2,7 @@
 
 A playable rural horror game based on **Debrief**, the short story by **Ryan L. Melvin**.
 
-Work three watchtower shifts. Shoot corn that tries to escape, distinguish human figures from moving crops, try to resist an intrusive urge to investigate, and choose what goes into the official debrief. The urge becomes legible just after the sighting and grows into a command. Holding your post until relief leads straight to the map with a brief notice that you could no longer resist; your later testimony remembers whether you chose to leave or were compelled. Inspect all three locations and return to the tower for debrief; your evidence changes your answers and available endings.
+Work three watchtower shifts. Shoot corn that tries to escape, distinguish human figures from moving crops, try to resist an intrusive urge to investigate, and choose what goes into the official debrief. After the sighting, roots gradually fill the stationary word “investigate” across the watchtower view. Holding your post until relief leads straight to the map with a brief notice that you could no longer resist; your later testimony remembers whether you chose to leave or were compelled. Inspect all three locations and return to the tower for debrief; your evidence changes your answers and available endings.
 
 This is a first playable adaptation, with original additional scenes and six alternate outcomes. The source manuscript has not been copied into the project. The application records and environmental anomalies are fictional story elements.
 
@@ -18,17 +18,17 @@ Open **http://localhost:4317**. To use another port: `PORT=4321 npm start`.
 
 If you fire on the recovery team, the final field view stays on screen with only “Shoot any that try to escape.” The outcome remains in Records.
 
-The game lasts roughly 8–15 minutes, depending on reading and exploration. **Story** intensity slows moving crops and reduces the exposure cost of walking.
+The game lasts roughly 8–15 minutes, depending on reading and exploration. **Story** is the default intensity and uses the former Standard balance. **Hard** makes crops 40% faster, shortens spawn intervals by 25%, and raises walking exposure by about 30%. The former easy Story setting has been removed. Existing Story and Standard saves continue as the new Story mode with their progress intact.
 
 | Action | Mouse or touch | Keyboard |
 | --- | --- | --- |
 | Fire | Click or tap a moving crop | X selects a crop; Space fires |
 | Reload | Reload button | R |
-| Travel | Tap a landmark, choose a route, then Walk & investigate | Tab between destinations; arrows/WASD for individual steps |
+| Travel | Tap a landmark, choose a route, then Walk | Tab between destinations; arrows/WASD for individual steps |
 | Inspect | Opens automatically on arrival | E |
 | Pause | Pause button | P or Escape |
 
-White figures are not targets. Six total perimeter breaches end the assignment. Leaving the tower early allows currently loose crops to escape. Investigations offer slower, lower-exposure paths or fast shortcuts through the rows. The map previews exposure before departure; walking can be stopped at any time. Each discovery opens on arrival, and the map suggests the next unread location. Inspect all three sites, then return to the tower before reaching 100 exposure. Debrief answers and retained exhibits affect the final disposition.
+People are not targets, whether they wear a white dress or recovery equipment. Six total perimeter breaches end the assignment. Leaving the tower early allows currently loose crops to escape. Investigations offer slower, lower-exposure paths or fast shortcuts through the rows. The map previews exposure before departure; walking can be stopped at any time. Each discovery opens on arrival, and the map suggests the next unread location. Inspect all three sites, then return to the tower before reaching 100 exposure. Debrief answers and retained exhibits affect the final disposition.
 
 Walking between locations brings twelve illustrated encounters across three nights: buried radios, impossible tracks, abandoned lamps, and things that follow. The walk pauses for a choice. You can always move on without extra exposure; investigating can cost exposure, uncover an aid, or change an encounter on a later night. Your choices go into the notebook, mark the map, and can become testimony in the debrief. Mid-encounter saves preserve the choice and destination, including after an update.
 
@@ -71,14 +71,15 @@ The game-rule tests cover ammunition, shooting, civilian encounters, timing, con
 | `docs/engine.js` | Game rules, branching narrative, save validation |
 | `docs/field.js` / `docs/field-ui.js` | Route planning, exposure previews, responsive touch investigation map |
 | `docs/encounters.js` | Between-location scenes, choices, consequences, and field notes |
-| `docs/renderer.js` | Procedural canvas landscape, moving targets, field survey |
+| `docs/renderer.js` | Layered canvas landscape, illustrated actors, root motion and field survey |
+| `docs/watch-story.js` | Nightly sightings, crop anatomy, and retrieval-team light timing |
 | `docs/app.js` | Controls, paper documents, audio, saving, installation |
 | `docs/style.css` | Responsive interface and typography |
 | `docs/sw.js` | Versioned offline cache |
 | `docs/manifest.webmanifest` | Installable app metadata |
 | `DESIGN.md` | Adaptation choices and proposed next iteration |
 
-The original landscape is drawn in code. Custom field photographs, nine specimen studies, notebook and survey textures, and station props are bundled locally in `docs/assets/`. The private notebook has an exhibit index and pages; discovered evidence keeps its own study and location image. The map uses a worn survey sheet and drawn landmarks, and briefings and interviews use illustrated station equipment. Asset prompts are recorded in `ASSET-PROMPTS.md`; three additional encounter plates and their prompts are documented in `ENCOUNTER-ART.md`. Fonts use the system’s installed serif and monospace families. No font service, CDN, analytics, or external network call is used during play.
+The original landscape is drawn in code. Custom moving crop and retrieval-team sprites, field photographs, nine specimen studies, notebook and survey textures, and station props are bundled locally in `docs/assets/`. The private notebook has an exhibit index and pages; discovered evidence keeps its own study and location image. The map uses a worn survey sheet and drawn landmarks, and briefings and interviews use illustrated station equipment. Asset prompts are recorded in `ASSET-PROMPTS.md`; three additional encounter plates and their prompts are documented in `ENCOUNTER-ART.md`. Fonts use the system’s installed serif and monospace families. No font service, CDN, analytics, or external network call is used during play.
 
 ## Inspiration
 

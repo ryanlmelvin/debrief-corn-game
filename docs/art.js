@@ -3,13 +3,14 @@ import { currentEncounter, encounterById } from './encounters.js';
 
 const escape = value => String(value).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 export const FIELD_ART = {
-  corner: { file: 'field-corner', caption: 'Northeast corner / first field impression', alt: 'Torn white cotton caught in a corn stalk beside the perimeter fence.' },
-  pump: { file: 'field-pump', caption: 'Pump house / treatment station', alt: 'A dim pump shed with rusting pipes, treatment drums and an old ledger.' },
-  drain: { file: 'field-drain', caption: 'Drainage channel / below the root line', alt: 'Pale roots spread across a muddy drainage ditch and dark water.' },
-  tower: { file: 'station-kit', caption: 'Station 04 / issued equipment', alt: 'A worn field radio, binoculars, pocket notebook and brass cartridges on the tower sill.' },
-  sighting: { file: 'field-sighting', caption: 'Northeast perimeter / something moved', alt: 'A distant pale human figure disappears between corn rows, seen from the watchtower.' },
-  stove: { file: 'pump-stove', caption: 'Pump house / do not consume the crop', alt: 'Corn steams on a camping stove beside a clean plate, butter and salt in the dirty pump shed.' },
-  debrief: { file: 'debrief-desk', caption: 'Interview room / recording in progress', alt: 'A reel-to-reel recorder and blank report sheets on a worn desk under lamplight.' }
+  corner: { file: 'field-corner', alt: 'Torn white cotton caught in a corn stalk beside the perimeter fence.' },
+  pump: { file: 'field-pump', alt: 'A dim pump shed with rusting pipes, treatment drums and an old ledger.' },
+  drain: { file: 'field-drain', alt: 'Pale roots spread across a muddy drainage ditch and dark water.' },
+  tower: { file: 'station-kit', alt: 'A worn field radio, binoculars, pocket notebook and brass cartridges on the tower sill.' },
+  retrieval: { file: 'field-retrieval', alt: 'Three recovery workers in worn field clothing enter the corn, each carrying a light.' },
+  sighting: { file: 'field-sighting', alt: 'A distant pale human figure disappears between corn rows, seen from the watchtower.' },
+  stove: { file: 'pump-stove', alt: 'Corn steams on a camping stove beside a clean plate, butter and salt in the dirty pump shed.' },
+  debrief: { file: 'debrief-desk', alt: 'A reel-to-reel recorder and blank report sheets on a worn desk under lamplight.' }
 };
 export const SPECIMENS = {
   dress: { cell: 0, site: 'corner' }, ledger: { cell: 1, site: 'pump' }, roots: { cell: 2, site: 'drain' },
@@ -17,17 +18,17 @@ export const SPECIMENS = {
   map: { cell: 6, site: 'drain' }, water: { cell: 7, site: 'drain' }, glove: { cell: 8, site: 'pump' }
 };
 
-export function scenePlate(site, caption = FIELD_ART[site]?.caption) {
+export function scenePlate(site) {
   const art = FIELD_ART[site];
   if (!art) return '';
-  return `<figure class="scene-plate"><img src="./assets/${art.file}.webp" alt="${art.alt}" width="1200" height="800">${caption?`<figcaption>${escape(caption)}</figcaption>`:''}</figure>`;
+  return `<figure class="scene-plate"><img src="./assets/${art.file}.webp" alt="${art.alt}" width="1200" height="800"></figure>`;
 }
 
 export function specimenStudy(id) {
   const specimen = SPECIMENS[id], evidence = EVIDENCE[id];
   if (!specimen || !evidence) return '';
   const x = specimen.cell % 3, y = Math.floor(specimen.cell / 3);
-  return `<figure class="specimen-study"><div class="specimen-drawing" role="img" aria-label="Field sketch: ${escape(evidence.title)}" style="background-position:${x * 50}% ${y * 50}%"></div><figcaption>${escape(evidence.code)} / FIELD STUDY</figcaption></figure>`;
+  return `<figure class="specimen-study"><div class="specimen-drawing" role="img" aria-label="Field sketch: ${escape(evidence.title)}" style="background-position:${x * 50}% ${y * 50}%"></div></figure>`;
 }
 
 export function evidenceMount(id) {
@@ -36,10 +37,11 @@ export function evidenceMount(id) {
 }
 
 export function dialogArtwork(kind, shift = 0) {
-  if (kind === 'debrief') return `<div class="interview-scene">${scenePlate('debrief', '')}<span class="recording-label"><i></i> REC / TAPE 0${shift + 1}</span></div>`;
-  if (['briefing', 'manual', 'guide-intro'].includes(kind)) return scenePlate('tower');
-  if (kind === 'sighting') return scenePlate('sighting');
-  if (['ending', 'records'].includes(kind)) return scenePlate('debrief', 'Station archive / retained copy');
+  if (kind === 'debrief') return `<div class="interview-scene">${scenePlate('debrief')}<span class="recording-label"><i></i> REC / TAPE 0${shift + 1}</span></div>`;
+  if (kind === 'guide-intro') return scenePlate('retrieval');
+  if (['briefing', 'manual'].includes(kind)) return scenePlate('tower');
+  if (kind === 'sighting') return scenePlate(shift > 0 ? 'retrieval' : 'sighting');
+  if (['ending', 'records'].includes(kind)) return scenePlate('debrief');
   if (kind === 'corn') return scenePlate('stove');
   return '';
 }
@@ -61,21 +63,20 @@ export function notebookMarkup(game, requestedPage = 0) {
   if (!pages.length) pages.push('empty');
   const page = Math.max(0, Math.min(pages.length - 1, Number(requestedPage) || 0)), id = pages[page];
   let content;
-  if (id === 'empty') content = `${scenePlate('tower')}<h3>A place for what you saw.</h3><p>The pages are still empty.</p>`;
+  if (id === 'empty') content = `${scenePlate('tower')}`;
   else if (id === 'testimony') content = `<h3>What went on record.</h3><div class="notebook-testimony">${game.reports.map(r => `<section><p class="eyebrow">SHIFT 0${r.shift + 1}</p><h4>${escape(r.question)}</h4><p>${r.redacted ? '<span class="withheld-note">Observation withheld</span> ' : ''}${escape(r.answer)}</p>${r.supervisorReply ? `<p class="pencil-note">Supervisor: ${escape(r.supervisorReply)}</p>` : ''}</section>`).join('')}</div>`;
-  else if(id==='encounters')content=`<p class="eyebrow">BETWEEN THE ROWS / PRIVATE OBSERVATIONS</p><h3>What happened on the walk.</h3><div class="notebook-encounters">${game.fieldEvents.journal.map(j=>{const e=encounterById(j.id),c=e.choices.find(c=>c.id===j.choice);return `<section><p class="eyebrow">NIGHT 0${e.night+1} · CROSSING ${j.x+1}, ${j.y+1}</p><h4>${escape(e.title)}</h4><p>${escape(e.report)}</p><p class="pencil-note">${escape(c.label)} ${escape(c.result)}</p></section>`;}).join('')}</div>`;
+  else if(id==='encounters')content=`<h3>Between the rows.</h3><div class="notebook-encounters">${game.fieldEvents.journal.map(j=>{const e=encounterById(j.id),c=e.choices.find(c=>c.id===j.choice);return `<section><p class="eyebrow">NIGHT 0${e.night+1} · CROSSING ${j.x+1}, ${j.y+1}</p><h4>${escape(e.title)}</h4><p>${escape(e.report)}</p><p class="pencil-note">${escape(c.label)} ${escape(c.result)}</p></section>`;}).join('')}</div>`;
   else {
     const e = EVIDENCE[id];
     content = `<p class="eyebrow">${escape(e.code)} / ${escape(e.where)}</p><h3>${escape(e.title)}</h3>${evidenceMount(id)}<p class="handwritten-observation">${escape(e.text)}</p>`;
   }
-  return `<article class="field-notebook"><header class="notebook-header"><div><p class="eyebrow">STATION 04 / PERSONAL EFFECTS</p><h2 id="dialog-title" tabindex="-1">Private notebook.</h2></div><button class="notebook-close" data-action="close" aria-label="Close notebook">×</button></header><button id="dialog-update" class="secondary" data-update hidden>Update ready. Download?</button><div class="notebook-spread"><aside class="notebook-index"><span class="notebook-label">FIELD NOTES</span><p class="pencil-note">Write it down.<br>Before it changes.</p><nav aria-label="Notebook pages">${pages.map((entry, i) => `<button data-action="notebook-page" data-value="${i}" ${i === page ? 'aria-current="page"' : ''}><span>${String(i + 1).padStart(2, '0')}</span>${entry === 'empty' ? 'Unwritten' : entry === 'testimony' ? 'Previous testimony' : entry === 'encounters' ? 'Between the rows' : escape(EVIDENCE[entry].title)}</button>`).join('')}</nav><span class="notebook-private">DO NOT FILE</span></aside><section class="notebook-leaf">${content}<footer class="notebook-pagination"><button data-action="notebook-page" data-value="${page - 1}" ${page === 0 ? 'disabled' : ''} aria-label="Previous notebook page">← Previous</button><span>PAGE ${String(page + 1).padStart(2, '0')} / ${String(pages.length).padStart(2, '0')}</span><button data-action="notebook-page" data-value="${page + 1}" ${page === pages.length - 1 ? 'disabled' : ''} aria-label="Next notebook page">Next →</button></footer></section></div></article>`;
+  return `<article class="field-notebook"><header class="notebook-header"><div><h2 id="dialog-title" tabindex="-1">Private notebook.</h2></div><button class="notebook-close" data-action="close" aria-label="Close notebook">×</button></header><button id="dialog-update" class="secondary" data-update hidden>Update ready. Download?</button><div class="notebook-spread"><aside class="notebook-index"><p class="pencil-note">Write it down.<br>Before it changes.</p><nav aria-label="Notebook pages">${pages.map((entry, i) => `<button data-action="notebook-page" data-value="${i}" ${i === page ? 'aria-current="page"' : ''}><span>${String(i + 1).padStart(2, '0')}</span>${entry === 'empty' ? 'Unwritten' : entry === 'testimony' ? 'Previous testimony' : entry === 'encounters' ? 'Between the rows' : escape(EVIDENCE[entry].title)}</button>`).join('')}</nav></aside><section class="notebook-leaf">${content}<footer class="notebook-pagination"><button data-action="notebook-page" data-value="${page - 1}" ${page === 0 ? 'disabled' : ''} aria-label="Previous notebook page">←</button><span>${String(page + 1).padStart(2, '0')} / ${String(pages.length).padStart(2, '0')}</span><button data-action="notebook-page" data-value="${page + 1}" ${page === pages.length - 1 ? 'disabled' : ''} aria-label="Next notebook page">→</button></footer></section></div></article>`;
 }
 
 const encounterAlt={radio:'A scratched field radio half buried in wet soil between corn rows.',tracks:'Two trails of boot prints lead toward pale roots and a dirty survey ribbon.',lantern:'An oil lantern lights a corn row with an indistinct human shape beyond it.'};
 export function encounterMarkup(game) {
   const e=currentEncounter(game);if(!e)return '';
-  const pending=game.fieldEvents.pending,chosen=e.choices.find(c=>c.id===pending.choice),entry=game.fieldEvents.journal.find(j=>j.id===e.id);
-  const effect=delta=>delta>0?`+${delta} exposure${game.exposure+delta>=100?' · reaches 100':''}`:delta<0?`Recover ${-delta} exposure`:'No extra exposure';
-  const impact=entry?(entry.delta>0?`+${entry.delta.toFixed(0)} exposure`:entry.delta<0?`${entry.delta.toFixed(0)} exposure`:'Exposure unchanged'):'';
-  return `<article class="encounter-sheet"><div class="encounter-image"><img src="./assets/encounter-${e.art}.webp" alt="${encounterAlt[e.art]}" width="1536" height="1024"><span>NIGHT 0${game.shift+1} / BETWEEN THE ROWS</span></div><div class="encounter-copy"><button id="dialog-update" class="secondary" data-update hidden>Update ready. Download?</button><p class="eyebrow">${chosen?'PRIVATE OBSERVATION RETAINED':'YOUR WALK HAS STOPPED'} · EXPOSURE ${Math.floor(game.exposure)} / 100</p><h2 id="dialog-title" tabindex="-1">${escape(e.title)}</h2><p class="encounter-story">${escape(chosen?chosen.result:e.text)}</p>${chosen?`<p class="encounter-impact">${escape(impact)} · Saved in your field notes</p><div class="encounter-outcome"><button class="primary" data-action="encounter-continue">${game.fieldEvents.journey?'Continue walking →':'Back to the field →'}</button>${game.fieldEvents.journey?'<button class="secondary" data-action="encounter-map">Recheck the map</button>':''}</div>`:`<div class="encounter-choices">${e.choices.map(c=>`<button class="choice" data-action="encounter-choice" data-value="${c.id}"><span>${escape(c.label)}</span><small class="${c.delta>0?'encounter-cost':''}">${effect(c.delta)}${c.requires?' · Uses what you found earlier':''}</small></button>`).join('')}</div><p class="encounter-hint">The field can wait. Choose when you are ready.</p>`}</div></article>`;
+  const pending=game.fieldEvents.pending,chosen=e.choices.find(c=>c.id===pending.choice);
+  const effect=delta=>delta>0?`+${delta} exposure${game.exposure+delta>=100?' · reaches 100':''}`:delta<0?`−${-delta} exposure`:'0 exposure';
+  return `<article class="encounter-sheet"><div class="encounter-image"><img src="./assets/encounter-${e.art}.webp" alt="${encounterAlt[e.art]}" width="1536" height="1024"></div><div class="encounter-copy"><button id="dialog-update" class="secondary" data-update hidden>Update ready. Download?</button><p class="eyebrow">EXPOSURE ${Math.floor(game.exposure)} / 100</p><h2 id="dialog-title" tabindex="-1">${escape(e.title)}</h2><p class="encounter-story">${escape(chosen?chosen.result:e.text)}</p>${chosen?`<div class="encounter-outcome"><button class="primary" data-action="encounter-continue">${game.fieldEvents.journey?'Continue →':'Return →'}</button>${game.fieldEvents.journey?'<button class="secondary" data-action="encounter-map">Map</button>':''}</div>`:`<div class="encounter-choices">${e.choices.map(c=>`<button class="choice" data-action="encounter-choice" data-value="${c.id}"><span>${escape(c.label)}</span><small class="${c.delta>0?'encounter-cost':''}">${effect(c.delta)}</small></button>`).join('')}</div>`}</div></article>`;
 }
