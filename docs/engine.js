@@ -1,4 +1,4 @@
-import { SIGHTING_TIME, sightingPeople, watchNight, personRole, personExitTime, observedSighting } from './watch-story.js';
+import { SIGHTING_TIME, sightingPeople, watchNight, personExitTime, observedSighting } from './watch-story.js';
 import { startGuide, advanceGuide, guideDisposition } from './guide.js';
 import { fieldStepCost } from './field.js';
 import { freshFieldEvents, encounterAfterStep, resolveEncounter, dismissEncounter, migrateFieldEvents, validFieldEvents, encounterById } from './encounters.js';
@@ -117,7 +117,7 @@ export function reload(s) {
   s.reload = 1.65; addLog(s, 'Reloading…'); return true;
 }
 export function targetAt(s, x, y, padding = 0) {
-  return [...s.targets].reverse().find(t => ((x-t.x)/(24+padding))**2 + ((y-(t.y-34))/(45+padding))**2 <= 1);
+  return [...s.targets].reverse().find(t => t.kind === 'corn' && ((x-t.x)/(24+padding))**2 + ((y-(t.y-34))/(45+padding))**2 <= 1);
 }
 export function shoot(s, x, y, padding = 0) {
   if (s.phase !== 'tower' || s.reload > 0) return 'blocked';
@@ -126,12 +126,6 @@ export function shoot(s, x, y, padding = 0) {
   const target = targetAt(s, x, y, padding);
   if (!target) return 'miss';
   s.targets = s.targets.filter(t => t.id !== target.id);
-  if (target.kind === 'person') {
-    s.trust -= 2; s.exposure = Math.min(100, s.exposure + 14);
-    if (!s.searched.includes('figure-shot')) s.searched.push('figure-shot');
-    addLog(s, personRole(s.shift,target)==='retrieval'?'A recovery worker falls into the rows. A light drops. Your radio stays silent.':'The white figure folds into the rows. Your radio stays silent.', 'story');
-    return 'person';
-  }
   s.kills++; addLog(s, 'Mobile crop contained.'); return 'hit';
 }
 export function focusNext(s) {

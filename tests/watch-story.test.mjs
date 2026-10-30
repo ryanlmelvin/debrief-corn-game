@@ -42,9 +42,9 @@ test('third-night lights fade once, sequentially, before their workers disappear
 
 test('retrieval workers stay civilians and never count as escaped crops',()=>{
   const s=watch(1);advance(s,13);const worker=s.targets.find(t=>t.kind==='person');
-  assert.equal(shoot(s,worker.x,worker.y-34),'person');assert.equal(s.kills,0);
-  assert.equal(s.targets.filter(t=>t.kind==='person').length,2);assert.equal(s.exposure,14);
-  assert.match(s.log[0].message,/recovery worker falls/);
+  assert.equal(shoot(s,worker.x,worker.y-34),'miss');assert.equal(s.kills,0);
+  assert.equal(s.targets.filter(t=>t.kind==='person').length,3);assert.equal(s.exposure,0);
+  assert.ok(s.targets.includes(worker));
   const loose=s.targets.filter(t=>t.kind==='corn').length;enterField(s);
   assert.equal(s.breaches,loose);
 });
