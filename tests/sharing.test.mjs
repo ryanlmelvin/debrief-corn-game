@@ -65,3 +65,22 @@ test('unavailable or blocked clipboard offers manual copying; invalid endings do
     assert.equal(await shareEnding(ending, { share: () => assert.fail() }), 'unavailable');
   }
 });
+
+test('share progress counts unique discovered endings including the current ending', () => {
+  assert.equal(endingShareData('consumption', []).text, "I ate the corn.\nI've found 1 of 7 endings.");
+  const collected = ['witness', 'witness', 'compliance', 'unknown', '__proto__'];
+  const data = endingShareData('consumption', collected);
+  assert.equal(data.text, "I ate the corn.\nI've found 3 of 7 endings.");
+  assert.equal(collected.length, 5, 'sharing must not change the saved collection');
+  assert.match(endingShareData('witness', Object.keys(ENDINGS)).text, /7 of 7 endings/);
+  assert.equal(data.url, endingShareData('consumption').url, 'collection progress belongs in the message');
+});
+
+test('native sharing and clipboard fallback both include collection progress', async () => {
+  const collected = ['witness', 'consumption', 'breach'];
+  let shared, copied;
+  await shareEnding('witness', { share: async data => { shared = data; } }, collected);
+  await shareEnding('witness', { clipboard: { writeText: async text => { copied = text; } } }, collected);
+  assert.equal(shared.text, "I kept the receipts.\nI've found 3 of 7 endings.");
+  assert.equal(copied, `${shared.text}\n${shared.url}`);
+});

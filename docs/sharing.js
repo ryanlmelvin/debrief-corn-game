@@ -10,14 +10,19 @@ export const ENDING_SHARES = {
   consumption: { code: '07', line: 'I ate the corn.', art: 'pump-stove', alt: 'Corn boils on a camping stove beside a plate and butter.' }
 };
 
-export function endingShareData(ending) {
+export function endingShareData(ending, collected = null) {
   if (!Object.hasOwn(ENDING_SHARES, ending)) return null;
   const card = ENDING_SHARES[ending];
-  return { title: `${card.line} — DEBRIEF`, text: card.line, url: `${SHARE_ROOT}share/${card.code}/` };
+  let text = card.line;
+  if (Array.isArray(collected)) {
+    const found = new Set([...collected, ending].filter(id => Object.hasOwn(ENDING_SHARES, id))).size;
+    text += `\nI've found ${found} of ${Object.keys(ENDING_SHARES).length} endings.`;
+  }
+  return { title: `${card.line} — DEBRIEF`, text, url: `${SHARE_ROOT}share/${card.code}/` };
 }
 
-export async function shareEnding(ending, platform = navigator) {
-  const data = endingShareData(ending);
+export async function shareEnding(ending, platform = navigator, collected = null) {
+  const data = endingShareData(ending, collected);
   if (!data) return 'unavailable';
   if (typeof platform.share === 'function') {
     try {

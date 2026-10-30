@@ -368,12 +368,13 @@ async function shareDisposition(ending) {
   if(sharingEnding)return;
   sharingEnding=true;
   save();
+  const collected=[...history.collected];
   try {
-    const result=await shareEnding(ending);
+    const result=await shareEnding(ending,navigator,collected);
     if(result==='copied')toast('Ending and link copied. Paste them into a message.');
     if(result==='manual'){
-      const data=endingShareData(ending);
-      showModal('share',paper('Pass it on.',`<p>${esc(data.text)}</p><p class="small">Copy this link into a message to share your ending.</p><input class="share-link" aria-label="Ending link" readonly value="${esc(data.url)}"><div class="paper-actions"><button class="secondary" data-action="select-share-link">Select link</button><button class="primary" data-action="close">Back to assignment ↗</button></div>`,'SHARE YOUR ENDING'));
+      const data=endingShareData(ending,collected);
+      showModal('share',paper('Pass it on.',`<p class="small">Copy this message and link to share your ending.</p><textarea class="share-link" aria-label="Ending message and link" rows="5" readonly>${esc(data.text+'\n'+data.url)}</textarea><div class="paper-actions"><button class="secondary" data-action="select-share-link">Select message</button><button class="primary" data-action="close">Back to assignment ↗</button></div>`,'SHARE YOUR ENDING'));
     }
   } finally { sharingEnding=false; }
 }
