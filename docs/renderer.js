@@ -105,7 +105,8 @@ export class Renderer {
     }
     line(c,0,553.5,W,553.5,'#71745166');
   }
-  paintLandscape(c) {
+  paintLandscape(c,farmLightsOn=true) {
+    this.farmLightsOn=farmLightsOn;
     const random=rng(40130);
     this.cropRows=[];
     const sky=c.createLinearGradient(0,0,0,310); sky.addColorStop(0,'#101e1d'); sky.addColorStop(.55,'#3f5149'); sky.addColorStop(1,'#b2a875');
@@ -122,7 +123,7 @@ export class Renderer {
     // A distant farm, treatment silo and utility lines at the horizon.
     c.fillStyle='#192c24'; c.fillRect(641,217,95,39);
     c.beginPath(); c.moveTo(630,217); c.lineTo(689,181); c.lineTo(746,217); c.fill();
-    c.fillStyle='#af9a57'; c.fillRect(679,226,8,13);c.fillRect(702,226,8,13);
+    c.fillStyle=farmLightsOn?'#af9a57':'#0e1712'; c.fillRect(679,226,8,13);c.fillRect(702,226,8,13);
     c.fillStyle='#253a30'; c.fillRect(757,198,25,61);c.beginPath();c.ellipse(769.5,198,12.5,9,0,0,Math.PI*2);c.fill();
     c.fillStyle='#283c32'; c.fillRect(300,182,33,36);c.beginPath();c.ellipse(316.5,182,16.5,5,0,0,Math.PI*2);c.fill();
     for(const x of [304,329]) line(c,x,214,x-5,261,'#25382d',3);
@@ -193,6 +194,10 @@ export class Renderer {
     if(s?.phase==='guide'||isGuideAftermath(s)) { this.drawGuide(s); return; }
     if(s?.phase==='field') { this.drawMap(s); return; }
     const active=s&&!title;
+    // The third briefing reports the outage. Repaint both cached landscapes
+    // once so the windows stay dark with moving crops and after restoring a save.
+    const farmLightsOn=!active||s.shift<2;
+    if(this.farmLightsOn!==farmLightsOn)this.paintLandscape(this.background.getContext('2d'),farmLightsOn);
     if(this.trackScene!==s||this.trackShift!==s?.shift||s?.time<this.trackTime) this.groundTracks=[];
     this.trackScene=s;this.trackShift=s?.shift;this.trackTime=s?.time;
     this.groundTracks=active?updateGroundTracks(this.groundTracks||[],s.targets,s.time):[];
