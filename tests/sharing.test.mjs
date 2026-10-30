@@ -90,7 +90,7 @@ test('only the full-team outcome gets the sheriff caption and its matching previ
   const line = 'I shot the sheriff. And the deputy. And some third guy.';
   const full = endingShareData('guide', ['guide', 'consumption'], 'PERIMETER SECURED');
   assert.equal(full.text, `${line}\nI've found 2 of 10 endings.`);
-  assert.equal(full.url, 'https://ryanlmelvin.github.io/debrief-corn-game/share/02-team/');
+  assert.equal(full.url, 'https://ryanlmelvin.github.io/debrief-corn-game/share/10/');
   assert.equal(endingShareData('guide', null, 'RECOVERY INCOMPLETE').text, ENDING_SHARES.guide.line);
   assert.equal(endingShareData('guide', null, 'PERSONNEL INCIDENT').text, ENDING_SHARES.guide_arrested.line);
   assert.equal(endingShareData('guide_shot').text, GUIDE_TEAM_SHARE.line);
@@ -104,7 +104,7 @@ test('only the full-team outcome gets the sheriff caption and its matching previ
   assert.ok(page.includes(`<meta property="og:title" content="${full.title}">`));
   assert.ok(page.includes(`<meta property="og:image" content="${full.url}preview.jpg">`));
   assert.ok(page.includes(`<h1>${line}</h1>`));
-  const jpg = readFileSync(new URL('../docs/share/02-team/preview.jpg', import.meta.url));
+  const jpg = readFileSync(new URL('../docs/share/10/preview.jpg', import.meta.url));
   assert.equal(jpg.readUInt16BE(0), 0xffd8);
 });
 

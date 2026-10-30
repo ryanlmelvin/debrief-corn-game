@@ -3,7 +3,7 @@ export const SHARE_ROOT = 'https://ryanlmelvin.github.io/debrief-corn-game/';
 export const ENDING_SHARES = {
   witness: { code: '01', line: 'I kept the receipts.', art: 'debrief-desk', alt: 'A lamp lights a tape recorder and papers on a desk.' },
   guide: { code: '02', line: 'I took the scenic route.', art: 'encounter-lantern', alt: 'A lantern waits between the corn rows.' },
-  guide_shot: { code: '02-team', line: 'I shot the sheriff. And the deputy. And some third guy.', art: 'encounter-unattended-lamp', alt: 'An unattended lantern and an open equipment case among the corn rows.' },
+  guide_shot: { code: '10', line: 'I shot the sheriff. And the deputy. And some third guy.', art: 'encounter-unattended-lamp', alt: 'An unattended lantern and an open equipment case among the corn rows.' },
   guide_arrested: { code: '08', line: 'I made it a police matter.', art: 'encounter-unattended-lamp', alt: 'An unattended lantern and an open equipment case among the corn rows.' },
   guide_interrupted: { code: '09', line: 'I went off script.', art: 'debrief-desk', alt: 'A lamp lights a tape recorder and papers on a desk.' },
   compliance: { code: '03', line: 'I was just following orders.', art: 'field-sighting', alt: 'Corn stands beyond the watchtower at night.' },
