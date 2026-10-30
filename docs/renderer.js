@@ -48,6 +48,13 @@ export function aimProjection(point,view,targets=[]) {
   const anchor=target||{x:point.x,y:point.y+34},p=targetProjection(anchor,view);
   return {x:p.x+(point.x-anchor.x)*p.size,y:p.y+(point.y-anchor.y)*p.size};
 }
+// Aim assistance must only select a person the current crop actually shows.
+export function visibleGuideTarget(guide,target,view) {
+  const p=projectGuide(guide,target);
+  if(!p)return null;
+  const aimY=p.y-p.height*.5;
+  return p.x>=view.left&&p.x<=view.left+view.width&&aimY>=view.top&&aimY<=view.top+view.height?p:null;
+}
 // Cosmetic tracks follow simulation time, so pausing never advances or erases them.
 // They are deliberately separate from saves and cannot alter containment or aim.
 export function updateGroundTracks(tracks,targets,time) {
@@ -417,8 +424,6 @@ export class Renderer {
     }
     const vignette=c.createRadialGradient(480,320,40,480,320,480);vignette.addColorStop(0,'#02080500');vignette.addColorStop(.65,'#02080560');vignette.addColorStop(1,'#020805f2');c.fillStyle=vignette;c.fillRect(0,0,W,H);
     c.fillStyle='#afba98';c.font='11px monospace';c.textAlign='left';
-    const compass=['E','S','W','N'][((Math.round(g.angle/(Math.PI/2))%4)+4)%4];
-    if(!aftermath)c.fillText(`RECOVERY DETAIL  /  ${compass}`,this.view.left+18,this.view.top+110);
     if(g.stage==='escape'){
       if(!aftermath){
       const p=this.pointer;c.strokeStyle='#d6cfad';c.lineWidth=1;c.beginPath();c.arc(p.x,p.y,10,0,Math.PI*2);c.stroke();
@@ -428,9 +433,6 @@ export class Renderer {
       }
       c.fillStyle='#191f18';c.beginPath();c.moveTo(620,600);c.lineTo(493,401);c.lineTo(483,401);c.lineTo(535,600);c.fill();
     }
-    c.fillStyle='#d4d2b7';c.font='15px Georgia';c.textAlign='center';
-    const words=(aftermath?'':g.message).split(' ');let row='',y=Math.min(490,this.view.top+this.view.height-150);
-    for(const word of words){if(c.measureText(row+word).width>Math.min(730,this.view.width-36)){c.fillText(row,480,y);y+=22;row='';}row+=word+' ';}c.fillText(row,480,y);
     c.restore();
   }
   coords(event) {
@@ -448,6 +450,16 @@ export class Renderer {
     }
     if(this.scene?.phase==='field'&&this.mapView)
       return {x:(point.x-this.mapView.left)/this.mapView.scale,y:(point.y-this.mapView.top)/this.mapView.scale};
+    if(this.scene?.phase==='guide'&&event.pointerType==='touch') {
+      // A distant lamp is smaller than a fingertip. Keep the same 44px touch
+      // target as the tower, while leaving mouse aim and game rules precise.
+      const radius=22/view.scale;
+      const target=this.scene.guide.team.filter(t=>t.status==='running')
+        .map(t=>visibleGuideTarget(this.scene.guide,t,view)).filter(Boolean)
+        .filter(p=>Math.abs(point.x-p.x)<=Math.max(18,p.width/2,radius)&&Math.abs(point.y-(p.y-p.height*.5))<=Math.max(p.height/2,radius))
+        .sort((a,b)=>a.distance-b.distance)[0];
+      if(target)return {x:target.x,y:target.y-target.height*.5};
+    }
     return point;
   }
 }

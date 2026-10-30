@@ -12,6 +12,8 @@
   <link rel="stylesheet" href="./style.css">
   <link rel="stylesheet" href="./art.css">
   <link rel="stylesheet" href="./field-kit.css">
+  <link rel="stylesheet" href="./mobile.css">
+  <link rel="stylesheet" href="./pager.css">
   <script type="module" src="./app.js"></script>
 </head>
 <body>
@@ -26,15 +28,13 @@
       <div id="game-menu" popover aria-label="Game menu">
         <div class="menu-heading">FIELD KIT / 04 <button class="quiet" popovertarget="game-menu" popovertargetaction="hide" aria-label="Close game menu">✕</button></div>
         <button id="sound" class="quiet" aria-pressed="false">Sound off</button>
-        <button id="records" class="quiet">Records · 0/6</button>
+        <button id="records" class="quiet">Records</button>
         <button id="manual" class="quiet">Field manual</button>
-        <details class="about-game"><summary>About Debrief</summary><p>An interactive adaptation of the short story by Ryan L. Melvin.</p><p>Three shifts · about 10 minutes. Headphones optional.</p><p>Saves stay in this browser or app. Clearing site data deletes them; installation is not a backup.</p>      <div class="station-bar"><span><i class="status-light"></i> STATION 04 <span class="bar-divider">/</span> <span class="station-location"><span class="censor-bar" role="img" aria-label="Town name redacted"></span>, ILLINOIS</span> <span class="bar-divider">/</span> <span id="station-status">FIELD OPERATIONS</span></span><span id="date-label">OCTOBER, <span class="redaction">████</span></span></div></details>
+        <button id="about" class="quiet">About Debrief</button>
         <button id="install" class="quiet">Install on device</button>
-<details class="about-game" id="assignment-info"><summary>Assignment details</summary>          <div class="panel-heading"><span id="phase-label">WATCHTOWER</span><span id="shift-number">01 / 03</span></div>
-          <div class="assignment"><h2 id="objective">Watch the corn.</h2><p id="objective-detail">Shoot any that try to escape.</p></div>
-</details>
-        <button id="notebook" class="notebook-button" hidden>Private notebook <span id="evidence-count">00</span></button>
-        <details class="radio" id="menu-radio" hidden><summary class="panel-heading">Radio / field notes <span class="radio-wave">＋</span></summary><ol id="radio-log"></ol></details>
+        <button id="assignment" class="quiet" hidden>Assignment</button>
+        <button id="notebook" class="notebook-button" hidden>Notebook <span id="evidence-count">00</span></button>
+        <button id="menu-radio" class="quiet" hidden>Radio / field notes</button>
       </div>
     </nav>
   </header>
@@ -43,12 +43,14 @@
       <div class="workspace">
         <section class="viewport" aria-label="North field">
           <canvas id="field" width="960" height="600" tabindex="0" aria-label="Watchtower shooting gallery. Click moving corn to fire. Press X to select a crop, Space to fire, R to reload."></canvas>
+          <div id="guide-message" class="guide-message" role="status" hidden></div>
           <section id="field-exploration" class="field-exploration" aria-label="Field investigation map" hidden></section>
           <div id="welcome" class="welcome">
             <div class="welcome-content">
               <h1>DEBRIEF<span class="title-period">.</span></h1>
               <p class="opening">Watch the corn.<br>Shoot any that try to escape.</p>
               <div class="start-actions"><button id="new-game" class="primary">Report for duty <span>↗</span></button><button id="resume" class="secondary" hidden>Continue shift</button></div>
+              <p class="welcome-meta">THREE SHIFTS · ABOUT 10 MINUTES<br>Progress saves automatically on this device.</p>
               <label class="difficulty">SHIFT INTENSITY <select id="difficulty"><option value="story" selected>Story</option><option value="hard">Hard · faster crops, higher exposure</option></select></label>
             </div>
 
@@ -73,6 +75,7 @@
     <p id="announcement" class="sr-only" role="status" aria-live="polite"></p>
     <noscript><p class="noscript">This game needs JavaScript. Enable it in your browser to report for duty.</p></noscript>
   </main>
+  <div hidden aria-hidden="true"><span id="station-status"></span><span id="date-label"></span><span id="phase-label"></span><span id="shift-number"></span><span id="objective"></span><span id="objective-detail"></span><ol id="radio-log"></ol></div>
   <dialog id="paper-dialog" aria-labelledby="dialog-title"><div id="dialog-content"></div></dialog>
   <div id="toast" class="toast" role="status" hidden></div>
   <div id="compulsion-notice" class="compulsion-notice" popover="auto" role="status" aria-live="polite" aria-atomic="true"><p id="compulsion-message"></p><button type="button" popovertarget="compulsion-notice" popovertargetaction="hide" aria-label="Dismiss notice">×</button></div>

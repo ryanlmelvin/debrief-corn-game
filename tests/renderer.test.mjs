@@ -1,7 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createGame, startShift, shoot, focusNext } from '../docs/engine.js';
-import { Renderer, cameraFor, targetProjection, aimProjection, updateGroundTracks } from '../docs/renderer.js';
+import { Renderer, cameraFor, targetProjection, aimProjection, updateGroundTracks, visibleGuideTarget } from '../docs/renderer.js';
+import { fireGuide, projectGuide } from '../docs/guide.js';
 
 for (const [width,height] of [[390,844],[844,390],[1440,900]]) {
   test(`proportional camera and target taps at ${width} × ${height}`, () => {
@@ -71,4 +72,28 @@ test('soil trails record actual crop movement, survive a shot, and expire in sim
   assert.deepEqual(updateGroundTracks(tracks,[],10),paused);
   assert.deepEqual(updateGroundTracks(tracks,[],22),[]);
   assert.deepEqual(corn,{id:1,kind:'corn',x:460,y:410});
+});
+
+test('guide aim assistance excludes people outside the portrait camera', () => {
+  const guide={x:5.5,y:5.5,angle:0};
+  const centered={x:6.5,y:5.5},peripheral={x:6.5,y:5.9};
+  assert.ok(projectGuide(guide,peripheral),'The person is inside the full scene field of view.');
+  assert.ok(visibleGuideTarget(guide,centered,cameraFor(390,844)));
+  assert.equal(visibleGuideTarget(guide,peripheral,cameraFor(390,844)),null);
+  assert.ok(visibleGuideTarget(guide,peripheral,cameraFor(1440,900)));
+});
+
+test('distant guide figures have a 44px touch target without widening mouse aim', () => {
+  const width=844,height=390,view=cameraFor(width,height);
+  const person={id:1,x:11.5,y:10.5,status:'running'};
+  const guide={x:11.5,y:1.5,angle:Math.PI/2,stage:'escape',fired:0,team:[person]};
+  const s={phase:'guide',guide,shots:0},p=projectGuide(guide,person);
+  const renderer={scene:s,canvas:{getBoundingClientRect:()=>({left:0,top:0,width,height})}};
+  const event={clientX:(p.x-view.left)*view.scale+21,clientY:(p.y-p.height*.5-view.top)*view.scale};
+  const mouse=Renderer.prototype.coords.call(renderer,{...event,pointerType:'mouse'});
+  assert.equal(fireGuide(structuredClone(s),mouse.x,mouse.y),'miss');
+  const touch=Renderer.prototype.coords.call(renderer,{...event,pointerType:'touch'});
+  assert.equal(fireGuide(structuredClone(s),touch.x,touch.y),'person');
+  const outside=Renderer.prototype.coords.call(renderer,{...event,clientX:event.clientX+3,pointerType:'touch'});
+  assert.equal(fireGuide(structuredClone(s),outside.x,outside.y),'miss');
 });

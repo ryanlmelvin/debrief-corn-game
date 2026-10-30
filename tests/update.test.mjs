@@ -1,10 +1,19 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
 import vm from 'node:vm';
 
 const app = readFileSync(new URL('../docs/app.js', import.meta.url), 'utf8');
 const updateCode = app.slice(app.indexOf("if ('serviceWorker' in navigator"), app.indexOf('\nfunction frame'));
+
+test('every runtime script and stylesheet is available to an offline phone', () => {
+  const docs = new URL('../docs/', import.meta.url);
+  const worker = readFileSync(new URL('sw.js', docs), 'utf8');
+  for (const file of readdirSync(docs).filter(name => /\.(js|css)$/.test(name) && name !== 'sw.js')) {
+    assert.ok(worker.includes(`'./${file}'`), `${file} is missing from the offline cache`);
+  }
+});
+
 function harness(waiting = true) {
   const events = {}, workerEvents = {}, calls = [];
   const buttons = { 'update-game': { hidden: true }, 'dialog-update': { hidden: true }, 'dialog-content': {} };

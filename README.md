@@ -4,7 +4,7 @@ A playable rural horror game based on **Debrief**, the short story by **Ryan L. 
 
 Work three watchtower shifts. Shoot corn that tries to escape, distinguish human figures from moving crops, try to resist an intrusive urge to investigate, and choose what goes into the official debrief. After the sighting, roots gradually fill the stationary word “investigate” across the watchtower view. Holding your post until relief leads straight to the map with a brief notice that you could no longer resist; your later testimony remembers whether you chose to leave or were compelled. Inspect all three locations and return to the tower for debrief; your evidence changes your answers and available endings.
 
-This is a first playable adaptation, with original additional scenes and six alternate outcomes. The source manuscript has not been copied into the project. The application records and environmental anomalies are fictional story elements.
+This is a first playable adaptation, with original additional scenes and seven alternate outcomes. The source manuscript has not been copied into the project. The application records and environmental anomalies are fictional story elements.
 
 ## Play locally
 
@@ -49,6 +49,12 @@ Play online: https://ryanlmelvin.github.io/debrief-corn-game/
 
 With sound enabled, the investigate pressure starts as a distant low drone. The pulse and close, beating tones build as the outdoor ambience recedes. The entire mix cuts to silence when the compulsion wins; ordinary ambience returns after the map notice closes. Pause, menus, and background tabs mute the sound; turning it back on resumes the current pressure level.
 
+## Phone and desktop play
+
+The game stays within the visible screen in portrait and landscape, including short phone screens with browser controls showing. Briefings, interviews, evidence, encounters, installation help, and records use readable pages with Back/Next controls instead of scrolling. Choices stay together when they fit. Optional documents can be closed from their header; the notebook has a direct entry selector.
+
+The field map keeps travel costs and Walk/Stop within reach. The recovery walk uses a compact thumb pad, a separate readable narrative line, and larger touch targets. Desktop retains mouse aiming, keyboard controls, and roomy illustrated documents. Arrow keys turn document pages; Tab navigates actions. The game pauses behind documents, the kit, and background tabs.
+
 ## Offline play and saves
 
 The manifest and service worker make the game installable in compatible browsers and cache every game asset after an initial online load. The browser may offer **Install**, or **Add to Home Screen** through its own menu. On iOS, use Safari’s Share menu. Browser support determines the exact installation UI.
@@ -74,7 +80,8 @@ The game-rule tests cover ammunition, shooting, civilian encounters, timing, con
 | `docs/renderer.js` | Layered canvas landscape, illustrated actors, root motion and field survey |
 | `docs/watch-story.js` | Nightly sightings, crop anatomy, and retrieval-team light timing |
 | `docs/app.js` | Controls, paper documents, audio, saving, installation |
-| `docs/style.css` | Responsive interface and typography |
+| `docs/style.css` / `docs/mobile.css` | Responsive interface, viewport layout, and touch controls |
+| `docs/pager.js` / `docs/pager.css` | Measured, accessible document pages without scrolling |
 | `docs/sw.js` | Versioned offline cache |
 | `docs/manifest.webmanifest` | Installable app metadata |
 | `DESIGN.md` | Adaptation choices and proposed next iteration |
