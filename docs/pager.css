@@ -298,3 +298,5 @@
 
 /* The interrupted tape keeps its pauses and offers no account after the static. */
 #paper-dialog .pager-page p.ending-transcript { font: 14px/1.5 'Courier New', monospace; }
+
+#paper-dialog .ending-transcript .censor-bar { background: #111; }
