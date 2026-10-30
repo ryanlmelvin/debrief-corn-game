@@ -31,3 +31,30 @@ test('archive caps transcripts while preserving all discovered ending badges',()
 test('uncompleted assignments are not recorded and a damaged archive does not block play',()=>{
   const a=archive(new Map([['archive','broken json']]));a.context.game=createGame();a.run('archiveRun()');assert.equal(a.run('history.runs.length'),0);
 });
+
+test('guide outcome stamps survive archiving so all-three and partial shootings share differently',()=>{
+  const a=archive();
+  for(const shots of [0,1,2,3]){
+    const game=createGame('story',shots+1);
+    Object.assign(game,{phase:'ending',ending:'guide',guide:{team:Array.from({length:3},(_,i)=>({status:i<shots?'shot':'escaped'}))}});
+    a.context.game=game;a.run('archiveRun();archiveRun();');
+  }
+  const resumed=archive(a.storage);
+  assert.equal(resumed.run('history.runs.length'),4);
+  assert.equal(resumed.run('history.collected.length'),1);
+  assert.equal(resumed.run('history.runs[0].stamp'),'PERIMETER SECURED');
+  assert.equal(resumed.run('history.runs[1].stamp'),'PERSONNEL INCIDENT');
+  assert.equal(resumed.run('history.runs[2].stamp'),'PERSONNEL INCIDENT');
+  assert.equal(resumed.run('history.runs[3].stamp'),'RECOVERY INCOMPLETE');
+});
+
+test('resuming an older archived ending fills in its outcome without duplicating the run',()=>{
+  const a=archive();
+  const game=createGame('story',17);
+  Object.assign(game,{phase:'ending',ending:'guide',guide:{team:Array.from({length:3},()=>({status:'shot'}))}});
+  a.context.game=game;a.run('archiveRun();delete history.runs[0].stamp;archiveRun();');
+  const resumed=archive(a.storage);
+  assert.equal(resumed.run('history.runs.length'),1);
+  assert.equal(resumed.run('history.runs[0].stamp'),'PERIMETER SECURED');
+  assert.equal(resumed.run('history.collected.length'),1);
+});

@@ -37,10 +37,17 @@ try { const stored=JSON.parse(localStorage.getItem(HISTORY_KEY)); if(stored && A
 function updateHistoryCount(){ $('records').textContent=`Records · ${history.collected.length}/${Object.keys(ENDINGS).length}`; }
 updateHistoryCount();
 function archiveRun(){
-  if(!game || game.phase!=='ending' || history.runs.some(r=>r.id===game.runId))return;
+  if(!game || game.phase!=='ending')return;
   const e=getEnding(game);
-  if(!history.collected.includes(game.ending))history.collected.push(game.ending);
-  history.runs.unshift({id:game.runId,ending:game.ending,title:e.title,text:e.text,last:e.last,reports:game.reports.map(r=>({...r})),date:new Date().toISOString()});
+  const existing=history.runs.find(r=>r.id===game.runId);
+  if(existing){
+    if(existing.stamp===e.stamp)return;
+    // A resumed ending can fill in the outcome omitted by older archives.
+    existing.stamp=e.stamp;
+  }else{
+    if(!history.collected.includes(game.ending))history.collected.push(game.ending);
+    history.runs.unshift({id:game.runId,ending:game.ending,title:e.title,text:e.text,last:e.last,stamp:e.stamp,reports:game.reports.map(r=>({...r})),date:new Date().toISOString()});
+  }
   history.runs=history.runs.slice(0,30);
   try{localStorage.setItem(HISTORY_KEY,JSON.stringify(history));}catch{toast('Records are available for this session. Your browser could not save them.');}
   updateHistoryCount();
@@ -241,8 +248,8 @@ function showCasePreparation() {
 }
 function act(action,value) {
   if(action==='select-share-link'){const input=dialog.querySelector('.share-link');input?.focus();input?.select();return;}
-  if(action==='share-ending'){if(game?.phase==='ending')shareDisposition(game.ending);return;}
-  if(action==='share-record'){const run=history.runs[Number(value)];if(run)shareDisposition(run.ending);return;}
+  if(action==='share-ending'){if(game?.phase==='ending')shareDisposition(game.ending,getEnding(game).stamp);return;}
+  if(action==='share-record'){const run=history.runs[Number(value)];if(run)shareDisposition(run.ending,run.stamp);return;}
   if(action.startsWith('guide-')&&(!game||game.phase!=='guide'||paused||dialog.open||menuOpen()))return;
   if(action==='encounter-choice') {
     if(!chooseFieldEncounter(game,value))return;
@@ -389,16 +396,16 @@ document.addEventListener('keydown',event=>{
 document.addEventListener('visibilitychange',()=>{if(document.hidden){save();if(game&&!dialog.open)togglePause(true);}syncAudio();});
 window.addEventListener('pagehide',save);
 let sharingEnding=false;
-async function shareDisposition(ending) {
+async function shareDisposition(ending,stamp) {
   if(sharingEnding)return;
   sharingEnding=true;
   save();
   const collected=[...history.collected];
   try {
-    const result=await shareEnding(ending,navigator,collected);
+    const result=await shareEnding(ending,navigator,collected,stamp);
     if(result==='copied')toast('Ending and link copied. Paste them into a message.');
     if(result==='manual'){
-      const data=endingShareData(ending,collected);
+      const data=endingShareData(ending,collected,stamp);
       showModal('share',paper('Pass it on.',`<p class="small">Copy this message and link to share your ending.</p><textarea class="share-link" aria-label="Ending message and link" rows="5" readonly>${esc(data.text+'\n'+data.url)}</textarea><div class="paper-actions"><button class="secondary" data-action="select-share-link">Select message</button><button class="primary" data-action="close">Back to assignment ↗</button></div>`,'SHARE YOUR ENDING'));
     }
   } finally { sharingEnding=false; }

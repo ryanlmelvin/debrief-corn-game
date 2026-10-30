@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { ENDINGS } from '../docs/engine.js';
-import { ENDING_SHARES, endingShareData, shareEnding } from '../docs/sharing.js';
+import { ENDING_SHARES, GUIDE_TEAM_SHARE, endingShareData, shareEnding } from '../docs/sharing.js';
 
 test('every ending has a distinct static link preview without ending prose', () => {
   assert.deepEqual(Object.keys(ENDING_SHARES).sort(), Object.keys(ENDINGS).sort());
@@ -83,4 +83,26 @@ test('native sharing and clipboard fallback both include collection progress', a
   await shareEnding('witness', { clipboard: { writeText: async text => { copied = text; } } }, collected);
   assert.equal(shared.text, "I kept the receipts.\nI've found 3 of 7 endings.");
   assert.equal(copied, `${shared.text}\n${shared.url}`);
+});
+
+test('only the full-team outcome gets the sheriff caption and its matching preview', async () => {
+  const line = 'I shot the sheriff. And the deputy. And some third guy.';
+  const full = endingShareData('guide', ['guide', 'consumption'], 'PERIMETER SECURED');
+  assert.equal(full.text, `${line}\nI've found 2 of 7 endings.`);
+  assert.equal(full.url, 'https://ryanlmelvin.github.io/debrief-corn-game/share/02-team/');
+  for (const stamp of [null, 'PERSONNEL INCIDENT', 'RECOVERY INCOMPLETE']) {
+    assert.equal(endingShareData('guide', null, stamp).text, ENDING_SHARES.guide.line);
+  }
+  assert.equal(endingShareData('consumption', null, 'PERIMETER SECURED').text, 'I ate the corn.');
+  let shared, copied;
+  await shareEnding('guide', { share: async data => { shared = data; } }, ['guide', 'consumption'], 'PERIMETER SECURED');
+  await shareEnding('guide', { clipboard: { writeText: async text => { copied = text; } } }, ['guide', 'consumption'], 'PERIMETER SECURED');
+  assert.deepEqual(shared, full);
+  assert.equal(copied, `${full.text}\n${full.url}`);
+  const page = readFileSync(new URL(`../docs/share/${GUIDE_TEAM_SHARE.code}/index.html`, import.meta.url), 'utf8');
+  assert.ok(page.includes(`<meta property="og:title" content="${full.title}">`));
+  assert.ok(page.includes(`<meta property="og:image" content="${full.url}preview.jpg">`));
+  assert.ok(page.includes(`<h1>${line}</h1>`));
+  const jpg = readFileSync(new URL('../docs/share/02-team/preview.jpg', import.meta.url));
+  assert.equal(jpg.readUInt16BE(0), 0xffd8);
 });

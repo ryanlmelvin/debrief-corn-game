@@ -1,9 +1,9 @@
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
-import { ENDING_SHARES, SHARE_ROOT } from '../docs/sharing.js';
+import { ENDING_SHARES, GUIDE_TEAM_SHARE, SHARE_ROOT } from '../docs/sharing.js';
 
 const escape = text => text.replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const description = 'Watch the corn. Follow procedure. Find your own ending in DEBRIEF, a short rural horror game.';
-for (const card of Object.values(ENDING_SHARES)) {
+for (const card of [...Object.values(ENDING_SHARES), GUIDE_TEAM_SHARE]) {
   const url = `${SHARE_ROOT}share/${card.code}/`;
   const image = `${SHARE_ROOT}share/${card.code}/preview.jpg`;
   const title = escape(`${card.line} — DEBRIEF`);
