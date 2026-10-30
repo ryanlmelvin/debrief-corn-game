@@ -1,10 +1,7 @@
-import { endingPathCounter, endingPathsMarkup } from './ending-paths.js';
-import { CASE_TASKS, CASE_PLAN, preparationTasks, caseDetail } from './evidence-case.js';
-import { planFieldRoute } from './field.js';
 import './image-viewer.js';
 import { watchNight, sightingPromptReady } from './watch-story.js';
 import { guideTravel, guideRouteStatus, inspectGuide, spareGuide, fireGuide, focusGuide, nearbyGuideSite, isGuideAftermath } from './guide.js';
-import { createGame, startShift, advance, reload, shoot, focusNext, enterField, move, inspect, canEatCrop, eatCrop, prepareEvidence, nearbySite, FIELD_SITES, investigationPressure, investigationComplete, beginDebrief, chooseFieldEncounter, continueFieldEncounter, getQuestion, getEnding, answer, serialize, restore, BRIEFINGS, EVIDENCE, ENDINGS, DATES, REPORT_DATES, SHIFT_LENGTH, COMPULSION_NOTICE } from './engine.js';
+import { createGame, startShift, advance, reload, shoot, focusNext, enterField, move, inspect, canEatCrop, eatCrop, nearbySite, investigationPressure, investigationComplete, beginDebrief, chooseFieldEncounter, continueFieldEncounter, getQuestion, getEnding, answer, serialize, restore, BRIEFINGS, EVIDENCE, ENDINGS, DATES, REPORT_DATES, SHIFT_LENGTH, COMPULSION_NOTICE } from './engine.js';
 import { Renderer, visibleGuideTarget } from './renderer.js';
 import { FieldMap } from './field-ui.js';
 import { dialogArtwork, evidenceMount, notebookMarkup, encounterMarkup, interviewRecord } from './art.js';
@@ -136,14 +133,14 @@ function sceneDialog() {
   if(game.phase==='field'&&pending){showModal('encounter',encounterMarkup(game));save();return;}
   if(game.phase==='briefing') {
     const b=BRIEFINGS[game.shift];
-    showModal('briefing',paper(b.title,`<p class="eyebrow">SHIFT ${game.shift+1} / ${DATES[game.shift]}, <span class="redacted-text">19XX</span></p><p>${esc(b.text).replaceAll('██████', REDACTED_TOWN)}</p><ol class="orders">${b.orders.map((o,i)=>`<li><span>0${i+1}</span>${o}</li>`).join('')}</ol>${b.note?`<p class="note">${b.note}</p>`:''}<p class="note">PRIVATE PLAN · ${game.shift===0?CASE_PLAN:'Your notebook tracks the outside case. Prepare evidence at its site; keep physical findings on record.'}</p>${game.shift===0?'<p class="small"><span class="touch-help">Tap moving corn to fire. Tap Reload to refill your rifle. People are not targets.</span><span class="keyboard-help">Click to fire. <b>X</b> aims, <b>Space</b> fires, <b>R</b> reloads. People are not targets.</span></p>':''}<button class="primary" data-action="start">Take your post <span>↗</span></button>`, 'SHIFT ORDERS'));
+    showModal('briefing',paper(b.title,`<p class="eyebrow">SHIFT ${game.shift+1} / ${DATES[game.shift]}, <span class="redacted-text">19XX</span></p><p>${esc(b.text).replaceAll('██████', REDACTED_TOWN)}</p><ol class="orders">${b.orders.map((o,i)=>`<li><span>0${i+1}</span>${o}</li>`).join('')}</ol>${b.note?`<p class="note">${b.note}</p>`:''}${game.shift===0?'<p class="small"><span class="touch-help">Tap moving corn to fire. Tap Reload to refill your rifle. People are not targets.</span><span class="keyboard-help">Click to fire. <b>X</b> aims, <b>Space</b> fires, <b>R</b> reloads. People are not targets.</span></p>':''}<button class="primary" data-action="start">Take your post <span>↗</span></button>`, 'SHIFT ORDERS'));
   } else if(sightingPromptReady(game) && !game.incidentPrompted) {
     game.incidentPrompted=true;
     showModal('sighting',paper('Movement in the field.', `<p>${watchNight(game.shift).notice}</p><p class="small">Leaving now means any loose crops can cross the perimeter.</p><div class="paper-actions"><button class="primary" data-action="confirm-enter">Investigate now ↗</button><button class="secondary" data-action="close">Stay at my post</button></div>`, 'FIELD OBSERVATION'));
     save();
   } else if(game.phase==='debrief') {
     const q=decisionQuestion(game);
-    showModal('debrief',paper('For the record.',`<p class="eyebrow">${REPORT_DATES[game.shift]}, <span class="redacted-text">19XX</span></p>${game.question<3?`<span class="question-num" aria-label="Question ${game.question+1} of 3">${game.question+1} / 3</span>`:''}<div class="interview-question"><span class="speaker-label">SUPERVISOR</span><p>${esc(q.prompt)}</p></div><p class="note"><span class="decision-note-label">${esc(q.contextLabel)}</span> ${esc(q.context)}</p><div class="choices" role="group" aria-label="Your response"><span class="speaker-label">YOUR RESPONSE</span>${q.options.map((o,i)=>`<button class="choice" data-action="answer" data-value="${o.id}" ${o.disabled?'disabled':''}><span class="response-key" aria-hidden="true">${String.fromCharCode(65+i)}</span><span>${esc(o.label)}${o.detail?`<small>${esc(o.detail)}</small>`:''}</span></button>`).join('')}</div>`, 'DEBRIEF TRANSCRIPT'));
+    showModal('debrief',paper('For the record.',`<p class="eyebrow">${REPORT_DATES[game.shift]}, <span class="redacted-text">19XX</span></p>${game.question<3?`<span class="question-num" aria-label="Question ${game.question+1} of 3">${game.question+1} / 3</span>`:''}<div class="interview-question"><span class="speaker-label">SUPERVISOR</span><p>${esc(q.prompt)}</p></div><p class="note"><span class="decision-note-label">${esc(q.contextLabel)}</span> ${esc(q.context)}</p><div class="choices" role="group" aria-label="Your response"><span class="speaker-label">YOUR RESPONSE</span>${q.options.map((o,i)=>`<button class="choice" data-action="answer" data-value="${o.id}" ${o.disabled?'disabled':''}><span class="response-key" aria-hidden="true">${String.fromCharCode(65+i)}</span><span>${esc(o.label)}${o.detail?`<small>${esc(o.detail)}</small>`:''}${o.requirements?`<small class="ending-requirements">${o.requirements.map(r=>`<span class="ending-requirement ${r.met?'requirement-met':'requirement-unmet'}"><span aria-hidden="true">${r.met?'✓':'✗'}</span> <span class="sr-only">${r.met?'Met':'Unmet'}: </span>${esc(r.label)}${r.target>1?` ${r.current}/${r.target}`:''}</span>`).join('')}</small>`:''}</span></button>`).join('')}</div>`, 'DEBRIEF TRANSCRIPT'));
   } else if(game.phase==='guide' && game.guide.steps === 0) {
     showModal('guide-intro',paper('Between the rows.', '<p>Three recovery personnel wait beneath the tower. You take the rifle. They take lamps.</p><p class="note">“You know the way,” one of them says.</p><p class="small"><span class="touch-help">Tap Lead to follow the path. The team stops at each discovery so you can examine it.</span><span class="keyboard-help"><b>Space</b> or <b>W</b> leads onward or stops. The path turns for you. Press <b>E</b> to examine each discovery.</span></p><button class="primary" data-action="close">Lead them in ↗</button>', 'RECOVERY DETAIL'));
   } else if(game.phase==='ending') {
@@ -163,9 +160,6 @@ function updateUI(force=false) {
   document.body.dataset.phase=game.phase;
   const aftermath=isGuideAftermath(game);
   $('stats').hidden=aftermath;
-  $('ending-paths').hidden=aftermath;
-  $('ending-paths').textContent=`Paths · ${endingPathCounter(game)}`;
-  $('ending-paths').setAttribute('aria-label',`Ending paths: ${endingPathCounter(game)} steps. Open progress.`);
   $('pause').hidden=game.phase==='ending';
   const phase=game.phase,field=phase==='field',site=nearbySite(game),active=phase==='tower';
   $('date-label').textContent=`${DATES[game.shift]}, ████`;
@@ -258,13 +252,6 @@ function updateGuideUI() {
   const progress=$('controls').querySelector('.guide-progress i');
   if(progress)progress.style.width=`${route.progress*100}%`;
 }
-function showCasePreparation() {
-  const tasks=preparationTasks(game,nearbySite(game)?.id);
-  if(!tasks.length)return;
-  const returning=planFieldRoute(game,FIELD_SITES.find(s=>s.id==='tower')).exposure;
-  showModal('preparation',paper('Something that can leave.', `<p>Notes alone will not survive a denial. Prepare an exhibit here for the outside case.</p><p class="note">Exposure ${Math.ceil(game.exposure)} / 100 · return to tower at least +${Math.ceil(returning)}. ${investigationComplete(game)?'All sites searched.':'Other sites still need searching.'}</p><div class="choices">${tasks.map(t=>`<button class="choice" data-action="prepare-evidence" data-value="${t.id}"><span>${esc(t.title)}</span><small>+${t.cost} exposure · ${Math.ceil(game.exposure+t.cost)} / 100 afterward${game.exposure+t.cost>=100?' · reaches 100':game.exposure+t.cost+returning>=100?' · too exposed to return':''}</small></button>`).join('')}<button class="choice" data-action="close">Leave for now. I can return to this site later.</button></div>`, 'OUTSIDE CASE'));
-}
-
 function act(action,value) {
   if(action==='select-share-link'){const input=dialog.querySelector('.share-link');input?.focus();input?.select();return;}
   if(action==='share-ending'){if(game?.phase==='ending')shareDisposition(game.ending,getEnding(game).stamp);return;}
@@ -285,14 +272,6 @@ function act(action,value) {
     }
     lastModalKey='';save();updateUI(true);return;
   }
-  if(action==='ending-paths'&&game){showModal('ending-paths',paper('Ending paths.',endingPathsMarkup(game),'PRIVATE PLAN'));return;}
-  if(action==='prepare-case'){showCasePreparation();return;}
-  if(action==='prepare-evidence'){
-    if(!prepareEvidence(game,value))return;
-    closeModal();fieldMap.lastKey='';save();updateUI(true);
-    if(game.phase==='field')toast(`${CASE_TASKS.find(t=>t.id===value).short} secured. ${caseDetail(game)}`);
-    return;
-  }
   if(action==='notebook-page'){
     if(game&&modalKind==='notebook')showModal('notebook',notebookMarkup(game,value));
     return;
@@ -306,7 +285,7 @@ function act(action,value) {
       const site=nearbySite(game);
       if(site?.id===fieldMap.selected) {
         if(site.id==='tower'){act('debrief');return;}
-        act(preparationTasks(game,site.id).length?'prepare-case':canEatCrop(game)?'corn':'inspect');return;
+        act(canEatCrop(game)?'corn':'inspect');return;
       }
       fieldMap.start(game);
     }
@@ -342,7 +321,7 @@ function act(action,value) {
   if(action==='eat-crop' && eatCrop(game))closeModal();
   if(action==='inspect'){
     const id=inspect(game);
-    if(id){const e=EVIDENCE[id];showModal('evidence',paper(e.title,`<p class="eyebrow">${e.code} / ${e.where.toUpperCase()}</p>${evidenceMount(id)}<p>${e.text}</p>${preparationTasks(game,nearbySite(game)?.id).length?'<button class="primary" data-action="prepare-case">Prepare evidence for the outside case →</button>':''}${canEatCrop(game)?'<p>A sweet cooking smell drifts from behind the treatment drums.</p><button class="primary" data-action="corn">Follow the cooking smell</button>':''}<button class="primary" data-action="close">Close notebook ↗</button>`,'PRIVATE OBSERVATION'));}
+    if(id){const e=EVIDENCE[id];showModal('evidence',paper(e.title,`<p class="eyebrow">${e.code} / ${e.where.toUpperCase()}</p>${evidenceMount(id)}<p>${e.text}</p>${canEatCrop(game)?'<p>A sweet cooking smell drifts from behind the treatment drums.</p><button class="primary" data-action="corn">Follow the cooking smell</button>':''}<button class="primary" data-action="close">Close notebook ↗</button>`,'PRIVATE OBSERVATION'));}
   }
   if(action==='debrief')beginDebrief(game);
   if(action==='restart'){closeModal();begin(game.mode);return;}
@@ -373,7 +352,7 @@ $('menu-radio').addEventListener('click',()=>{
 });
 
 $('notebook').addEventListener('click',()=>{
-  if(game)showModal('notebook',notebookMarkup(game,0));
+  if(game)showModal('notebook',notebookMarkup(game,Math.max(0,game.evidence.length-1)));
 });
 
 canvas.addEventListener('pointermove',event=>{if(['tower','guide'].includes(game?.phase)){renderer.pointer=renderer.coords(event);game.focused=null;if(game.guide)game.guide.focused=null;}});

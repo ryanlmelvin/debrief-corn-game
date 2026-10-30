@@ -6,7 +6,7 @@
   "scripts": {
     "start": "node scripts/serve.mjs",
     "test": "node --test tests/*.test.mjs",
-    "check": "node --check docs/app.js && node --check docs/progress.js && node --check docs/image-viewer.js && node --check docs/pager.js && node --check docs/decision-copy.js && node --check docs/audio.js && node --check docs/audio-events.js && node --check docs/pressure-word.js && node --check docs/art.js && node --check docs/engine.js && node --check docs/evidence-case.js && node --check docs/ending-paths.js && node --check docs/encounters.js && node --check docs/field.js && node --check docs/field-ui.js && node --check docs/guide.js && node --check docs/watch-story.js && node --check docs/renderer.js && node --check docs/sw.js && node --check docs/sharing.js && node scripts/build-share-pages.mjs --check",
+    "check": "node --check docs/app.js && node --check docs/progress.js && node --check docs/image-viewer.js && node --check docs/pager.js && node --check docs/decision-copy.js && node --check docs/audio.js && node --check docs/audio-events.js && node --check docs/pressure-word.js && node --check docs/art.js && node --check docs/engine.js && node --check docs/ending-requirements.js && node --check docs/encounters.js && node --check docs/field.js && node --check docs/field-ui.js && node --check docs/guide.js && node --check docs/watch-story.js && node --check docs/renderer.js && node --check docs/sw.js && node --check docs/sharing.js && node scripts/build-share-pages.mjs --check",
     "build:share": "node scripts/build-share-pages.mjs"
   },
   "engines": { "node": ">=20" }

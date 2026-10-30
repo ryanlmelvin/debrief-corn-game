@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { createGame,startShift,advance,shoot,reload,enterField,move,inspect,beginDebrief,answer,getQuestion,restore,serialize,SHIFT_LENGTH,COMPULSION_NOTICE,focusNext,ENDINGS,EVIDENCE,investigationUrge,investigationPressure, canEatCrop, eatCrop, prepareEvidence, chooseFieldEncounter, continueFieldEncounter } from '../docs/engine.js';
+import { createGame,startShift,advance,shoot,reload,enterField,move,inspect,beginDebrief,answer,getQuestion,restore,serialize,SHIFT_LENGTH,COMPULSION_NOTICE,focusNext,ENDINGS,EVIDENCE,investigationUrge,investigationPressure, canEatCrop, eatCrop, chooseFieldEncounter, continueFieldEncounter } from '../docs/engine.js';
 
 import { currentEncounter } from '../docs/encounters.js';
 function settle(s){if(s.fieldEvents.pending){chooseFieldEncounter(s,currentEncounter(s).choices[0].id);continueFieldEncounter(s);}}
@@ -9,7 +9,7 @@ function walkStep(s,dx,dy){settle(s);const result=move(s,dx,dy);settle(s);return
 const watch=mode=>{const s=createGame(mode,42);startShift(s);return s;};
 function safeWatch(s){while(s.phase==='tower'){advance(s,.25);for(const t of [...s.targets]){if(t.kind!=='corn')continue;if(!s.rounds){reload(s);break;}shoot(s,t.x,t.y-34);}if(s.rounds<2)reload(s);}}
 function walkTo(s,x,y){while(s.phase==='field'&&s.player.x!==x)walkStep(s,Math.sign(x-s.player.x),0);while(s.phase==='field'&&s.player.y!==y)walkStep(s,0,Math.sign(y-s.player.y));}
-function investigateAll(s,prepare=false){for(const [x,y] of [[3,3],[9,1],[7,5]]){walkTo(s,x,y);const id=inspect(s);if(prepare)prepareEvidence(s,id);}walkTo(s,1,7);}
+function investigateAll(s){for(const [x,y] of [[3,3],[9,1],[7,5]]){walkTo(s,x,y);inspect(s);}walkTo(s,1,7);}
 function report(s,choice='comply'){if(s.phase==='field'&&!['corner','pump','drain'].every(id=>s.inspected.includes(id)))investigateAll(s);beginDebrief(s);answer(s,choice);answer(s,'evidence');answer(s,s.shift===2?'sign':'question');if(s.phase==='debrief'&&s.question===3)answer(s,'return');}
 
 test('game starts with briefing, and a shift resets its supplies',()=>{const s=createGame();assert.equal(s.phase,'briefing');startShift(s);assert.equal(s.rounds,6);assert.equal(s.phase,'tower');assert.equal(startShift(s),false);});
@@ -46,7 +46,7 @@ test('Hard mode raises crop speed and exploration costs above Story',()=>{const 
 test('debrief reports reflect actual findings',()=>{const s=watch();safeWatch(s);s.phase='debrief';answer(s,'truth');assert.match(getQuestion(s).options[0].label,/did not recover/);s.evidence.push('dress');assert.match(getQuestion(s).options[0].label,/white fabric/i);});
 test('invalid or locked responses cannot advance a debrief',()=>{const s=createGame();s.phase='debrief';s.shift=2;s.question=2;assert.equal(answer(s,'bogus'),false);assert.equal(answer(s,'expose'),false);assert.equal(s.question,2);});
 test('notebook quantity alone never unlocks the outside case',()=>{const s=createGame();Object.assign(s,{phase:'debrief',shift:2,question:2,evidence:Object.keys(EVIDENCE)});assert.equal(answer(s,'expose'),false);assert.equal(s.phase,'debrief');});
-test('a full investigation route reaches the witness ending with all nine exhibits',()=>{const s=watch();for(let i=0;i<3;i++){safeWatch(s);investigateAll(s,true);assert.equal(s.fieldSteps,28);assert.equal(beginDebrief(s),true);answer(s,'truth');answer(s,'evidence');answer(s,i===2?'expose':'question');if(s.phase==='debrief'&&s.question===3)answer(s,'return');if(s.phase==='briefing')startShift(s);}assert.equal(s.ending,'witness');assert.equal(s.evidence.length,9);assert.ok(Math.abs(s.exposure-95.97)<.001);});
+test('collecting all exhibits and objecting still requires the field recordings',()=>{const s=watch();for(let i=0;i<3;i++){safeWatch(s);investigateAll(s);assert.equal(s.fieldSteps,28);assert.equal(beginDebrief(s),true);answer(s,'truth');answer(s,'evidence');answer(s,i===2?'expose':'question');if(s.phase==='debrief'&&s.question===3)answer(s,'return');if(s.phase==='briefing')startShift(s);}assert.equal(s.phase,'debrief');assert.equal(s.ending,null);assert.equal(s.evidence.length,9);assert.ok(Math.abs(s.exposure-53.97)<.001);});
 test('final choices and prior testimony reach distinct endings',()=>{for(const [choice,honesty,ending]of[['sign',0,'compliance'],['sign',3,'dissent']]){const s=createGame();Object.assign(s,{phase:'debrief',shift:2,question:2,honesty});answer(s,choice);assert.equal(s.ending,ending);}assert.equal(Object.keys(ENDINGS).length,7);});
 test('save and restore preserve a live shift without losing targets',()=>{const s=watch();advance(s,13);assert.deepEqual(restore(serialize(s)),s);});
 test('corrupt, outdated and structurally invalid saves are rejected',()=>{for(const raw of ['nope','null','{}','{"version":99}'])assert.equal(restore(raw),null);for(const patch of [{shift:8},{targets:[{}]},{player:{x:99,y:0}},{evidence:['unknown']},{phase:'ending',ending:'bogus'},{rounds:-3}])assert.equal(restore(JSON.stringify({...createGame(),...patch})),null);});

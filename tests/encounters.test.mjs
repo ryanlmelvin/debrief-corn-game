@@ -69,7 +69,7 @@ test('the notebook and debrief reveal only encounters actually resolved by the p
   const s=field();assert.doesNotMatch(notebookMarkup(s),/Between the rows/);
   trigger(s,'first-call');assert.doesNotMatch(notebookMarkup(s),/Your voice. From the soil/);
   chooseFieldEncounter(s,'record');continueFieldEncounter(s);
-  const notebook=notebookMarkup(s,1);assert.match(notebook,/Your voice. From the soil/);assert.match(notebook,/keep a few seconds/);assert.doesNotMatch(notebook,/Tomorrow’s interview/);
+  const notebook=notebookMarkup(s);assert.match(notebook,/Your voice. From the soil/);assert.match(notebook,/keep a few seconds/);assert.doesNotMatch(notebook,/Tomorrow’s interview/);
   s.phase='debrief';s.question=1;assert.match(getQuestion(s).options.find(o=>o.id==='field-notes').label,/radio in the soil/);
   answer(s,'field-notes');assert.match(s.reports.at(-1).answer,/radio in the soil/);
 });

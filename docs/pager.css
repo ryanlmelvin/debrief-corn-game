@@ -288,14 +288,8 @@
   #paper-dialog .decision-sheet:has(#dialog-update:not([hidden])) .decision-context { padding-bottom: 54px; }
 }
 
-/* A live, inspectable tally for ending requirements. */
-#ending-paths { min-height: 44px; color: #e1ddbc; border: 1px solid #788367; padding: 6px 9px; white-space: nowrap; font-size: 11px; }
-.ending-path-checklist { padding-left: 19px; }
-.ending-path-checklist li { padding: 8px 0; border-bottom: 1px dashed #8b9474; font-size: 13px; }
-.ending-path-checklist .small { margin: 4px 0 0; }
-@media (max-width: 380px) {
-  .playing .wordmark { font-size: 12px; letter-spacing: 1px; gap: 5px; }
-  .playing .wordmark svg { width: 13px; }
-  .playing .masthead { gap: 6px; padding-inline: 10px; }
-  #ending-paths { font-size: 10px; padding-inline: 5px; }
-}
+/* Only the last refusal shows which cumulative requirements were met. */
+#paper-dialog .choice .ending-requirements { display: flex; flex-wrap: wrap; gap: 3px 12px; margin-top: 6px; }
+#paper-dialog .choice .ending-requirement { display: inline-block; font-weight: bold; font-size: 11px; line-height: 1.45; }
+#paper-dialog .choice .requirement-met { color: #315426; }
+#paper-dialog .choice .requirement-unmet { color: #843d2b; }

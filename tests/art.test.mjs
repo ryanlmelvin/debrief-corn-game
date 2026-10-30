@@ -6,21 +6,20 @@ import { notebookMarkup, interviewRecord, SPECIMENS } from '../docs/art.js';
 
 test('notebook exposes only discovered exhibits and clamps page navigation', () => {
   const game=createGame();
-  assert.match(notebookMarkup(game), /An outside case/);
+  assert.match(notebookMarkup(game), /Unwritten/);
   game.evidence=['dress','ledger'];
-  assert.match(notebookMarkup(game,-10),/An outside case/);
-  const first=notebookMarkup(game,1), last=notebookMarkup(game,100);
+  const first=notebookMarkup(game,-10), last=notebookMarkup(game,100);
   assert.match(first,/Field sketch: White fabric/);
   assert.match(last,/Field sketch: Application record/);
   assert.doesNotMatch(first,/Field sketch: Application record/);
   for(const [id,e] of Object.entries(EVIDENCE))if(!game.evidence.includes(id))assert.ok(!first.includes(e.title));
-  assert.match(last,/03 \/ 03/);
+  assert.match(last,/02 \/ 02/);
 });
 
 test('testimony pages keep reported text inert and preserve withheld observations', () => {
   const game=createGame();
   game.reports=[{shift:0,question:'<img src=x onerror=alert(1)>',answer:'A & B',supervisorReply:'<script>bad</script>',redacted:true}];
-  const html=notebookMarkup(game,1);
+  const html=notebookMarkup(game);
   assert.match(html,/Observation withheld/);
   assert.match(html,/&lt;img src=x onerror=alert\(1\)&gt;/);
   assert.match(html,/A &amp; B/);

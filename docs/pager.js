@@ -41,7 +41,7 @@ export class DialogPager {
   prepare(article) {
     if (this.body) this.resize.unobserve(this.body);
     this.article = article;
-    this.decision = ['debrief', 'encounter', 'corn', 'sighting', 'confirm', 'guide-intro', 'evidence', 'preparation'].includes(this.dialog.dataset.kind);
+    this.decision = ['debrief', 'encounter', 'corn', 'sighting', 'confirm', 'guide-intro', 'evidence'].includes(this.dialog.dataset.kind);
     article.classList.toggle('decision-sheet', this.decision);
     this.units = [];
     this.index = 0;

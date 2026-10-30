@@ -128,12 +128,14 @@ test('supervisor followups respect earlier disclosure and treatment objections u
   }
 });
 
-test('final disclosure uses prepared evidence and retained physical testimony', () => {
-  for (const [secured, reported, disabled] of [[[], [], true], [['ledger','sample','map'], [], true], [['ledger','sample'], [0,1], true], [['ledger','sample','map'], [0], true], [['ledger','sample','map'], [0,2], false]]) {
-    const game = interview({ shift: 2, question: 2, evidence: ['ledger','sample','map'], caseFile: {secured,reported} });
+test('final refusal preserves cumulative requirement statuses and the guide choice', () => {
+  for (const [recordings, objections, disabled] of [[0,0,true],[2,0,true],[1,2,true],[2,1,true],[2,2,false]]) {
+    const game = interview({ shift: 2, question: 2, evidence: ['ledger','sample','map'] });
+    game.fieldEvents.journal = ['first-call','future-call'].slice(0,recordings).map(id=>({id,choice:'record'}));
+    game.reports = [0,1].slice(0,objections).map(shift=>({shift,choice:'question',question:'Will you sign?',answer:'What is the treatment?'}));
     const question = assertEquivalent(game), expose = choice(question, 'expose');
     assert.equal(expose.disabled, disabled);
-    assert.match(expose.detail, /prepared|Case ready/);
+    assert.deepEqual(expose.requirements.map(r=>r.met),[true,true,true,recordings===2,objections===2]);
     assert.match(choice(question, 'guide').label, /Join the team and search/);
     game.searched.push('shift-1');
     assert.match(choice(decisionQuestion(game), 'guide').label, /Lead the team/);
