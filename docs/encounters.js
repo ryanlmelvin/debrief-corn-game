@@ -13,7 +13,7 @@ export const ENCOUNTERS=[
     text:'Another trail of boot prints runs beside yours. The soles have the same split at the heel. You take one step. A shallow print fills with water a little farther ahead.',
     report:'A second trail had the same damaged heel as my boots. New prints appeared ahead of me.',choices:[
       choice('stay','Keep to the marked path.',0,'You keep your light on the next crossing. The second trail leaves the path and continues into the crop.'),
-      choice('mark','Tie survey twine around a stalk.',2,'You knot a piece of twine at knee height and keep the rest. A real marker. Something to test your memory against.','twine'),
+      choice('mark','Tie survey twine around a stalk.',2,'You knot a piece of twine at knee height and keep the rest. You will recognize this crossing if you come back.','twine'),
       choice('follow','Follow the prints one row over.',4,'The trail ends at a dry patch of soil. Your next footprint is already there, pressed into earth that has not been wet.','followed-tracks')
     ]},
   {id:'unattended-lamp',night:0,step:16,art:'lantern',title:'A light off the path.',
