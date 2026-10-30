@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import vm from 'node:vm';
 import { readFileSync } from 'node:fs';
-import { GameAudio, PressureDrone, cornfieldAmbience } from '../docs/audio.js';
+import { GameAudio, PressureDrone, loadMusic } from '../docs/audio.js';
 
 class Param {
   constructor(value = 0) { this.value = value; this.events = []; }
@@ -49,7 +49,7 @@ test('pressure becomes louder, drier, closer and more insistent without allocati
 });
 
 test('the takeover cuts the entire mix and any shot, even without an open dialog', async () => {
-  const context = new Context(), sound = new GameAudio(context);
+  const context = new Context(), sound = new GameAudio(context, context.createBuffer(2, 8000));
   sound.sync({enabled:true,held:false,pressure:1});sound.shot(true);
   const shot = [...sound.shots][0];
   sound.sync({enabled:true,held:false,pressure:1,takeover:true});
@@ -64,7 +64,7 @@ test('the takeover cuts the entire mix and any shot, even without an open dialog
 });
 
 test('mute and pause resume the current pressure without a stale suspension or another sound graph', async () => {
-  const context = new Context(), sound = new GameAudio(context), count = context.nodes.length;
+  const context = new Context(), sound = new GameAudio(context, context.createBuffer(2, 8000)), count = context.nodes.length;
   assert.equal(sound.master.gain.value,0);assert.equal(context.resumes,0);
   sound.sync({enabled:false,held:false,pressure:1});assert.equal(context.resumes,0);
   for (const gate of [{enabled:false,held:false},{enabled:true,held:true}]) {
@@ -103,7 +103,7 @@ test('the game sends sound preference, pressure, all pause gates and the takeove
 
 
 test('sound confirmation is audible through the destination while the game mix is paused', async () => {
-  const context = new Context(), sound = new GameAudio(context);
+  const context = new Context(), sound = new GameAudio(context, context.createBuffer(2, 8000));
   sound.sync({enabled:true,held:false});
   sound.sync({enabled:true,held:true});
   sound.preview();
@@ -120,18 +120,18 @@ test('sound confirmation is audible through the destination while the game mix i
 });
 
 
-test('cornfield ambience has seamless stereo detail and distinct quiet and rustling passages', () => {
-  const context = new Context(), buffer = cornfieldAmbience(context);
-  const left = buffer.getChannelData(0), right = buffer.getChannelData(1);
-  assert.equal(left.length,context.sampleRate*32);
-  assert.notDeepEqual(left,right);
-  for(const data of [left,right]) {
-    assert.equal(Math.abs(data[0]),0);assert.equal(Math.abs(data.at(-1)),0);
-    assert.ok(data.every(value=>Number.isFinite(value)&&Math.abs(value)<.8));
-  }
-  const rms = (start,end) => Math.sqrt(left.slice(start*context.sampleRate,end*context.sampleRate).reduce((sum,x)=>sum+x*x,0)/((end-start)*context.sampleRate));
-  assert.ok(rms(3,4)>rms(11,12)*2, 'stalk movement rises out of a quiet field');
-  const sound = new GameAudio(context);
-  assert.equal(sound.ambient.buffer.getChannelData(0).length,left.length);
-  assert.equal(sound.ambient.loop,true);
+test('recorded music loads from the game host and decodes before playback', async () => {
+  const bytes = new ArrayBuffer(8), music = {duration:134};
+  const context = {decodeAudioData: async data => {assert.equal(data,bytes);return music;}};
+  const decoded = await loadMusic(context,async url => {
+    assert.ok(url.pathname.endsWith('/assets/lost-in-a-bad-place.mp3'));
+    return {ok:true,arrayBuffer:async()=>bytes};
+  });
+  assert.equal(decoded,music);
+  await assert.rejects(loadMusic(context,async()=>({ok:false,status:404})),/404/);
+  await assert.rejects(loadMusic({decodeAudioData:async()=>{throw new Error('decode failed');}},async()=>({ok:true,arrayBuffer:async()=>bytes})),/decode failed/);
+  const graph = new Context(), sound = new GameAudio(graph,music);
+  assert.equal(sound.ambient.buffer,music);assert.equal(sound.ambient.loop,true);
+  const worker = readFileSync(new URL('../docs/sw.js',import.meta.url),'utf8');
+  assert.ok(worker.includes("'./assets/lost-in-a-bad-place.mp3'"));
 });

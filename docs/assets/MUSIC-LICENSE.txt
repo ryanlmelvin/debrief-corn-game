@@ -1,0 +1,12 @@
+Lost in a Bad Place (horror ambience loop)
+Artist: congusbongus
+Source: https://opengameart.org/content/lost-in-a-bad-place-horror-ambience-loop
+Original audio: https://opengameart.org/sites/default/files/lost_2.ogg
+License: CC0 1.0 Universal (public domain dedication)
+https://creativecommons.org/publicdomain/zero/1.0/
+Verified on the artist submission page: 2026-10-30.
+
+The bundled lost-in-a-bad-place.mp3 is a 128 kbps stereo MP3 conversion
+of the original Ogg recording, resampled to 32 kHz for mobile memory use.
+The composition is unchanged. It is hosted with the game and cached for
+offline playback. Credit is provided voluntarily; CC0 does not require it.

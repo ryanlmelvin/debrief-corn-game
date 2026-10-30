@@ -4,7 +4,7 @@ import { createGame, startShift, advance, reload, shoot, focusNext, enterField, 
 import { Renderer, visibleGuideTarget } from './renderer.js';
 import { FieldMap } from './field-ui.js';
 import { dialogArtwork, evidenceMount, notebookMarkup, encounterMarkup, interviewRecord } from './art.js';
-import { GameAudio } from './audio.js';
+import { GameAudio, loadMusic } from './audio.js';
 import { pressureWordMarkup } from './pressure-word.js';
 import { DialogPager } from './pager.js';
 import { endingShareData, shareEnding } from './sharing.js';
@@ -313,7 +313,7 @@ $('pause').addEventListener('click',()=>togglePause());$('unpause').addEventList
 dialog.addEventListener('cancel',event=>{if(['briefing','debrief','ending','encounter'].includes(modalKind))event.preventDefault();else{event.preventDefault();closeModal();}});
 $('manual').addEventListener('click',()=>showModal('manual',paper('The field manual.',`<ol class="orders"><li><span>01</span>Watch the corn. Shoot any that try to escape.</li><li><span>02</span>Remain in the watchtower.</li><li><span>03</span>Do not consume the crop.</li><li><span>04</span>Remember any irregularities for your debrief at the end of the night.</li></ol><button class="primary" data-action="close">Understood ↗</button>`)));
 
-$('about').addEventListener('click',()=>showModal('about',paper('About Debrief.', '<p>An interactive adaptation of the short story by Ryan L. Melvin.</p><p>Three shifts. About ten minutes. Headphones optional.</p><p>The goal is to find your way through every possible ending. More endings will be added over time.</p><p class="small">Your progress and records stay in this browser or app, on this device. Clearing site data deletes them; installation is not a backup.</p><button class="primary" data-action="close">Back ↗</button>', 'STATION 04')));
+$('about').addEventListener('click',()=>showModal('about',paper('About Debrief.', '<p>An interactive adaptation of the short story by Ryan L. Melvin.</p><p>Three shifts. About ten minutes. Headphones optional.</p><p class="small">Music: <a href="https://opengameart.org/content/lost-in-a-bad-place-horror-ambience-loop" target="_blank" rel="noopener">Lost in a Bad Place</a> by congusbongus · <a href="https://creativecommons.org/publicdomain/zero/1.0/" target="_blank" rel="noopener">CC0</a>.</p><p>The goal is to find your way through every possible ending. More endings will be added over time.</p><p class="small">Your progress and records stay in this browser or app, on this device. Clearing site data deletes them; installation is not a backup.</p><button class="primary" data-action="close">Back ↗</button>', 'STATION 04')));
 $('assignment').addEventListener('click',()=>{
   if(!game)return;
   showModal('assignment',paper($('objective').textContent,`<p>${esc($('objective-detail').textContent)}</p><p class="small">Shift ${game.shift+1} of 3 · ${esc($('station-status').textContent)}</p><button class="primary" data-action="close">Return to duty ↗</button>`, 'CURRENT ORDERS'));
@@ -392,15 +392,23 @@ async function initAudio() {
   // Resume during the button gesture before building the sound graph (mobile).
   await audioContext.resume();
   if(audioContext.state!=='running')throw new Error('Audio is suspended');
-  if(!soundscape)soundscape=new GameAudio(audioContext);
+  if(!soundscape)soundscape=new GameAudio(audioContext,await loadMusic(audioContext));
   return true;
 }
 function syncAudio(){soundscape?.sync({enabled:soundEnabled,held:paused||dialog.open||menuOpen()||document.hidden||game?.phase==='ending',pressure:game?investigationPressure(game)?.strength||0:0,takeover:game?.phase==='field'&&game.compulsionNotice===true});}
 $('sound').addEventListener('click',async()=>{
-  if(!soundEnabled){try{if(!await initAudio())return;}catch{toast('Sound could not start. You can keep playing silently.');return;}}
-  soundEnabled=!soundEnabled;$('sound').textContent=soundEnabled?'Sound: ON · Turn off':'Sound: OFF · Turn on';$('sound').setAttribute('aria-pressed',String(soundEnabled));syncAudio();
-  if(soundEnabled){soundscape.preview();toast('Sound is on. A short tone confirms playback. Ambient sound resumes when you return to play.');}
-  else toast('Sound is off.');
+  const button=$('sound');button.disabled=true;
+  try {
+    if(!soundEnabled){
+      button.textContent='Sound: loading…';
+      if(!await initAudio())return;
+    }
+    soundEnabled=!soundEnabled;
+    button.setAttribute('aria-pressed',String(soundEnabled));syncAudio();
+    if(soundEnabled){soundscape.preview();toast('Sound is on. Music resumes when you return to play.');}
+    else toast('Sound is off.');
+  } catch {toast('Sound could not start. Check your connection and try again.');}
+  finally {button.disabled=false;button.textContent=soundEnabled?'Sound: ON · Turn off':'Sound: OFF · Turn on';}
 });
 function shotSound(hit) {
   if(soundEnabled)soundscape?.shot(hit);
