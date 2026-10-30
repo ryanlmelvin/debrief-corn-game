@@ -5,7 +5,7 @@ import { createGame,startShift,advance,shoot,reload,enterField,move,inspect,begi
 const watch=mode=>{const s=createGame(mode,42);startShift(s);return s;};
 function safeWatch(s){while(s.phase==='tower'){advance(s,.25);for(const t of [...s.targets]){if(t.kind!=='corn')continue;if(!s.rounds){reload(s);break;}shoot(s,t.x,t.y-34);}if(s.rounds<2)reload(s);}}
 function walkTo(s,x,y){while(s.phase==='field'&&s.player.x!==x)move(s,Math.sign(x-s.player.x),0);while(s.phase==='field'&&s.player.y!==y)move(s,0,Math.sign(y-s.player.y));}
-function report(s,choice='comply'){beginDebrief(s);answer(s,choice);answer(s,'evidence');answer(s,s.shift===2?'sign':'question');}
+function report(s,choice='comply'){beginDebrief(s);answer(s,choice);answer(s,'evidence');answer(s,s.shift===2?'sign':'question');if(s.phase==='debrief'&&s.question===3)answer(s,'return');}
 
 test('game starts with briefing, and a shift resets its supplies',()=>{const s=createGame();assert.equal(s.phase,'briefing');startShift(s);assert.equal(s.rounds,6);assert.equal(s.phase,'tower');assert.equal(startShift(s),false);});
 test('targets spawn deterministically from a seed',()=>{const a=watch(),b=watch();advance(a,8);advance(b,8);assert.deepEqual(a.targets,b.targets);assert.ok(a.targets.length);});
@@ -28,7 +28,7 @@ test('story mode lowers crop speed and exploration costs',()=>{const a=watch('st
 test('debrief reports reflect actual findings',()=>{const s=watch();safeWatch(s);beginDebrief(s);answer(s,'truth');assert.match(getQuestion(s).options[0].label,/did not reach/);s.evidence.push('dress');assert.match(getQuestion(s).options[0].label,/white fabric/i);});
 test('invalid or locked responses cannot advance a debrief',()=>{const s=createGame();s.phase='debrief';s.shift=2;s.question=2;assert.equal(answer(s,'bogus'),false);assert.equal(answer(s,'expose'),false);assert.equal(s.question,2);});
 test('evidence ending requires both quantity and treatment evidence',()=>{const s=createGame();s.phase='debrief';s.shift=2;s.question=2;s.evidence=['dress','badge','teeth'];assert.equal(answer(s,'expose'),false);s.evidence.push('ledger');assert.equal(answer(s,'expose'),true);assert.equal(s.ending,'witness');});
-test('a full investigation route can retain treatment evidence and reach the witness ending',()=>{const s=watch();for(let i=0;i<3;i++){safeWatch(s);enterField(s);if(i===0){walkTo(s,3,3);inspect(s);}walkTo(s,9,1);inspect(s);walkTo(s,1,7);beginDebrief(s);answer(s,'truth');answer(s,'evidence');answer(s,i===2?'expose':'question');if(s.phase==='briefing')startShift(s);}assert.equal(s.ending,'witness');assert.ok(s.exposure<100);});
+test('a full investigation route can retain treatment evidence and reach the witness ending',()=>{const s=watch();for(let i=0;i<3;i++){safeWatch(s);enterField(s);if(i===0){walkTo(s,3,3);inspect(s);}walkTo(s,9,1);inspect(s);walkTo(s,1,7);beginDebrief(s);answer(s,'truth');answer(s,'evidence');answer(s,i===2?'expose':'question');if(s.phase==='debrief'&&s.question===3)answer(s,'return');if(s.phase==='briefing')startShift(s);}assert.equal(s.ending,'witness');assert.ok(s.exposure<100);});
 test('final choices and prior testimony reach distinct endings',()=>{for(const [choice,honesty,ending]of[['guide',0,'guide'],['sign',0,'compliance'],['sign',3,'dissent']]){const s=createGame();Object.assign(s,{phase:'debrief',shift:2,question:2,honesty});answer(s,choice);assert.equal(s.ending,ending);}assert.equal(Object.keys(ENDINGS).length,6);});
 test('save and restore preserve a live shift without losing targets',()=>{const s=watch();advance(s,13);assert.deepEqual(restore(serialize(s)),s);});
 test('corrupt, outdated and structurally invalid saves are rejected',()=>{for(const raw of ['nope','null','{}','{"version":99}'])assert.equal(restore(raw),null);for(const patch of [{shift:8},{targets:[{}]},{player:{x:99,y:0}},{evidence:['unknown']},{phase:'ending',ending:'bogus'},{rounds:-3}])assert.equal(restore(JSON.stringify({...createGame(),...patch})),null);});
@@ -66,4 +66,38 @@ test('treatment objections introduce the private evidence before asking about it
     assert.match(getQuestion(s).options[0].label, wording);
     assert.doesNotMatch(getQuestion(s).prompt, /suggesting the treatment/);
   }
+});
+
+
+test('objections receive a dismissive reply before the player leaves, including after resume', () => {
+  for (const evidence of [[], ['ledger'], ['sample']]) {
+    for (const shift of [0, 1]) {
+      const s = createGame();
+      Object.assign(s, { phase: 'debrief', shift, question: 2, evidence });
+      answer(s, 'question');
+      assert.equal(s.phase, 'debrief');
+      assert.equal(s.shift, shift);
+      assert.equal(s.question, 3);
+      assert.match(getQuestion(s).prompt, evidence.length ? /Do you need to know that to do your job/ : /Closing the field is not your decision/);
+      assert.match(getQuestion(s).context, /before you can answer/);
+      const resumed = restore(serialize(s));
+      assert.deepEqual(getQuestion(resumed), getQuestion(s));
+      const honesty = resumed.honesty;
+      assert.equal(answer(resumed, 'question'), false);
+      assert.equal(answer(resumed, 'return'), true);
+      assert.equal(resumed.phase, 'briefing');
+      assert.equal(resumed.shift, shift + 1);
+      assert.equal(resumed.honesty, honesty);
+      assert.equal(resumed.reports.length, 1);
+      assert.equal(answer(resumed, 'return'), false);
+    }
+  }
+});
+
+test('accepting the report still closes the interview directly', () => {
+  const s = createGame();
+  Object.assign(s, { phase: 'debrief', question: 2 });
+  answer(s, 'sign');
+  assert.equal(s.phase, 'briefing');
+  assert.equal(s.shift, 1);
 });

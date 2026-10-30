@@ -159,6 +159,11 @@ export function beginDebrief(s) {
   s.phase = 'debrief'; s.question = 0; return true;
 }
 export function getQuestion(s) {
+  if (s.question === 3 && s.shift < 2) return {
+    prompt: s.reports.at(-1).supervisorReply,
+    context: 'He closes the folder before you can answer. His hand stays on the cover. The interview is over.',
+    options: [{ id: 'return', label: 'Return to your post.', detail: 'Leave the office. Your next shift orders are waiting.' }]
+  };
   const testimony = s.reports.filter(r => r.shift === s.shift);
   const concealedSighting = testimony[0]?.redacted;
   const correctedObservation = testimony[1]?.redacted;
@@ -205,16 +210,31 @@ export function getQuestion(s) {
 
 export function answer(s, id) {
   if (s.phase !== 'debrief') return false;
+  if (s.question === 3) {
+    if (id !== 'return' || s.shift >= 2) return false;
+    nextShift(s);
+    return true;
+  }
   const q = getQuestion(s), option = q.options.find(o => o.id === id && !o.disabled);
   if (!option) return false;
   s.honesty += option.honesty || 0; s.trust += option.trust || 0;
   s.reports.push({ shift: s.shift, question: q.prompt, answer: option.label, redacted: ['redact', 'comply', 'sign'].includes(id) });
+  if (s.question === 2 && id === 'question' && s.shift < 2) {
+    s.reports.at(-1).supervisorReply = s.evidence.some(e => ['ledger', 'sample'].includes(e))
+      ? 'Do you need to know that to do your job? Your assignment is to watch the corn and contain anything that tries to leave. Return to your post.'
+      : 'Closing the field is not your decision. Your assignment is to watch the corn and contain anything that tries to leave. Return to your post.';
+    s.question = 3;
+    return true;
+  }
   s.question++;
   if (s.question === 3) {
     if (s.shift === 2) finish(s, id === 'expose' ? 'witness' : id === 'guide' ? 'guide' : s.honesty >= 2 ? 'dissent' : 'compliance');
-    else { s.shift++; s.phase = 'briefing'; s.exposure = Math.max(0, s.exposure - 12); }
+    else nextShift(s);
   }
   return true;
+}
+function nextShift(s) {
+  s.shift++; s.phase = 'briefing'; s.exposure = Math.max(0, s.exposure - 12);
 }
 export const ENDINGS = {
   witness: { code: '01', title: 'An unofficial record.', stamp: 'DISTRIBUTION UNAUTHORIZED', text: 'The photographs and application records reach someone outside the department. The field is closed pending an inquiry. For a week, no one calls you. Then a farmer three counties away sends a photograph of his drainage ditch.', last: 'You keep the original report.' },
@@ -240,7 +260,7 @@ export function restore(raw) {
     if (!s.targets.every(t => Number.isFinite(t.x) && Number.isFinite(t.y) && Number.isFinite(t.speed) && Number.isFinite(t.wobble) && [-1,1].includes(t.direction) && ['corn','person'].includes(t.kind))) return null;
     if (!s.log.every(l => typeof l.message === 'string') || !s.reports.every(r => typeof r.question === 'string' && typeof r.answer === 'string')) return null;
     if (s.phase === 'ending' && !Object.hasOwn(ENDINGS,s.ending)) return null;
-    if (s.phase === 'debrief' && s.question > 2) return null;
+    if (s.phase === 'debrief' && s.question === 3 && (s.shift >= 2 || typeof s.reports.at(-1)?.supervisorReply !== 'string')) return null;
     return s;
   } catch { return null; }
 }
