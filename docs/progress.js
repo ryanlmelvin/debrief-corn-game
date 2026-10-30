@@ -8,10 +8,10 @@ const COOKIE_LIMIT = 6000;
 const CHUNK_SIZE = 3000;
 
 export function validateHistory(value) {
-  if (!value || !Array.isArray(value.collected) || !Array.isArray(value.runs) || value.runs.length > 30) throw Error('Invalid records.');
+  if (!value || !Array.isArray(value.collected) || !Array.isArray(value.runs) || value.runs.length > 30) throw Error('Invalid ending collection.');
   if (!value.collected.every(id => Object.hasOwn(ENDINGS, id))) throw Error('Unknown ending.');
   for (const run of value.runs) {
-    if (!run || !Object.hasOwn(ENDINGS, run.ending) || !['id', 'title', 'text', 'last', 'date'].every(key => typeof run[key] === 'string') || !Number.isFinite(Date.parse(run.date))) throw Error('Invalid assignment.');
+    if (!run || !Object.hasOwn(ENDINGS, run.ending) || !['id', 'title', 'text', 'last', 'date'].every(key => typeof run[key] === 'string') || !Number.isFinite(Date.parse(run.date))) throw Error('Invalid completed game.');
     if (run.stamp !== undefined && typeof run.stamp !== 'string') throw Error('Invalid outcome.');
     if (!Array.isArray(run.reports) || run.reports.length > 200 || !run.reports.every(report => report && typeof report.question === 'string' && typeof report.answer === 'string')) throw Error('Invalid transcript.');
   }
@@ -20,7 +20,7 @@ export function validateHistory(value) {
 
 export function progressSnapshot(save, history) {
   const snapshot = { format: 'debrief-progress', version: 1, save: save ? restore(serialize(save)) : null, history: validateHistory(history) };
-  if (save && !snapshot.save) throw Error('The saved shift could not be read.');
+  if (save && !snapshot.save) throw Error('The saved game could not be read.');
   if (!snapshot.save && !snapshot.history.collected.length && !snapshot.history.runs.length) throw Error('No progress to transfer yet.');
   return snapshot;
 }

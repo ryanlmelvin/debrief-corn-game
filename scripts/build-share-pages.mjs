@@ -41,7 +41,7 @@ for (const card of [...Object.values(ENDING_SHARES), GUIDE_TEAM_SHARE]) {
     <header><a class="wordmark" href="../../">DEBRIEF</a></header>
     <img src="./preview.jpg" width="1200" height="800" alt="${escape(card.alt)}">
     <div class="copy">
-      <p class="eyebrow">AN ASSIGNMENT COMPLETED</p>
+      <p class="eyebrow">ENDING ACHIEVED</p>
       <h1>${escape(card.line)}</h1>
       <p class="description">Watch the corn. Follow procedure.<br>What will you put on the record?</p>
       <a class="play" href="../../">Find your own ending ↗</a>

@@ -21,7 +21,7 @@ export function endingShareData(ending, collected = null, stamp = null) {
   let text = card.line;
   if (Array.isArray(collected)) {
     const found = new Set([...collected, ending].filter(id => Object.hasOwn(ENDING_SHARES, id))).size;
-    text += `\nI've found ${found} of ${Object.keys(ENDING_SHARES).length} endings.`;
+    text += `\nI've achieved ${found} of ${Object.keys(ENDING_SHARES).length} endings.`;
   }
   return { title: `${card.line} — DEBRIEF`, text, url: `${SHARE_ROOT}share/${card.code}/` };
 }

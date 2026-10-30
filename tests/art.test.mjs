@@ -6,7 +6,7 @@ import { notebookMarkup, interviewRecord, SPECIMENS } from '../docs/art.js';
 
 test('notebook exposes only discovered exhibits and clamps page navigation', () => {
   const game=createGame();
-  assert.match(notebookMarkup(game), /Unwritten/);
+  assert.match(notebookMarkup(game), /No notes yet/);
   game.evidence=['dress','ledger'];
   const first=notebookMarkup(game,-10), last=notebookMarkup(game,100);
   assert.match(first,/Field sketch: White fabric/);

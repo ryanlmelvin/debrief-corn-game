@@ -300,3 +300,8 @@
 #paper-dialog .pager-page p.ending-transcript { font: 14px/1.5 'Courier New', monospace; }
 
 #paper-dialog .ending-transcript .censor-bar { background: #111; }
+
+/* Keep ending numbers, names, and achievement states easy to scan. */
+#paper-dialog .pager-page .ending-slot { display: grid; grid-template-columns: 42px minmax(0, 1fr); align-items: center; gap: 10px; padding: 6px 4px; }
+#paper-dialog .ending-summary { min-width: 0; }
+#paper-dialog .ending-summary small { display: block; margin-top: 4px; font: 11px/1.4 'Courier New', monospace; color: var(--faded-ink); }

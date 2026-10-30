@@ -47,7 +47,7 @@ for(const run of history.runs){
   }
   if(!history.collected.includes(run.ending))history.collected.push(run.ending);
 }
-function updateHistoryCount(){ $('records').textContent=`Records · ${history.collected.length}/${Object.keys(ENDINGS).length}`; }
+function updateHistoryCount(){ $('records').textContent=`Endings · ${history.collected.length}/${Object.keys(ENDINGS).length}`; }
 updateHistoryCount();
 function archiveRun(){
   if(!game || game.phase!=='ending')return;
@@ -65,21 +65,21 @@ function archiveRun(){
     history.runs.unshift({id:game.runId,ending:id,title:e.title,text:e.text,last:e.last,stamp:e.stamp,reports:game.reports.map(r=>({...r})),date:new Date().toISOString()});
   }
   history.runs=history.runs.slice(0,30);
-  try{localStorage.setItem(HISTORY_KEY,JSON.stringify(history));}catch{toast('Records are available for this session. Your browser could not save them.');}
+  try{localStorage.setItem(HISTORY_KEY,JSON.stringify(history));}catch{toast('Endings are available for this session. Your browser could not save them.');}
   updateHistoryCount();
   installHandoff.update(game||readSave(),history);
 }
 function showRecords() {
   archiveRun();
-  const collection=Object.entries(ENDINGS).map(([id,e])=>`<li class="ending-slot ${history.collected.includes(id)?'collected':''}"><span>${e.code}</span> ${history.collected.includes(id)?esc(e.title):'Unrecorded'}</li>`).join('');
-  const runs=history.runs.map((r,i)=>`<button class="choice" data-action="record-run" data-value="${i}">${esc(r.title)}<small>${esc(new Date(r.date).toLocaleDateString())} · Read transcript →</small></button>`).join('');
-  showModal('records',paper('Your records.',`<p class="small">${history.collected.length} of ${Object.keys(ENDINGS).length} endings recorded on this device.</p><ol class="ending-collection">${collection}</ol>${runs?`<h3>Past assignments</h3><div class="choices">${runs}</div>`:'<p>No completed assignments yet.</p>'}<button class="primary" data-action="close">Close records ↗</button>`,'PRIVATE ARCHIVE'));
+  const collection=Object.entries(ENDINGS).sort(([,a],[,b])=>Number(a.code)-Number(b.code)).map(([id,e])=>`<li class="ending-slot ${history.collected.includes(id)?'collected':''}"><span>${e.code}</span><div class="ending-summary">${history.collected.includes(id)?`${esc(e.title)}<small>Achieved</small>`:'Not yet unlocked'}</div></li>`).join('');
+  const runs=history.runs.map((r,i)=>`<button class="choice" data-action="record-run" data-value="${i}">${esc(r.title)}<small>${esc(new Date(r.date).toLocaleDateString())} · View ending &amp; transcript →</small></button>`).join('');
+  showModal('records',paper('Endings',`<p class="small">${history.collected.length} of ${Object.keys(ENDINGS).length} endings achieved on this device.</p><ol class="ending-collection">${collection}</ol>${runs?`<h3>Completed games</h3><div class="choices">${runs}</div>`:'<p>No completed games yet.</p>'}<button class="primary" data-action="close">Close endings</button>`,'ENDING COLLECTION'));
 }
 $('records').addEventListener('click',showRecords);
 let saved=readSave();
 $('resume').hidden=!saved;
 installHandoff.update(saved,history);
-if(carriedProgress)toast('Your browser progress is ready. Continue your shift or open Records.');
+if(carriedProgress)toast('Your browser progress is ready. Continue your game or open Endings.');
 function save() {
   if(!game)return;
   try { localStorage.setItem(SAVE_KEY,serialize(game));saved=game;$('save-status').textContent='PROGRESS SAVED ON THIS DEVICE';installHandoff.update(game,history); }
@@ -128,7 +128,7 @@ function begin(mode,fromSave=false) {
   clearTimeout(compulsionTimer);
   if($('guide-aftermath').matches(':popover-open'))$('guide-aftermath').hidePopover();
   game=fromSave?readSave():createGame(mode);
-  if(!game){toast('The saved shift could not be read. You can start a new one.');return;}
+  if(!game){toast('The saved game could not be read. You can start a new game.');return;}
   soundEvents.reset(game);
   paused=false;lastModalKey='';lastControlsKey='';lastLog='';
   fieldMap.reset();
@@ -145,7 +145,7 @@ function sceneDialog() {
   if(game.phase==='field'&&pending){showModal('encounter',encounterMarkup(game));save();return;}
   if(game.phase==='briefing') {
     const b=BRIEFINGS[game.shift];
-    showModal('briefing',paper(b.title,`<p class="eyebrow">SHIFT ${game.shift+1} / ${DATES[game.shift]}, <span class="redacted-text">19XX</span></p><p>${esc(b.text).replaceAll('██████', REDACTED_TOWN)}</p><ol class="orders">${b.orders.map((o,i)=>`<li><span>0${i+1}</span>${o}</li>`).join('')}</ol>${b.note?`<p class="note">${b.note}</p>`:''}${game.shift===0?'<p class="small"><span class="touch-help">Tap moving corn to fire. Tap Reload to refill your rifle. People are not targets.</span><span class="keyboard-help">Click to fire. <b>X</b> aims, <b>Space</b> fires, <b>R</b> reloads. People are not targets.</span></p>':''}<button class="primary" data-action="start">Take your post <span>↗</span></button>`, 'SHIFT ORDERS'));
+    showModal('briefing',paper(b.title,`<p class="eyebrow">SHIFT ${game.shift+1} / ${DATES[game.shift]}, <span class="redacted-text">19XX</span></p><p>${esc(b.text).replaceAll('██████', REDACTED_TOWN)}</p><ol class="orders">${b.orders.map((o,i)=>`<li><span>0${i+1}</span>${o}</li>`).join('')}</ol>${b.note?`<p class="note">${b.note}</p>`:''}${game.shift===0?'<p class="small"><span class="touch-help">Tap moving corn to fire. Tap Reload to refill your rifle. People are not targets.</span><span class="keyboard-help">Click to fire. <b>X</b> aims, <b>Space</b> fires, <b>R</b> reloads. People are not targets.</span></p>':''}<button class="primary" data-action="start">Start shift <span>↗</span></button>`, 'SHIFT ORDERS'));
   } else if(sightingPromptReady(game) && !game.incidentPrompted) {
     game.incidentPrompted=true;
     showModal('sighting',paper('Movement in the field.', `<p>${watchNight(game.shift).notice}</p><p class="small">Leaving now means any loose crops can cross the perimeter.</p><div class="paper-actions"><button class="primary" data-action="confirm-enter">Investigate now ↗</button><button class="secondary" data-action="close">Stay at my post</button></div>`, 'FIELD OBSERVATION'));
@@ -166,7 +166,7 @@ function sceneDialog() {
       if(!$('guide-aftermath').matches(':popover-open'))$('guide-aftermath').showPopover();
       return;
     }
-    showModal('ending',paper(e.title,`<p class="eyebrow">ENDING ${e.code} / ${String(Object.keys(ENDINGS).length).padStart(2,'0')}</p><p${e.transcript?' class="ending-transcript"':''}>${esc(e.text).replace(/\[redacted\]|██████/g,'<span class="censor-bar" role="img" aria-label="Speaker name redacted"></span>').replaceAll('\n','<br>')}</p>${e.last?`<p class="note">${esc(e.last)}</p>`:''}<div class="stamp">${e.stamp}</div><div class="receipt-stats"><span>CROPS CONTAINED<strong>${game.kills}</strong></span><span>EXHIBITS RETAINED<strong>${game.evidence.length}</strong></span><span>PERIMETER BREACHES<strong>${game.breaches}</strong></span></div><div class="paper-actions"><button class="primary" data-action="restart">Another assignment ↗</button><button class="secondary" data-action="share-ending">Share ending ↗</button><button class="secondary" data-action="export">Keep the transcript ↓</button><button class="secondary" data-action="records">Records</button></div>`, 'FINAL DISPOSITION'));
+    showModal('ending',paper(e.title,`<p class="eyebrow">ENDING ${e.code} / ${String(Object.keys(ENDINGS).length).padStart(2,'0')}</p><p${e.transcript?' class="ending-transcript"':''}>${esc(e.text).replace(/\[redacted\]|██████/g,'<span class="censor-bar" role="img" aria-label="Speaker name redacted"></span>').replaceAll('\n','<br>')}</p>${e.last?`<p class="note">${esc(e.last)}</p>`:''}<div class="stamp">${e.stamp}</div><div class="receipt-stats"><span>CROPS CONTAINED<strong>${game.kills}</strong></span><span>EXHIBITS RETAINED<strong>${game.evidence.length}</strong></span><span>PERIMETER BREACHES<strong>${game.breaches}</strong></span></div><div class="paper-actions"><button class="primary" data-action="restart">New game</button><button class="secondary" data-action="share-ending">Share ending ↗</button><button class="secondary" data-action="export">Download transcript ↓</button><button class="secondary" data-action="records">Endings</button></div>`, 'ENDING ACHIEVED'));
   }
 }
 function stat(label,value,sub='',percent=null,warning=false) {return `<div class="stat ${warning?'warning':''}"><label>${label}</label><strong>${value}</strong><small> ${sub}</small>${percent!==null?`<div class="meter"><span style="width:${Math.min(100,Math.max(0,percent))}%"></span></div>`:''}</div>`;}
@@ -205,7 +205,7 @@ function updateUI(force=false) {
   if(phase!=='guide'&&(force||controlKey!==lastControlsKey)) {
     lastControlsKey=controlKey;
     const focusedAction=$('controls').contains(document.activeElement)?document.activeElement.dataset.action:null;
-    let html=aftermath?'<button class="primary" data-action="restart">Another assignment ↗</button><button class="secondary" data-action="records">View records</button><button class="secondary" data-action="share-ending">Share ending ↗</button><button class="secondary" data-action="export">Keep the transcript ↓</button>':'';
+    let html=aftermath?'<button class="primary" data-action="restart">New game</button><button class="secondary" data-action="records">View endings</button><button class="secondary" data-action="share-ending">Share ending ↗</button><button class="secondary" data-action="export">Download transcript ↓</button>':'';
     if(field){
       html='<div class="dpad" aria-label="Walk through the field"><button class="up" data-action="move" data-value="0,-1" aria-label="Move north">↑</button><button class="left" data-action="move" data-value="-1,0" aria-label="Move west">←</button><button class="down" data-action="move" data-value="0,1" aria-label="Move south">↓</button><button class="right" data-action="move" data-value="1,0" aria-label="Move east">→</button></div>';
       if(site?.id==='tower'){if(investigationComplete(game))html+='<button class="primary" data-action="debrief">Return / submit report ↗</button>';}
@@ -319,7 +319,7 @@ function act(action,value) {
   }
   if(action==='record-run') {
     const r=history.runs[Number(value)];if(!r)return;
-    showModal('record',paper(esc(r.title),`<p${ENDINGS[r.ending]?.transcript?' class="ending-transcript"':''}>${esc(r.text).replace(/\[redacted\]|██████/g,'<span class="censor-bar" role="img" aria-label="Speaker name redacted"></span>').replaceAll('\n','<br>')}</p>${r.last?`<p class="note">${esc(r.last)}</p>`:''}<div class="transcript">${r.reports.map(t=>`<section><p class="eyebrow">${t.kind==='recovery'?'RECOVERY DEBRIEF':`SHIFT ${Number(t.shift)+1}`}</p><p>${esc(t.question)}</p><p><b>YOU</b> ${esc(t.answer)}</p>${t.supervisorReply?`<p class="note">${esc(t.replySpeaker||'SUPERVISOR')}: ${esc(t.supervisorReply)}</p>`:''}</section>`).join('')}</div><div class="paper-actions"><button class="secondary" data-action="share-record" data-value="${Number(value)}">Share ending ↗</button><button class="primary" data-action="records">Back to records</button><button class="secondary" data-action="close">Close</button></div>`,'PAST ASSIGNMENT'));return;
+    showModal('record',paper(esc(r.title),`<p${ENDINGS[r.ending]?.transcript?' class="ending-transcript"':''}>${esc(r.text).replace(/\[redacted\]|██████/g,'<span class="censor-bar" role="img" aria-label="Speaker name redacted"></span>').replaceAll('\n','<br>')}</p>${r.last?`<p class="note">${esc(r.last)}</p>`:''}<div class="transcript">${r.reports.map(t=>`<section><p class="eyebrow">${t.kind==='recovery'?'RECOVERY DEBRIEF':`SHIFT ${Number(t.shift)+1}`}</p><p>${esc(t.question)}</p><p><b>YOU</b> ${esc(t.answer)}</p>${t.supervisorReply?`<p class="note">${esc(t.replySpeaker||'SUPERVISOR')}: ${esc(t.supervisorReply)}</p>`:''}</section>`).join('')}</div><div class="paper-actions"><button class="secondary" data-action="share-record" data-value="${Number(value)}">Share ending ↗</button><button class="primary" data-action="records">Back to endings</button><button class="secondary" data-action="close">Close</button></div>`,'ENDING & TRANSCRIPT'));return;
   }
   if(action==='records'){$('records').click();return;}
   if(action==='guide-travel')guideTravel(game);
@@ -358,23 +358,23 @@ function act(action,value) {
 }
 document.addEventListener('click',event=>{const button=event.target.closest('[data-action]');if(button&&!button.disabled)act(button.dataset.action,button.dataset.value);});
 $('new-game').addEventListener('click',()=>{
-  if(readSave())showModal('confirm',paper('A new assignment.',`<p>Starting a new assignment replaces the saved shift on this device.</p><div class="paper-actions"><button class="primary" data-action="new-confirm">Start a new shift ↗</button><button class="secondary" data-action="close">Keep my place</button></div>`));
+  if(readSave())showModal('confirm',paper('Start a new game?',`<p>This replaces your current saved game. Your achieved endings and transcripts from completed games are kept.</p><div class="paper-actions"><button class="primary" data-action="new-confirm">Start new game</button><button class="secondary" data-action="close">Cancel</button></div>`));
   else begin($('difficulty').value);
 });
 $('resume').addEventListener('click',()=>begin(null,true));
 function togglePause(force) {if(!game||game.phase==='ending'||dialog.open)return;paused=typeof force==='boolean'?force:!paused;updateUI();save();syncAudio();}
 $('pause').addEventListener('click',()=>togglePause());$('unpause').addEventListener('click',()=>{togglePause(false);canvas.focus({preventScroll:true});});
 dialog.addEventListener('cancel',event=>{if(['briefing','debrief','guide-debrief','ending','encounter'].includes(modalKind))event.preventDefault();else{event.preventDefault();closeModal();}});
-$('manual').addEventListener('click',()=>showModal('manual',paper('The field manual.',`<ol class="orders"><li><span>01</span>Watch the corn. Shoot any that try to escape.</li><li><span>02</span>Remain in the watchtower.</li><li><span>03</span>Do not consume the crop.</li><li><span>04</span>Remember any irregularities for your debrief at the end of the night.</li></ol><button class="primary" data-action="close">Understood ↗</button>`)));
+$('manual').addEventListener('click',()=>showModal('manual',paper('Instructions',`<ol class="orders"><li><span>01</span>Watch the corn. Shoot any that try to escape.</li><li><span>02</span>Remain in the watchtower.</li><li><span>03</span>Do not consume the crop.</li><li><span>04</span>Remember any irregularities for your debrief at the end of the night.</li></ol><button class="primary" data-action="close">Close</button>`)));
 
-$('about').addEventListener('click',()=>showModal('about',paper('About Debrief.', '<p>An interactive adaptation of the short story by Ryan L. Melvin.</p><p>Three shifts. About ten minutes. Headphones optional.</p><p class="small">Music: <a href="https://opengameart.org/content/lost-in-a-bad-place-horror-ambience-loop" target="_blank" rel="noopener">Lost in a Bad Place</a> by congusbongus · <a href="https://creativecommons.org/publicdomain/zero/1.0/" target="_blank" rel="noopener">CC0</a>.</p><p class="small">Field sounds (CC0): <a href="https://opengameart.org/content/crickets-ambient-noise-loopable" target="_blank" rel="noopener">crickets by Ted Kerr</a>; <a href="https://opengameart.org/content/random-sounds-samples" target="_blank" rel="noopener">footsteps and leaves by Brandon Morris</a>; <a href="https://opengameart.org/content/static" target="_blank" rel="noopener">radio static by xhunterko</a>.</p><p>The goal is to find your way through every possible ending. New endings added all the time.</p><p class="small">Your progress and records stay in this browser or app, on this device. Clearing site data deletes them; installation is not a backup.</p><button class="primary" data-action="close">Back ↗</button>', 'STATION 04')));
+$('about').addEventListener('click',()=>showModal('about',paper('About Debrief.', '<p>An interactive adaptation of the short story by Ryan L. Melvin.</p><p>Three shifts. About ten minutes. Headphones optional.</p><p class="small">Music: <a href="https://opengameart.org/content/lost-in-a-bad-place-horror-ambience-loop" target="_blank" rel="noopener">Lost in a Bad Place</a> by congusbongus · <a href="https://creativecommons.org/publicdomain/zero/1.0/" target="_blank" rel="noopener">CC0</a>.</p><p class="small">Field sounds (CC0): <a href="https://opengameart.org/content/crickets-ambient-noise-loopable" target="_blank" rel="noopener">crickets by Ted Kerr</a>; <a href="https://opengameart.org/content/random-sounds-samples" target="_blank" rel="noopener">footsteps and leaves by Brandon Morris</a>; <a href="https://opengameart.org/content/static" target="_blank" rel="noopener">radio static by xhunterko</a>.</p><p>The goal is to find your way through every possible ending. New endings added all the time.</p><p class="small">Your saved game, achieved endings, and transcripts stay in this browser or app, on this device. Clearing site data deletes them; installation is not a backup.</p><button class="primary" data-action="close">Back ↗</button>', 'STATION 04')));
 $('assignment').addEventListener('click',()=>{
   if(!game)return;
-  showModal('assignment',paper($('objective').textContent,`<p>${esc($('objective-detail').textContent)}</p><p class="small">Shift ${game.shift+1} of 3 · ${esc($('station-status').textContent)}</p><button class="primary" data-action="close">Return to duty ↗</button>`, 'CURRENT ORDERS'));
+  showModal('assignment',paper($('objective').textContent,`<p>${esc($('objective-detail').textContent)}</p><p class="small">Shift ${game.shift+1} of 3 · ${esc($('station-status').textContent)}</p><button class="primary" data-action="close">Back to game</button>`, 'CURRENT OBJECTIVE'));
 });
 $('menu-radio').addEventListener('click',()=>{
   if(!game)return;
-  showModal('radio',paper('Radio / field notes.',`<div class="radio-entries">${game.log.slice(0,6).map(l=>`<p>${esc(l.message)}</p>`).join('')}</div><button class="primary" data-action="close">Back to the field ↗</button>`, 'STATION 04'));
+  showModal('radio',paper('Recent events',`<div class="radio-entries">${game.log.slice(0,6).map(l=>`<p>${esc(l.message)}</p>`).join('')}</div><button class="primary" data-action="close">Back to game</button>`, 'STATION 04'));
 });
 
 $('notebook').addEventListener('click',()=>{
@@ -431,7 +431,7 @@ async function shareDisposition(ending,stamp) {
     if(result==='copied')toast('Ending and link copied. Paste them into a message.');
     if(result==='manual'){
       const data=endingShareData(ending,collected,stamp);
-      showModal('share',paper('Pass it on.',`<p class="small">Copy this message and link to share your ending.</p><textarea class="share-link" aria-label="Ending message and link" rows="5" readonly>${esc(data.text+'\n'+data.url)}</textarea><div class="paper-actions"><button class="secondary" data-action="select-share-link">Select message</button><button class="primary" data-action="close">Back to assignment ↗</button></div>`,'SHARE YOUR ENDING'));
+      showModal('share',paper('Share ending',`<p class="small">Copy this message and link to share your ending.</p><textarea class="share-link" aria-label="Ending message and link" rows="5" readonly>${esc(data.text+'\n'+data.url)}</textarea><div class="paper-actions"><button class="secondary" data-action="select-share-link">Select message</button><button class="primary" data-action="close">Back to game</button></div>`,'SHARE YOUR ENDING'));
     }
   } finally { sharingEnding=false; }
 }
@@ -481,8 +481,8 @@ function shotSound(hit) {
 function showProgressTransfer() {
   save();archiveRun();
   showModal('progress',paper('Move saved progress.',`
-    <p class="small">Carry your current shift, collected endings, and transcripts between the browser and installed app.</p>
-    <p class="small">In the browser with your progress, copy it or save a backup. Then open the app’s <b>KIT → Move saved progress</b> and paste the code or open that backup.</p>
+    <p class="small">Carry your saved game, achieved endings, and transcripts between the browser and installed app.</p>
+    <p class="small">In the browser with your progress, copy it or save a backup. Then open the app’s <b>Menu → Move saved progress</b> and paste the code or open that backup.</p>
     <div class="paper-actions"><button id="copy-progress" class="secondary" disabled>Copy progress</button><button id="download-progress" class="secondary" disabled>Save backup ↓</button></div>
     <p id="progress-export-status" class="small" role="status">Preparing progress…</p>
     <div class="paper-actions"><div class="progress-entry"><label for="progress-code">Progress code</label><textarea id="progress-code" rows="3" spellcheck="false" autocapitalize="off" autocomplete="off" placeholder="Paste the code from your browser here"></textarea></div>
@@ -514,9 +514,9 @@ function showProgressTransfer() {
     try {
       const snapshot=await decodeProgress(value);
       if(!importStatus.isConnected)return;
-      const summary=snapshot.save?`Shift ${snapshot.save.shift+1} of 3 · ${snapshot.save.mode==='hard'?'Hard':'Story'}`:'Completed records';
-      const replacement=snapshot.save && (game||readSave())?'This replaces the current shift in this app. ':'';
-      showModal('progress-confirm',paper('Restore this progress?',`<p>${esc(summary)}<br>${snapshot.history.collected.length} endings · ${snapshot.history.runs.length} completed assignments</p><p class="small">${replacement}Collected endings are combined. The latest 30 completed assignments are kept.</p><p id="progress-restore-status" class="small" role="status"></p><div class="paper-actions"><button id="confirm-progress" class="primary">Restore progress ↗</button><button id="cancel-progress" class="secondary">Cancel</button></div>`, 'SAVED PROGRESS'));
+      const summary=snapshot.save?`Shift ${snapshot.save.shift+1} of 3 · ${snapshot.save.mode==='hard'?'Hard':'Story'}`:'Achieved endings and transcripts';
+      const replacement=snapshot.save && (game||readSave())?'This replaces the current saved game in this app. ':'';
+      showModal('progress-confirm',paper('Restore this progress?',`<p>${esc(summary)}<br>${snapshot.history.collected.length} achieved endings · ${snapshot.history.runs.length} completed games</p><p class="small">${replacement}Achieved endings are combined. Transcripts from the latest 30 completed games are kept.</p><p id="progress-restore-status" class="small" role="status"></p><div class="paper-actions"><button id="confirm-progress" class="primary">Restore progress ↗</button><button id="cancel-progress" class="secondary">Cancel</button></div>`, 'SAVED PROGRESS'));
       $('cancel-progress').addEventListener('click',showProgressTransfer);
       $('confirm-progress').addEventListener('click',()=>{
         try {
@@ -524,7 +524,7 @@ function showProgressTransfer() {
           updateHistoryCount();saved=readSave();$('resume').hidden=!saved;
           if(snapshot.save){game=null;begin('story',true);}else closeModal();
           installHandoff.update(game||saved,history);
-          toast('Progress restored. Your endings and records are ready.');
+          toast('Progress restored. Your endings and transcripts are ready.');
         } catch {$('progress-restore-status').textContent='This browser could not save the transfer. Your existing progress has been kept. Try allowing site storage.';}
       });
     } catch {if(importStatus.isConnected)importStatus.textContent='That progress could not be read. Copy the full code again, or open a Debrief progress backup.';}
@@ -559,7 +559,7 @@ function showInstallGuide() {
     <p class="small">Open the new icon once online to prepare for offline play. Installation carries progress on supported browsers. After installation, browser and app saves may advance separately. For an app already installed, or if progress is missing, use Move saved progress.</p>
     <h3>Protect saves</h3>
     <p class="small">Keep saves during automatic browser cleanup.</p>
-    <button id="protect-storage" class="secondary">Request persistent storage</button>
+    <button id="protect-storage" class="secondary">Protect saved progress</button>
     <p id="storage-status" class="small" role="status" aria-live="polite">Checking storage…</p>
     <p class="note"><b>Installation is not a backup.</b> Clearing this site’s data deletes saves even with storage protection. Private browsing may discard them when closed.</p>
     <button class="primary" data-action="close">Done ↗</button>`, 'DEVICE SETUP'));
@@ -573,12 +573,12 @@ function showInstallGuide() {
   });
   const status=$('storage-status'), protect=$('protect-storage');
   if(!navigator.storage?.persist || !navigator.storage?.persisted){
-    status.textContent='This browser cannot request persistent storage. You can still play and save, but automatic cleanup may remove data.';
+    status.textContent='This browser cannot request save protection. You can still play and save, but automatic cleanup may remove data.';
     protect.disabled=true;
   } else {
     navigator.storage.persisted().then(granted=>{
       if(!status.isConnected || protect.disabled)return;
-      status.textContent=granted ? 'Persistent storage is enabled.' : 'Persistent storage is not enabled.';
+      status.textContent=granted ? 'Save protection is enabled.' : 'Save protection is not enabled.';
       if(granted){protect.disabled=true;protect.textContent='Storage protected';}
     }).catch(()=>{if(status.isConnected)status.textContent='Storage status could not be checked. You can try requesting protection.';});
   }
@@ -587,7 +587,7 @@ function showInstallGuide() {
     status.textContent='Requesting storage protection…';
     try {
       const granted=await navigator.storage.persist();
-      status.textContent=granted ? 'Persistent storage is enabled.' : 'The browser did not grant persistent storage. Try from the installed app.';
+      status.textContent=granted ? 'Save protection is enabled.' : 'The browser did not grant save protection. Try from the installed app.';
       protect.textContent=granted ? 'Storage protected' : 'Try again';
       protect.disabled=granted;
     } catch {
