@@ -61,3 +61,20 @@ test('resuming an older archived ending fills in its outcome without duplicating
   assert.equal(resumed.run('history.runs[0].stamp'),'PERIMETER SECURED');
   assert.equal(resumed.run('history.collected.length'),1);
 });
+
+test('an interrupted interview remains a distinct ending alongside the recovery result',()=>{
+  const a=archive();
+  const ordinary=createGame('story',41);
+  Object.assign(ordinary,{phase:'ending',ending:'guide_shot',reports:[{shift:2,kind:'recovery',question:'Confirm the report?',answer:'No.'}]});
+  a.context.game=ordinary;a.run('archiveRun();');
+  const interrupted=createGame('story',42);
+  Object.assign(interrupted,{phase:'ending',ending:'guide_interrupted',reports:[{shift:2,kind:'recovery',question:'Tell me what happened.',answer:'Grab the rifle and try to shoot the interviewer.'}]});
+  a.context.game=interrupted;a.run('archiveRun();archiveRun();');
+  const resumed=archive(a.storage);
+  assert.equal(resumed.run('history.runs.length'),2);
+  assert.equal(resumed.run('history.collected.length'),2);
+  assert.equal(resumed.run('history.runs[0].ending'),'guide_interrupted');
+  assert.equal(resumed.run('history.runs[0].stamp'),'RECORDING INTERRUPTED');
+  assert.equal(resumed.run('history.runs[0].reports[0].answer'),'Grab the rifle and try to shoot the interviewer.');
+  assert.equal(resumed.run('history.runs[1].ending'),'guide_shot');
+});

@@ -294,6 +294,7 @@ function nextShift(s) {
   s.shift++; s.phase = 'briefing'; s.exposure = Math.max(0, s.exposure - 12);
 }
 export const ENDINGS = {
+  guide_interrupted: { code: '09', title: 'I went off script.', stamp: 'RECORDING INTERRUPTED', transcript: true, text: '[redacted]: I watch the corn grow. I shoot any that try to escape.\n\n[gunshot]\n\n[sounds of a struggle]\n\n[static]\n\n[static]\n\n[static]', last: '' },
   consumption: { code: '07', title: 'Nothing wasted.', stamp: 'SPECIMEN INGESTED', text: 'The first bite is sweet. You finish the ear before you notice the boiling has stopped. Something fine catches between your teeth. When you pull it free, the pain comes from beneath your tongue. Your radio calls you back to the tower. You try to answer, but your mouth is full of warm soil. Outside, the rows lean toward the pump house.', last: 'For the first time tonight, you are no longer hungry.' },
   witness: { code: '01', title: 'An unofficial record.', stamp: 'DISTRIBUTION UNAUTHORIZED', text: 'The photographs and application records reach someone outside the department. The field is closed pending an inquiry. For a week, no one calls you. Then a farmer three counties away sends a photograph of his drainage ditch.', last: 'You keep the original report.' },
   guide: { code: '02', title: ENDING_SHARES.guide.line, stamp: 'RECOVERY PENDING', text: 'They follow you between the rows. You know each turn before you take it. Behind you, someone asks why the path is so warm. At the northeast corner, the corn makes room.', last: 'This makes three, sir.' },
@@ -345,6 +346,7 @@ export function restore(raw) {
     if (!s.log.every(l => typeof l.message === 'string') || !s.reports.every(r => typeof r.question === 'string' && typeof r.answer === 'string')) return null;
     if (!retirePreparations(s)) return null;
     if (s.phase === 'ending' && !Object.hasOwn(ENDINGS,s.ending)) return null;
+    if (s.ending === 'guide_interrupted' && (s.phase !== 'ending' || !s.guide)) return null;
     if (s.phase === 'debrief' && s.question === 3 && (s.shift >= 2 || typeof s.reports.at(-1)?.supervisorReply !== 'string')) return null;
     if (s.phase === 'guide' || s.guide) {
       const g=s.guide;

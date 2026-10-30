@@ -43,6 +43,14 @@ function finishDebrief(s){
 }
 function hitNext(s){const p=focusGuide(s);assert.ok(p);assert.equal(fireGuide(s,p.x,p.y),'person');}
 function waitForDebrief(s){for(let i=0;i<90&&s.guide.stage==='escape';i++)advance(s,1);assert.equal(s.guide.stage,'debrief');}
+function recoveryInterview(outcome,misses=0){
+  const s=explore();
+  for(let i=0;i<misses;i++)fireGuide(s,0,0);
+  if(outcome==='spared')spareGuide(s);
+  else if(outcome==='secured')for(let i=0;i<3;i++)hitNext(s);
+  else {if(!misses)fireGuide(s,0,0);waitForDebrief(s);}
+  assert.equal(s.guide.outcome,outcome);return s;
+}
 test('leading the team follows open rows and stops at discoveries in order',()=>{
   const s=begin();assert.equal(s.phase,'guide');assert.equal(s.ending,null);
   assert.equal(inspectGuide(s),null);assert.equal(s.guide.steps,0);
@@ -148,6 +156,73 @@ test('the final interview validates answers, freezes the field, and survives res
     assert.equal(serialize(s),completed,'Repeated inputs cannot duplicate the transcript.');
     assert.deepEqual(restore(completed),s);
   }
+});
+test('remaining rounds allow an interrupted recording at either recovery question in every branch',()=>{
+  for(const outcome of ['spared','secured','arrested'])for(const questionIndex of [0,1]){
+    const s=recoveryInterview(outcome,outcome==='secured'?2:outcome==='arrested'?5:0);
+    if(questionIndex)answerGuideDebrief(s,guideDebrief(s).options[0].id);
+    const question=guideDebrief(s),attack=question.options.find(option=>option.action==='rifle');
+    assert.ok(attack,`${outcome} question ${questionIndex+1} offers the rifle`);
+    assert.equal(attack.id,`${outcome}-${questionIndex}-rifle`);
+    assert.match(question.context,/within reach/);
+    assert.match(attack.detail,new RegExp(`^${6-s.guide.fired} round`));
+    const shots=s.shots,fieldShots=s.guide.fired,beforeReports=s.reports.length;
+    assert.equal(answerGuideDebrief(s,attack.id),true);
+    assert.equal(s.phase,'ending');assert.equal(s.ending,'guide_interrupted');
+    assert.equal(s.guide.interviewShot,true);assert.equal(s.guide.outcome,outcome);
+    assert.equal(s.guide.fired,fieldShots,'The field casualty outcome keeps its original ammunition count.');
+    assert.equal(s.shots,shots+1,'The interview consumes exactly one remaining round.');
+    assert.equal(s.guide.debriefQuestion,questionIndex+1);assert.equal(s.reports.length,beforeReports+1);
+    assert.equal(s.reports.at(-1).guideAction,'rifle');
+    assert.equal(s.reports.at(-1).supervisorReply,undefined,'No ordinary reply or claimed victim is appended after the shot.');
+    assert.deepEqual(restore(serialize(s)),s);
+    const finished=serialize(s);assert.equal(answerGuideDebrief(s,attack.id),false);
+    assert.equal(serialize(s),finished,'Repeating the input cannot fire again or append testimony.');
+  }
+});
+test('an empty rifle never offers or accepts an interview shot',()=>{
+  for(const outcome of ['secured','arrested']){
+    const s=recoveryInterview(outcome,outcome==='secured'?3:6);
+    for(const questionIndex of [0,1]){
+      const question=guideDebrief(s);
+      assert.equal(question.options.some(option=>option.action==='rifle'),false);
+      assert.match(question.context,/rifle is empty/);
+      const before=serialize(s);
+      assert.equal(answerGuideDebrief(s,`${outcome}-${questionIndex}-rifle`),false);
+      assert.equal(serialize(s),before);
+      answerGuideDebrief(s,question.options[0].id);
+    }
+    assert.equal(s.ending,'guide');assert.equal(s.guide.interviewShot,undefined);
+    assert.deepEqual(restore(serialize(s)),s);
+  }
+});
+test('a stale rifle choice cannot interrupt the next question',()=>{
+  const s=recoveryInterview('secured'),first=guideDebrief(s);
+  const stale=first.options.find(option=>option.action==='rifle').id;
+  answerGuideDebrief(s,first.options[0].id);
+  const before=serialize(s);assert.equal(answerGuideDebrief(s,stale),false);assert.equal(serialize(s),before);
+  assert.equal(answerGuideDebrief(s,guideDebrief(s).options.find(option=>option.action==='rifle').id),true);
+  assert.equal(s.ending,'guide_interrupted');
+});
+test('interrupted recordings reject inconsistent ammunition, phase, and transcript saves',()=>{
+  const s=recoveryInterview('secured');
+  answerGuideDebrief(s,guideDebrief(s).options.find(option=>option.action==='rifle').id);
+  const patches=[
+    state=>{state.guide.fired=6;},
+    state=>{state.shots=state.guide.fired;},
+    state=>{state.guide.interviewShot=false;},
+    state=>{delete state.guide.interviewShot;},
+    state=>{state.guide.interviewShot='yes';},
+    state=>{state.phase='guide';state.ending=null;},
+    state=>{state.ending='guide';},
+    state=>{state.guide.stage='escape';},
+    state=>{state.guide.debriefQuestion=0;},
+    state=>{state.guide.debriefQuestion=2;},
+    state=>{delete state.reports.at(-1).guideAction;},
+    state=>{state.reports.at(-1).supervisorReply='The report is approved.';}
+  ];
+  for(const patch of patches){const invalid=structuredClone(s);patch(invalid);assert.equal(restore(serialize(invalid)),null);}
+  assert.deepEqual(restore(serialize(s)),s);
 });
 test('guide saves cannot bypass an unfinished recovery interview through another phase',()=>{
   const retreat=explore(),interview=structuredClone(retreat);spareGuide(interview);

@@ -169,15 +169,15 @@ export function guideDebrief(s) {
       { speaker:'SUPERVISOR', prompt:'All three members of the recovery detail returned. They say you let them leave the field. Why?',
         context:'Three lamps sit on the desk. Outside the door, their owners are still talking.',
         options:[{id:'spared-0-people',label:'They were people. They were leaving a dangerous field.'},{id:'spared-0-order',label:'The order said to shoot anything that escaped. I decided not to follow it.'}],
-        reply:'The supervisor stops the tape. “We will record a refusal of duty.”' },
+        reply:'Beside the running recorder, the supervisor writes “refusal of duty.”' },
       { speaker:'SUPERVISOR', prompt:'You are relieved of this assignment. Put the rifle on the desk. Is there anything else you want on the recording?',
         context:'He removes your name from the next watch. The three lamps remain lit.',
         options:[{id:'spared-1-names',label:'Record the names of all three people who came back.'},{id:'spared-1-warning',label:'Do not send another team into that field.'}],
-        reply:'He takes the rifle before he restarts the tape.' }
+        reply:'He takes the rifle, then stops the tape.' }
     ],
     secured:[
       { speaker:'SUPERVISOR', prompt:'Three lights went out. No member of the recovery detail returned with you. Tell me what happened.',
-        context:`The rifle lies beside the recorder. You fired ${g.fired} of its six rounds.`,
+        context:`You fired ${g.fired} of the rifle’s six rounds. The recorder is running.`,
         options:[{id:'secured-0-people',label:'I shot all three members of the team.'},{id:'secured-0-order',label:'They tried to leave. I followed the instruction.'}],
         reply:'He writes “three escaping specimens contained” on the report.' },
       { speaker:'SUPERVISOR', prompt:'The report records successful containment. Your next watch begins tomorrow. Will you confirm that account?',
@@ -187,7 +187,7 @@ export function guideDebrief(s) {
     ],
     arrested:[
       { speaker:'SUPERVISOR', prompt:`${survivorsText} reported that you fired on the recovery detail. ${shot?`${shot===1?'One person did':`${shot} people did`} not return.`:'Everyone reached the road.'} What happened?`,
-        context:`${g.fired===6?'The rifle is empty.':'The remaining cartridges have been counted.'} A deputy stands beside the interview-room door.`,
+        context:'A deputy stands beside the interview-room door.',
         options:[{id:'arrested-0-admit',label:g.fired===1?'I fired at them. I was following the order.':'I fired at them. I heard the order and kept shooting.'},{id:'arrested-0-compulsion',label:'After the first shot, I could not make my hands lower the rifle.'}],
         reply:'The supervisor stops writing. The deputy asks him to keep the tape running.' },
       { speaker:'DEPUTY', prompt:'The rifle and this recording are being taken as evidence. You are coming with me. Is there anything else you want recorded?',
@@ -197,14 +197,28 @@ export function guideDebrief(s) {
     ]
   };
   const item=interviews[g.outcome]?.[question];
-  return item?{...item,question,total:2}:null;
+  if (!item) return null;
+  const remaining=6-g.fired;
+  const rifleContext=remaining>0
+    ? `The rifle is within reach. ${remaining===1?'One round remains':`${remaining} rounds remain`}.`
+    : 'The rifle is empty.';
+  const rifleOption=remaining>0&&!g.interviewShot
+    ? [{id:`${g.outcome}-${question}-rifle`,label:'Grab the rifle and try to shoot the interviewer.',detail:`${remaining} round${remaining===1?'':'s'} left.`,action:'rifle'}]
+    : [];
+  return {...item,context:`${item.context} ${rifleContext}`,options:[...item.options,...rifleOption],question,total:2};
 }
 export function answerGuideDebrief(s,id) {
   const question=guideDebrief(s),option=question?.options.find(option=>option.id===id);
   if (!option) return false;
-  s.reports.push({shift:s.shift,kind:'recovery',guideQuestion:s.guide.debriefQuestion,question:question.prompt,answer:option.label,supervisorReply:question.reply,replySpeaker:question.speaker});
+  const report={shift:s.shift,kind:'recovery',guideQuestion:s.guide.debriefQuestion,question:question.prompt,answer:option.label};
+  if (option.action==='rifle') report.guideAction='rifle';
+  else Object.assign(report,{supervisorReply:question.reply,replySpeaker:question.speaker});
+  s.reports.push(report);
   s.guide.debriefQuestion++;
-  if (s.guide.debriefQuestion===2) { s.phase='ending';s.ending='guide'; }
+  if (option.action==='rifle') {
+    s.guide.interviewShot=true;s.shots++;
+    s.phase='ending';s.ending='guide_interrupted';
+  } else if (s.guide.debriefQuestion===2) { s.phase='ending';s.ending='guide'; }
   return true;
 }
 // Preserve discoveries in old maze saves; resume safely from the last one.
@@ -232,6 +246,9 @@ export function restoreGuideRoute(s) {
     }
   }
   if (g.encounterVersion!==undefined && g.encounterVersion!==2) return false;
+  if (g.interviewShot!==undefined && typeof g.interviewShot!=='boolean') return false;
+  if (s.ending==='guide_interrupted' && (g.encounterVersion!==2||g.interviewShot!==true)) return false;
+  if (g.interviewShot && (g.encounterVersion!==2||g.stage!=='debrief'||s.phase!=='ending'||s.ending!=='guide_interrupted'||g.fired>=6||s.shots<g.fired+1)) return false;
   if (g.encounterVersion===2) {
     if (!['guide','ending'].includes(s.phase)) return false;
     if (![null,'spared','secured','arrested'].includes(g.outcome)||!Number.isInteger(g.debriefQuestion)||g.debriefQuestion<0||g.debriefQuestion>2) return false;
@@ -239,9 +256,13 @@ export function restoreGuideRoute(s) {
       const shot=g.team.filter(person=>person.status==='shot').length;
       if (!g.outcome||g.team.some(person=>person.status==='running')||g.routeProgress!==20||g.walking) return false;
       if ((g.outcome==='spared'&&(g.fired!==0||shot!==0))||(g.outcome==='secured'&&shot!==3)||(g.outcome==='arrested'&&(!g.fired||shot===3))) return false;
-      if ((s.phase==='guide'&&g.debriefQuestion===2)||(s.phase==='ending'&&(s.ending!=='guide'||g.debriefQuestion!==2))) return false;
+      if (g.interviewShot) {
+        if (g.debriefQuestion<1) return false;
+      } else if ((s.phase==='guide'&&g.debriefQuestion===2)||(s.phase==='ending'&&(s.ending!=='guide'||g.debriefQuestion!==2))) return false;
       const reports=s.reports.filter(report=>report.kind==='recovery');
       if (reports.length!==g.debriefQuestion||!reports.every((report,index)=>report.guideQuestion===index)) return false;
+      if (reports.some((report,index)=>report.guideAction!==undefined && (report.guideAction!=='rifle'||!g.interviewShot||index!==reports.length-1))) return false;
+      if (g.interviewShot && (reports.at(-1)?.guideAction!=='rifle'||reports.at(-1).supervisorReply!==undefined)) return false;
     } else if (g.outcome!==null||g.debriefQuestion!==0||s.phase==='ending') return false;
     if (g.stage==='escape'&&(g.fired>=6||g.team.every(person=>person.status==='shot')||(g.fired>0&&g.team.some(person=>person.status==='escaped')))) return false;
     if (g.stage!=='search'&&!['x','y','angle'].every(key=>Math.abs(g[key]-routePose(20)[key])<.000001)) return false;

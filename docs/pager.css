@@ -295,3 +295,6 @@
 #paper-dialog .choice .requirement-unmet { color: #843d2b; }
 /* The final interview can change from the supervisor to a deputy. */
 #paper-dialog[data-kind="guide-debrief"] .interview-question .speaker-label { display: block; }
+
+/* The interrupted tape keeps its pauses and offers no account after the static. */
+#paper-dialog .pager-page p.ending-transcript { font: 14px/1.5 'Courier New', monospace; }
