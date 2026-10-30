@@ -70,3 +70,21 @@ canvas,.playing canvas{width:100%;height:100%;min-height:0;max-height:none;objec
  .welcome h1{margin:8px 0 18px;letter-spacing:-4px}.opening{font-size:20px;margin-bottom:20px}
  .difficulty{margin-top:16px}.statusbar{padding:6px 12px}
 }
+
+/* Play occupies the viewport; controls and counters float over the field. */
+.playing .game-shell{height:100dvh;min-height:0;position:relative;overflow:hidden}
+.playing .game-shell .masthead{position:absolute;inset:0 0 auto;z-index:3;background:linear-gradient(#111914cc,transparent);border:0;padding-top:max(8px,env(safe-area-inset-top))}
+.playing .workspace{position:absolute;inset:0;display:block;min-height:0}
+.playing .viewport{position:absolute;inset:0;min-height:0}
+.playing canvas{position:absolute;inset:0;width:100%;height:100%;aspect-ratio:auto;object-fit:fill}
+.playing .statusbar{display:none}
+.playing .sidebar{position:absolute;bottom:max(12px,env(safe-area-inset-bottom));left:12px;right:12px;width:auto;border:0;background:transparent;display:block;pointer-events:none}
+.playing .sidebar .controls{padding:0;max-width:400px;margin:auto;pointer-events:auto}
+.playing .controls button{background:#20291fe8;min-height:44px}
+.playing .controls small{background:#111914dd;padding:6px}
+.playing .viewport>.stats{position:absolute;top:calc(68px + env(safe-area-inset-top));left:16px;right:16px;padding:0;display:flex;gap:20px;pointer-events:none;text-shadow:0 1px 4px #000}
+.playing .viewport>.stats .stat{border:0;padding:0}.playing .viewport>.stats .stat label{font-size:9px;margin-bottom:3px;color:var(--ink)}
+.playing .viewport>.stats .stat strong{font-size:20px}.playing .viewport>.stats .meter{display:none}
+.playing .tower-hud{right:16px;bottom:max(20px,env(safe-area-inset-bottom))}
+.playing .tower-hud button{min-height:48px;background:#20291fe8}
+#assignment-info .panel-heading{font-size:10px}#assignment-info .assignment{padding:12px}#assignment-info h2{font:22px Georgia,serif}

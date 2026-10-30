@@ -213,7 +213,7 @@ export class Renderer {
     c.restore();
   }
   coords(event) {
-    const r=this.canvas.getBoundingClientRect(),scale=Math.min(r.width/W,r.height/H);
-    return {x:(event.clientX-r.left-(r.width-W*scale)/2)/scale,y:(event.clientY-r.top-(r.height-H*scale)/2)/scale};
+    const r=this.canvas.getBoundingClientRect();
+    return {x:(event.clientX-r.left)*W/r.width,y:(event.clientY-r.top)*H/r.height};
   }
 }

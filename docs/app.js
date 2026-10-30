@@ -87,6 +87,7 @@ function sceneDialog() {
 function stat(label,value,sub='',percent=null,warning=false) {return `<div class="stat ${warning?'warning':''}"><label>${label}</label><strong>${value}</strong><small> ${sub}</small>${percent!==null?`<div class="meter"><span style="width:${Math.min(100,Math.max(0,percent))}%"></span></div>`:''}</div>`;}
 function updateUI(force=false) {
   if(!game)return;
+  document.body.dataset.phase=game.phase;
   const phase=game.phase,field=phase==='field',site=nearbySite(game),active=phase==='tower';
   $('date-label').textContent=`${DATES[game.shift]}, ████`;
   $('station-status').textContent=field?'RADIO SIGNAL WEAK':phase==='ending'?'FILE CLOSED':'PERIMETER ACTIVE';
