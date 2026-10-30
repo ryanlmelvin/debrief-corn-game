@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { createGame,startShift,advance,shoot,reload,enterField,move,inspect,beginDebrief,answer,getQuestion,restore,serialize,SHIFT_LENGTH,focusNext,ENDINGS } from '../docs/engine.js';
+import { createGame,startShift,advance,shoot,reload,enterField,move,inspect,beginDebrief,answer,getQuestion,restore,serialize,SHIFT_LENGTH,focusNext,ENDINGS,EVIDENCE } from '../docs/engine.js';
 
 const watch=mode=>{const s=createGame(mode,42);startShift(s);return s;};
 function safeWatch(s){while(s.phase==='tower'){advance(s,.25);for(const t of [...s.targets]){if(t.kind!=='corn')continue;if(!s.rounds){reload(s);break;}shoot(s,t.x,t.y-34);}if(s.rounds<2)reload(s);}}
@@ -100,4 +100,40 @@ test('accepting the report still closes the interview directly', () => {
   answer(s, 'sign');
   assert.equal(s.phase, 'briefing');
   assert.equal(s.shift, 1);
+});
+
+
+test('field notes never name exhibits before or during their discovery', () => {
+  for (let shift = 0; shift < 3; shift++) {
+    for (const [x, y] of [[9, 1], [3, 3], [7, 5]]) {
+      const s = watch('story');
+      s.shift = shift;
+      safeWatch(s);
+      enterField(s);
+      walkTo(s, x, y);
+      assert.equal(s.evidence.length, 0);
+      for (const exhibit of Object.values(EVIDENCE)) {
+        assert.ok(s.log.every(entry => !entry.message.includes(exhibit.title)));
+      }
+      const id = inspect(s);
+      assert.ok(id);
+      assert.ok(s.evidence.includes(id));
+      assert.equal(s.log[0].message, 'Private observation saved. Open your notebook to read it.');
+      assert.ok(!s.log[0].message.includes(EVIDENCE[id].title));
+    }
+  }
+});
+
+test('older saves replace exhibit-title receipts without losing evidence or other notes', () => {
+  const s = createGame();
+  s.evidence = ['roots'];
+  s.log = [
+    { message: 'Connected roots entered in your private notebook.', tone: 'story', at: 12 },
+    { message: 'Your radio stays silent.', tone: 'story', at: 5 }
+  ];
+  const resumed = restore(serialize(s));
+  assert.deepEqual(resumed.evidence, ['roots']);
+  assert.equal(resumed.log[0].message, 'Private observation saved. Open your notebook to read it.');
+  assert.equal(resumed.log[0].at, 12);
+  assert.deepEqual(resumed.log[1], s.log[1]);
 });

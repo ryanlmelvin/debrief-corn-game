@@ -150,7 +150,7 @@ export function inspect(s) {
   s.inspected.push(site.id);
   const id = site.id === 'corner' ? ['dress', 'badge', 'teeth'][s.shift] : site.id === 'pump' ? (s.shift === 0 ? 'ledger' : 'sample') : (s.shift < 2 ? 'roots' : 'map');
   if (!s.evidence.includes(id)) s.evidence.push(id);
-  addLog(s, `${EVIDENCE[id].title} entered in your private notebook.`, 'story');
+  addLog(s, 'Private observation saved. Open your notebook to read it.', 'story');
   return id;
 }
 export function beginDebrief(s) {
@@ -261,6 +261,11 @@ export function restore(raw) {
     if (!s.log.every(l => typeof l.message === 'string') || !s.reports.every(r => typeof r.question === 'string' && typeof r.answer === 'string')) return null;
     if (s.phase === 'ending' && !Object.hasOwn(ENDINGS,s.ending)) return null;
     if (s.phase === 'debrief' && s.question === 3 && (s.shift >= 2 || typeof s.reports.at(-1)?.supervisorReply !== 'string')) return null;
+    // Older saves used discovery titles as log receipts, revealing them outside the exhibit.
+    const oldReceipts = new Set(Object.values(EVIDENCE).map(e => `${e.title} entered in your private notebook.`));
+    s.log = s.log.map(entry => oldReceipts.has(entry.message)
+      ? { ...entry, message: 'Private observation saved. Open your notebook to read it.' }
+      : entry);
     return s;
   } catch { return null; }
 }
