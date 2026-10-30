@@ -102,6 +102,7 @@ function updateUI(force=false) {
   $('investigate-urge').style.setProperty('--urge-size',`${26+urge*15}px`);
   $('investigate-urge').style.setProperty('--urge-weight',String(400+Math.floor(urge*3)*100));
   $('tower-hud').hidden=!active;
+  $('hud-ammo').textContent=`${game.rounds} / ${game.reserve} · .22`;
   $('hud-reload').disabled=paused||game.reload>0||game.rounds===6||game.reserve===0;
   $('hud-reload').textContent=game.reload>0?'↻ Reloading…':'↻ Reload';
   $('hud-reload').setAttribute('aria-label',`Reload rifle. ${game.rounds} rounds loaded, ${game.reserve} in reserve.`);
@@ -199,8 +200,7 @@ canvas.addEventListener('pointerdown',event=>{
   if(game.phase==='guide'){renderer.pointer=renderer.coords(event);fire(renderer.pointer);}
   else if(game.phase==='tower'){
     const p=renderer.coords(event);renderer.pointer=p;
-    const rect=canvas.getBoundingClientRect(),scale=Math.min(rect.width/960,rect.height/600);
-    fire(p,event.pointerType==='touch'?Math.max(0,22/scale-24):0);
+    fire(p,event.pointerType==='touch'?22/Math.max(.1,renderer.view.scale):0);
   }
   else if(game.phase==='field') {
     const p=renderer.coords(event),x=Math.floor((p.x-125)/58),y=Math.floor((p.y-74)/58);

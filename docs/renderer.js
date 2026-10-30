@@ -21,6 +21,16 @@ function stalk(c,x,y,size,color,lean=0,mutant=false) {
   }
   c.restore();
 }
+export function cameraFor(width,height) {
+  const scale=Math.max(width/W,height/H);
+  const viewWidth=width/scale,viewHeight=height/scale;
+  return {scale,width:viewWidth,height:viewHeight,left:(W-viewWidth)/2,top:(H-viewHeight)/2};
+}
+export function targetProjection(target,view) {
+  const size=Math.min(1,Math.max(.55,view.width/W));
+  const margin=32*size;
+  return {x:view.left+margin+(target.x-40)/880*(view.width-2*margin),y:target.y,size};
+}
 export class Renderer {
   constructor(canvas) {
     this.canvas=canvas; this.c=canvas.getContext('2d');
@@ -33,8 +43,6 @@ export class Renderer {
     const random=rng(40130);
     const sky=c.createLinearGradient(0,0,0,310); sky.addColorStop(0,'#101e1d'); sky.addColorStop(.55,'#3f5149'); sky.addColorStop(1,'#b2a875');
     c.fillStyle=sky; c.fillRect(0,0,W,H);
-    c.fillStyle='#d9d6ae'; c.beginPath(); c.arc(760,99,23,0,Math.PI*2); c.fill();
-    c.fillStyle='#34483f'; c.beginPath(); c.arc(751,92,22,0,Math.PI*2); c.fill();
     c.globalAlpha=.28;
     for(let i=0;i<48;i++) { const x=random()*W,y=random()*160; c.fillStyle='#eee4c5'; c.fillRect(x,y,1,1); }
     c.globalAlpha=1;
@@ -72,19 +80,25 @@ export class Renderer {
     const vignette=c.createRadialGradient(480,310,170,480,310,620);vignette.addColorStop(0,'#08110d00');vignette.addColorStop(1,'#08110dc9');c.fillStyle=vignette;c.fillRect(0,0,W,H);
   }
   drawEclipse(s,title) {
-    // Keep the original, oddly offset shadow; let it grow across the disk.
     const progress=!s || title || s.phase==='briefing' ? 0
       : ['debrief','ending'].includes(s.phase) ? 1 : Math.max(0,Math.min(1,s.time/SHIFT_LENGTH));
-    if(progress===0)return;
-    const c=this.c;
+    const c=this.c,view=this.view||{left:0,top:0,width:W,height:H};
+    const x=view.left+view.width*.79,y=Math.max(99,view.top+view.height*.17);
+    // Cut the shadow out of one lit disk, leaving the sky visible through it.
+    // Painting an opaque shadow disk made it look like an additional gray moon.
     c.save();
-    c.beginPath();c.arc(760,99,23,0,Math.PI*2);c.clip();
-    c.fillStyle=`rgb(${Math.round(52+progress*40)},${Math.round(72+progress*20)},${Math.round(63+progress*29)})`;
-    c.beginPath();c.arc(751,92,22+14*progress,0,Math.PI*2);c.fill();
+    c.beginPath();c.arc(x,y,23,0,Math.PI*2);c.clip();
+    c.fillStyle='#d9d6ae';
+    c.beginPath();c.arc(x,y,23,0,Math.PI*2);
+    c.moveTo(x-9+22+14*progress,y-7);
+    c.arc(x-9,y-7,22+14*progress,0,Math.PI*2);
+    c.fill('evenodd');
     c.restore();
   }
   draw(s,now,title=false) {
     const c=this.c; c.clearRect(0,0,W,H);
+    const rect=this.canvas.getBoundingClientRect();
+    this.view=cameraFor(rect.width,rect.height);this.scene=s;
     if(s?.phase==='guide') { this.drawGuide(s); return; }
     if(s?.phase==='field') { this.drawMap(s); return; }
     c.drawImage(this.background,0,0);
@@ -110,21 +124,23 @@ export class Renderer {
     c.textAlign='right';c.fillText('38°00′17″ N   89°14′12″ W',913,51);
     c.textAlign='left';c.fillStyle='#a8b38d';c.fillText('N',477,42);line(c,480,49,480,62,'#a8b38d');
     if(s?.phase==='tower'&&!title) {
-      const {x,y}=this.pointer;
+      const {x,y}=this.pointer.view||targetProjection(this.pointer,this.view);
       c.strokeStyle=s.reload?'#d6af69':'#e3dfb9';c.lineWidth=1;
       c.beginPath();c.arc(x,y,12,0,Math.PI*2);c.stroke();
       for(const d of [-1,1]) { line(c,x+d*5,y,x+d*20,y,'#e3dfb9');line(c,x,y+d*5,x,y+d*20,'#e3dfb9'); }
       if(s.lastShot && s.time-s.lastShot.time<.16) {
-        const p=s.lastShot;c.strokeStyle='#d8ba75';c.beginPath();c.arc(p.x,p.y,20+(s.time-p.time)*80,0,Math.PI*2);c.stroke();
+        const p=targetProjection(s.lastShot,this.view);c.strokeStyle='#d8ba75';c.beginPath();c.arc(p.x,p.y,20+(s.time-p.time)*80,0,Math.PI*2);c.stroke();
       }
       if(s.shift>0 && s.time>35 && s.time<44){c.save();c.globalAlpha=this.reduced ? .6 :Math.sin((s.time-35)/9*Math.PI)*.6;c.fillStyle=s.shift===2?'#b56554':'#bcc09a';c.font='17px Georgia';c.textAlign='center';c.fillText('Watch the corn. Shoot any that try to escape.',480,110);c.restore();}
-      c.fillStyle='#ddd5ad';c.font='11px monospace';c.fillText(s.reload?'RELOADING':`${String(s.rounds).padStart(2,'0')} / ${String(s.reserve).padStart(2,'0')}   .22 RIFLE`,47,582);
+
 
     }
     c.restore();
   }
   drawTarget(target,t,s) {
-    const c=this.c,{x,y}=target;const sway=Math.sin(t*4+target.wobble)*.08;
+    const c=this.c,p=targetProjection(target,this.view);
+    c.save();c.translate(p.x,p.y);c.scale(p.size,p.size);c.translate(-target.x,-target.y);
+    const {x,y}=target;const sway=Math.sin(t*4+target.wobble)*.08;
     c.fillStyle='#07120b75';c.beginPath();c.ellipse(x,y+5,25,6,0,0,Math.PI*2);c.fill();
     if(target.kind==='person') {
       c.fillStyle='#c6c6b4';c.beginPath();c.moveTo(x-5,y-37);c.lineTo(x-13,y-2);c.lineTo(x+13,y-2);c.lineTo(x+5,y-37);c.fill();
@@ -136,9 +152,13 @@ export class Renderer {
       const col=s.focused===target.id?'#f2d694':'#c47756';
       for(const side of [-1,1]) { line(c,x+side*24,y-77,x+side*15,y-77,col,1.5);line(c,x+side*24,y-77,x+side*24,y-67,col,1.5);line(c,x+side*24,y+9,x+side*15,y+9,col,1.5); }
     }
+    c.restore();
   }
   drawMap(s) {
     const c=this.c;c.fillStyle='#16221c';c.fillRect(0,0,W,H);
+    const view=this.view,scale=Math.min(view.width/W,view.height/H)*.94;
+    this.mapView={scale,left:480-W*scale/2,top:300-H*scale/2};
+    c.save();c.translate(this.mapView.left,this.mapView.top);c.scale(scale,scale);
     const x0=125,y0=74,cell=58;
     c.font='11px monospace';c.fillStyle='#8e9d79';c.textAlign='left';c.fillText('FIELD SURVEY  /  BOOTS ON THE GROUND',42,36);c.textAlign='right';c.fillText('N ↑',916,36);
     for(let y=0;y<9;y++) for(let x=0;x<11;x++) {
@@ -163,6 +183,7 @@ export class Renderer {
     c.strokeStyle='#ddd9a67a';c.lineWidth=1;c.beginPath();c.arc(px,py,22,0,Math.PI*2);c.stroke();
     c.fillStyle='#f3e3aa';c.beginPath();c.moveTo(px,py-10);c.lineTo(px+7,py+7);c.lineTo(px,py+3);c.lineTo(px-7,py+7);c.fill();
     c.fillStyle='#9fa888';c.font='11px monospace';c.textAlign='left';c.fillStyle='#dfc77d';c.fillRect(42,563,10,14);c.fillText('UNREAD',61,576);c.fillStyle='#9fa888';c.fillText('✓  SEARCHED',155,576);
+    c.restore();
   }
   drawGuide(s) {
     const c=this.c,g=s.guide;
@@ -199,7 +220,7 @@ export class Renderer {
     const vignette=c.createRadialGradient(480,320,40,480,320,480);vignette.addColorStop(0,'#02080500');vignette.addColorStop(.65,'#02080560');vignette.addColorStop(1,'#020805f2');c.fillStyle=vignette;c.fillRect(0,0,W,H);
     c.fillStyle='#afba98';c.font='11px monospace';c.textAlign='left';
     const compass=['E','S','W','N'][((Math.round(g.angle/(Math.PI/2))%4)+4)%4];
-    c.fillText(`RECOVERY DETAIL  /  ${compass}`,35,36);
+    c.fillText(`RECOVERY DETAIL  /  ${compass}`,this.view.left+18,this.view.top+110);
     if(g.stage==='escape'){
       const p=this.pointer;c.strokeStyle='#d6cfad';c.lineWidth=1;c.beginPath();c.arc(p.x,p.y,10,0,Math.PI*2);c.stroke();
       // Slow fades, with a steady equivalent for reduced-motion preferences.
@@ -208,12 +229,25 @@ export class Renderer {
       c.fillStyle='#191f18';c.beginPath();c.moveTo(620,600);c.lineTo(493,401);c.lineTo(483,401);c.lineTo(535,600);c.fill();
     }
     c.fillStyle='#d4d2b7';c.font='15px Georgia';c.textAlign='center';
-    const words=g.message.split(' ');let row='',y=533;
-    for(const word of words){if(c.measureText(row+word).width>730){c.fillText(row,480,y);y+=22;row='';}row+=word+' ';}c.fillText(row,480,y);
+    const words=g.message.split(' ');let row='',y=Math.min(490,this.view.top+this.view.height-150);
+    for(const word of words){if(c.measureText(row+word).width>Math.min(730,this.view.width-36)){c.fillText(row,480,y);y+=22;row='';}row+=word+' ';}c.fillText(row,480,y);
     c.restore();
   }
   coords(event) {
-    const r=this.canvas.getBoundingClientRect();
-    return {x:(event.clientX-r.left)*W/r.width,y:(event.clientY-r.top)*H/r.height};
+    const r=this.canvas.getBoundingClientRect(),view=cameraFor(r.width,r.height);
+    const point={x:view.left+(event.clientX-r.left)/view.scale,y:view.top+(event.clientY-r.top)/view.scale};
+    if(this.scene?.phase==='tower') {
+      for(const target of [...this.scene.targets].reverse()) {
+        const p=targetProjection(target,view);
+        const dx=(point.x-p.x)/p.size,dy=(point.y-p.y)/p.size;
+        const padding=event.pointerType==='touch'?Math.max(0,22/view.scale/p.size-24):0;
+        if((dx/(24+padding))**2+((dy+34)/(45+padding))**2<=1)
+          return {x:target.x+dx,y:target.y+dy,view:point};
+      }
+      return {x:-1000,y:-1000,view:point};
+    }
+    if(this.scene?.phase==='field'&&this.mapView)
+      return {x:(point.x-this.mapView.left)/this.mapView.scale,y:(point.y-this.mapView.top)/this.mapView.scale};
+    return point;
   }
 }

@@ -88,3 +88,7 @@ canvas,.playing canvas{width:100%;height:100%;min-height:0;max-height:none;objec
 .playing .tower-hud{right:16px;bottom:max(20px,env(safe-area-inset-bottom))}
 .playing .tower-hud button{min-height:48px;background:#20291fe8}
 #assignment-info .panel-heading{font-size:10px}#assignment-info .assignment{padding:12px}#assignment-info h2{font:22px Georgia,serif}
+
+.playing canvas{object-fit:cover}
+
+.playing .tower-hud{left:16px;display:flex;align-items:center;justify-content:space-between;gap:12px}.tower-hud #hud-ammo{font-size:12px;color:var(--ink);padding:10px;background:#111914b3}
