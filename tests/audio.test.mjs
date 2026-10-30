@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import vm from 'node:vm';
 import { readFileSync } from 'node:fs';
-import { GameAudio, PressureDrone } from '../docs/audio.js';
+import { GameAudio, PressureDrone, cornfieldAmbience } from '../docs/audio.js';
 
 class Param {
   constructor(value = 0) { this.value = value; this.events = []; }
@@ -28,7 +28,7 @@ class Context {
   createBufferSource() { return this.node(); }
   createBiquadFilter() { return this.node(); }
   createDelay() { return this.node(); }
-  createBuffer(channels, length) { const data = new Float32Array(length); return {getChannelData: () => data}; }
+  createBuffer(channels, length) { const data = Array.from({length:channels}, () => new Float32Array(length)); return {getChannelData: channel => data[channel]}; }
   async resume() { this.resumes++; }
   async suspend() { this.suspends++; }
 }
@@ -117,4 +117,21 @@ test('sound confirmation is audible through the destination while the game mix i
   assert.equal(tone.stops.length,1);
   tone.onended();
   assert.equal(tone.connections.length,0);assert.equal(gain.connections.length,0);
+});
+
+
+test('cornfield ambience has seamless stereo detail and distinct quiet and rustling passages', () => {
+  const context = new Context(), buffer = cornfieldAmbience(context);
+  const left = buffer.getChannelData(0), right = buffer.getChannelData(1);
+  assert.equal(left.length,context.sampleRate*32);
+  assert.notDeepEqual(left,right);
+  for(const data of [left,right]) {
+    assert.equal(Math.abs(data[0]),0);assert.equal(Math.abs(data.at(-1)),0);
+    assert.ok(data.every(value=>Number.isFinite(value)&&Math.abs(value)<.8));
+  }
+  const rms = (start,end) => Math.sqrt(left.slice(start*context.sampleRate,end*context.sampleRate).reduce((sum,x)=>sum+x*x,0)/((end-start)*context.sampleRate));
+  assert.ok(rms(3,4)>rms(11,12)*2, 'stalk movement rises out of a quiet field');
+  const sound = new GameAudio(context);
+  assert.equal(sound.ambient.buffer.getChannelData(0).length,left.length);
+  assert.equal(sound.ambient.loop,true);
 });

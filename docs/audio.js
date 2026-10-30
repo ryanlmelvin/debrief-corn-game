@@ -21,6 +21,53 @@ function brownNoise(context) {
   return buffer;
 }
 
+// A composed, seamless night field rather than a constant bed of raw noise.
+// Fixed event positions keep the atmosphere reproducible and work offline.
+export function cornfieldAmbience(context) {
+  const duration = 32, rate = context.sampleRate, length = rate * duration;
+  const buffer = context.createBuffer(2, length, rate);
+  const rustles = [2.4, 8.7, 15.2, 21.8, 28.1];
+  for (let channel = 0; channel < 2; channel++) {
+    const data = buffer.getChannelData(channel);
+    let seed = 4301 + channel * 971, wind = 0, leafLow = 0, leafHigh = 0;
+    const smooth = 1 - Math.exp(-2 * Math.PI * 380 / rate);
+    const low = 1 - Math.exp(-2 * Math.PI * 650 / rate);
+    const high = 1 - Math.exp(-2 * Math.PI * 2400 / rate);
+    for (let i = 0; i < length; i++) {
+      const t = i / rate;
+      seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0;
+      const noise = seed / 4294967296 * 2 - 1;
+      wind += smooth * (noise - wind);
+      leafLow += low * (noise - leafLow); leafHigh += high * (noise - leafHigh);
+      // Long, uneven gusts with stretches of near stillness between them.
+      const gust = (.5 + .5 * Math.sin(2 * Math.PI * t / 16 + channel * .4)) ** 3;
+      let sample = wind * (.025 + .24 * gust);
+      for (let event = 0; event < rustles.length; event++) {
+        const age = t - rustles[event] - channel * .16;
+        if (age > 0 && age < 2.2) {
+          const envelope = Math.sin(Math.PI * age / 2.2) ** 2;
+          const side = event % 2 === channel ? 1 : .35;
+          sample += (leafHigh - leafLow) * envelope * side * .65;
+          // A dry stalk flexing inside the rustle, well below the insect calls.
+          sample += Math.sin(2 * Math.PI * (185 * age - 12 * age * age)) * envelope * side * .018;
+        }
+      }
+      // Small groups of distant cricket chirps; no continuous high-pitched tone.
+      const insectAge = (t + channel * 1.7) % 6.4;
+      if (insectAge < .85) {
+        const pulse = Math.max(0, Math.sin(2 * Math.PI * 14 * insectAge)) ** 4;
+        const phrase = Math.sin(Math.PI * insectAge / .85) ** 2;
+        sample += Math.sin(2 * Math.PI * (2600 + channel * 190) * t) * pulse * phrase * .035;
+      }
+      // A distant, barely tonal unease underneath the natural sounds.
+      sample += Math.sin(2 * Math.PI * 96 * t) * .009 * (.3 + .7 * gust);
+      const edge = Math.min(1, t / .4, (duration - 1 / rate - t) / .4);
+      data[i] = sample * Math.max(0, edge);
+    }
+  }
+  return buffer;
+}
+
 export class PressureDrone {
   constructor(context, destination, noise = brownNoise(context)) {
     this.context = context;
@@ -78,7 +125,7 @@ export class GameAudio {
     this.context = context; this.active = false; this.pressure = -1; this.suspendTimer = null; this.shots = new Set();
     this.master = context.createGain(); this.master.gain.value = 0; this.master.connect(context.destination);
     const noise = brownNoise(context);
-    this.ambient = context.createBufferSource(); this.ambient.buffer = noise; this.ambient.loop = true;
+    this.ambient = context.createBufferSource(); this.ambient.buffer = cornfieldAmbience(context); this.ambient.loop = true;
     this.ambientLevel = context.createGain(); this.ambientLevel.gain.value = .55;
     this.ambient.connect(this.ambientLevel); this.ambientLevel.connect(this.master); this.ambient.start();
     this.drone = new PressureDrone(context, this.master, noise);
