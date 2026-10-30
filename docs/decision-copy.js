@@ -44,7 +44,7 @@ export function decisionQuestion(game) {
         : 'What did you see in the northeast corner?';
     context = compelled ? 'Your hands ache from the ladder. You cannot explain leaving.'
       : 'The microphone catches your breathing.';
-    labels.truth = compelled ? `I saw ${sighting}. I meant to stay.`
+    labels.truth = compelled ? `I saw ${sighting}.`
       : game.entered ? `I saw ${sighting} and went to investigate.`
         : `I saw ${sighting}. I stayed at my post.`;
     labels.comply = game.entered ? 'I was checking the perimeter, sir.' : 'Routine crop movement. Nothing further.';

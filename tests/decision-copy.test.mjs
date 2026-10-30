@@ -56,7 +56,8 @@ test('sighting choices distinguish voluntary, compelled, and tower-only testimon
       const game = interview({ shift, departure, entered: departure !== null, lightsOut: [0, 1, 2].slice(0, count) });
       const question = assertEquivalent(game), truth = choice(question, 'truth').label;
       assert.ok(truth.includes(observedSighting(game)));
-      assert.match(truth, departure === 'compelled' ? /meant to stay/ : departure === 'chosen' ? /went to investigate/ : /stayed at my post/);
+      assert.match(truth, departure === 'compelled' ? /^I saw .+\.$/ : departure === 'chosen' ? /went to investigate/ : /stayed at my post/);
+      assert.doesNotMatch(truth, /meant to stay/);
       if (departure === 'compelled') assert.match(question.prompt, /without answering your relief/);
       if (shift === 2 && !count) assert.doesNotMatch(truth, /light.*out/);
     }
