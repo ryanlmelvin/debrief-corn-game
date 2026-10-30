@@ -1,5 +1,5 @@
 import { SIGHTING_TIME, sightingPeople, watchNight, personExitTime, observedSighting } from './watch-story.js';
-import { startGuide, advanceGuide, guideDisposition } from './guide.js';
+import { startGuide, advanceGuide, guideDisposition, restoreGuideRoute } from './guide.js';
 import { freshCaseFile, preparationTasks, caseProgress, caseDetail, migrateCaseFile, validCaseFile } from './evidence-case.js';
 import { fieldStepCost } from './field.js';
 import { freshFieldEvents, encounterAfterStep, resolveEncounter, dismissEncounter, migrateFieldEvents, validFieldEvents, encounterById } from './encounters.js';
@@ -352,6 +352,7 @@ export function restore(raw) {
       if (!Array.isArray(g.clues) || g.clues.length>3 || !g.clues.every((id,i)=>id===['boot','radio','corner'][i])) return null;
       if (!Array.isArray(g.team) || g.team.length>3 || !g.team.every(t=>Number.isInteger(t.id)&&Number.isFinite(t.x)&&Number.isFinite(t.y)&&Number.isFinite(t.distance)&&['running','shot','escaped'].includes(t.status))) return null;
       if (g.stage==='escape' && (g.team.length!==3 || g.clues.length!==3)) return null;
+      if (!restoreGuideRoute(s)) return null;
     }
     // Saves from the removed interstitial now resume directly on the map.
     if (s.phase === 'decision') { s.incident = true; s.targets = []; enterField(s); }

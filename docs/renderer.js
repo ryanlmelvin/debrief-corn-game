@@ -1,8 +1,14 @@
 import { personRole, personLight, targetArtwork } from './watch-story.js';
-import { guideWall, GUIDE_SITES, projectGuide, isGuideAftermath } from './guide.js';
+import { GUIDE_SITES, projectGuide, isGuideAftermath } from './guide.js';
 import { FIELD_SITES, SHIFT_LENGTH } from './engine.js';
 
 const W = 960, H = 600;
+const GUIDE_PLATES = {
+  walk: { file: 'encounter-tracks.webp', x: .62, y: .46 },
+  boot: { file: 'encounter-extra-step.webp', x: .52, y: .54 },
+  radio: { file: 'encounter-radio.webp', x: .46, y: .5 },
+  corner: { file: 'field-corner.webp', x: .45, y: .48 }
+};
 // Source bounds keep transparent padding out of the gameplay size. The root
 // crown / shoes share the same ground anchor as the procedural fallback.
 const TARGET_SPRITES = {
@@ -79,6 +85,10 @@ export class Renderer {
     for(const [kind,art] of Object.entries(TARGET_SPRITES)) {
       if(!byFile.has(art.file)) {const image=new Image();image.src=new URL(`./assets/${art.file}`,import.meta.url).href;byFile.set(art.file,image);}
       this.sprites[kind]=byFile.get(art.file);
+    }
+    this.guidePlates={};
+    for(const [key,plate] of Object.entries(GUIDE_PLATES)) {
+      const image=new Image();image.src=new URL(`./assets/${plate.file}`,import.meta.url).href;this.guidePlates[key]=image;
     }
     this.towerFrame=document.createElement('canvas');this.towerFrame.width=W;this.towerFrame.height=H;
     this.paintTowerFrame(this.towerFrame.getContext('2d'));
@@ -402,31 +412,26 @@ export class Renderer {
   drawGuide(s) {
     const c=this.c,g=s.guide,aftermath=isGuideAftermath(s);
     c.save();
-    const sky=c.createLinearGradient(0,0,0,300);sky.addColorStop(0,'#080f0e');sky.addColorStop(1,'#394338');c.fillStyle=sky;c.fillRect(0,0,W,300);
-    const soil=c.createLinearGradient(0,300,0,H);soil.addColorStop(0,'#2d3324');soil.addColorStop(1,'#111b15');c.fillStyle=soil;c.fillRect(0,300,W,300);
-    const soilGrain=rng(914);
-    for(let i=0;i<220;i++) {
-      const y=302+soilGrain()*298,depth=(y-300)/300,x=soilGrain()*W;
-      c.fillStyle=i%2?'#7c795c12':'#050b092b';c.fillRect(x,y,1+depth*5,.5+depth);
+    // The same field artwork used in the notebook fills the scene.
+    // Discoveries stay in view until the player leads onward.
+    const discovery=g.stage==='search'&&!g.walking&&GUIDE_SITES.find(site=>Math.hypot(site.x-g.x,site.y-g.y)<.18);
+    const plate=discovery?.id||'walk';
+    const legStart=[0,2,10][Math.min(g.clues.length,2)],legEnd=[2,10,20][Math.min(g.clues.length,2)];
+    const progress=Math.max(0,Math.min(1,(g.routeProgress-legStart)/(legEnd-legStart)));
+    const zoom=this.reduced||plate!=='walk'||g.stage!=='search'?1:1+progress*.055;
+    if(this.guideScene!==s) {
+      this.guideScene=s;this.guidePlate=plate;this.guidePlateFrom=null;this.guidePlateTime=g.time;
+    } else if(this.guidePlate!==plate) {
+      this.guidePlateFrom=this.guidePlate;this.guidePlateFromZoom=this.guidePlateZoom||1;
+      this.guidePlate=plate;this.guidePlateTime=g.time;
     }
-    // Ray-cast corn rows give the walk depth without changing the tower landscape.
-    for(let x=0;x<W;x+=4){
-      const offset=Math.atan((x-480)/640),angle=g.angle+offset;
-      let d=.05;
-      while(d<18&&!guideWall(g.x+Math.cos(angle)*d,g.y+Math.sin(angle)*d))d+=.045;
-      const depth=Math.max(.15,d*Math.cos(offset)),height=Math.min(900,620/depth);
-      const wx=g.x+Math.cos(angle)*d,wy=g.y+Math.sin(angle)*d;
-      const grain=(Math.sin(wx*41)+Math.cos(wy*43))*.5;
-      const light=Math.max(12,66-depth*5+grain*9);
-      c.fillStyle=`rgb(${light*.85},${light},${light*.57})`;c.fillRect(x,300-height/2,4,height);
-      if(Math.floor((wx+wy)*12)%3===0){c.fillStyle='#a4a56b18';c.fillRect(x,300-height*.45,2,height*.85);}
-      if(x%16===0){for(let leaf=0;leaf<4;leaf++){const yy=300-height*.3+leaf*height*.17,span=Math.min(42,height*.12),side=leaf%2?1:-1;c.fillStyle='#81935c20';c.beginPath();c.moveTo(x,yy);c.quadraticCurveTo(x+side*span,yy-span*.9,x+side*span,yy-span*.3);c.quadraticCurveTo(x+side*span*.3,yy,x,yy+5);c.fill();}}
-    }
-    const site=GUIDE_SITES[g.clues.length];
-    if(site){const p=projectGuide(g,site);if(p){const size=Math.max(6,50/Math.max(1,p.distance));c.fillStyle='#aaa27c';
-      if(site.id==='radio'){c.fillRect(p.x-size/2,p.y-size*.6,size,size*.6);line(c,p.x+size*.25,p.y-size*.6,p.x+size*.4,p.y-size*1.3,'#b5ba98',2);c.fillStyle='#1a251d';c.fillRect(p.x-size*.3,p.y-size*.4,size*.5,size*.15);}
-      else{for(let i=0;i<(site.id==='corner'?6:2);i++){c.beginPath();c.ellipse(p.x+(i%2?size*.3:-size*.3),p.y-i*size*.15,size*.15,size*.3,.3,0,Math.PI*2);c.fill();}}
-    }}
+    this.guidePlateZoom=zoom;
+    const blend=this.reduced||aftermath?1:Math.max(0,Math.min(1,(g.time-this.guidePlateTime)/.65));
+    c.fillStyle='#17231b';c.fillRect(0,0,W,H);
+    if(this.guidePlateFrom&&blend<1)this.drawGuidePlate(this.guidePlateFrom,this.guidePlateFromZoom);
+    c.globalAlpha=this.guidePlateFrom?blend:1;
+    this.drawGuidePlate(plate,zoom);c.globalAlpha=1;
+    if(blend===1)this.guidePlateFrom=null;
     for(const person of [...g.team].sort((a,b)=>Math.hypot(b.x-g.x,b.y-g.y)-Math.hypot(a.x-g.x,a.y-g.y))){
       const p=projectGuide(g,person);if(!p||person.status==='escaped')continue;
       const size=p.height/76;
@@ -442,8 +447,6 @@ export class Renderer {
       this.drawRetrievalMember(person.id-1,this.reduced?.35:g.time*.6+person.id,1);
       c.restore();
     }
-    const vignette=c.createRadialGradient(480,320,40,480,320,480);vignette.addColorStop(0,'#02080500');vignette.addColorStop(.65,'#02080560');vignette.addColorStop(1,'#020805f2');c.fillStyle=vignette;c.fillRect(0,0,W,H);
-    c.fillStyle='#afba98';c.font='11px monospace';c.textAlign='left';
     if(g.stage==='escape'){
       if(!aftermath){
       const p=this.pointer;c.strokeStyle='#d6cfad';c.lineWidth=1;c.beginPath();c.arc(p.x,p.y,10,0,Math.PI*2);c.stroke();
@@ -451,9 +454,20 @@ export class Renderer {
       c.globalAlpha=this.reduced ? .8 :Math.max(0,Math.sin(g.time*.55-.8))*.85;
       c.fillStyle='#c65b4f';c.font='22px Georgia';c.textAlign='center';c.fillText('shoot any that try to escape.',480,112);c.globalAlpha=1;
       }
-      c.fillStyle='#191f18';c.beginPath();c.moveTo(620,600);c.lineTo(493,401);c.lineTo(483,401);c.lineTo(535,600);c.fill();
     }
     c.restore();
+  }
+  drawGuidePlate(key,zoom=1) {
+    const image=this.guidePlates[key],plate=GUIDE_PLATES[key];
+    if(!image?.complete||!image.naturalWidth)return;
+    const view=this.view||{left:0,top:0,width:W,height:H};
+    const scale=Math.max(view.width/image.naturalWidth,view.height/image.naturalHeight)*zoom;
+    const width=view.width/scale,height=view.height/scale;
+    // Crop around the actual clue on portrait screens instead of cropping an
+    // already-composed landscape canvas a second time.
+    const x=Math.max(0,Math.min(image.naturalWidth-width,plate.x*image.naturalWidth-width/2));
+    const y=Math.max(0,Math.min(image.naturalHeight-height,plate.y*image.naturalHeight-height/2));
+    this.c.drawImage(image,x,y,width,height,view.left,view.top,view.width,view.height);
   }
   coords(event) {
     const r=this.canvas.getBoundingClientRect(),view=cameraFor(r.width,r.height);

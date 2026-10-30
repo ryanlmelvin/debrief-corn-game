@@ -3,7 +3,7 @@ import { CASE_TASKS, CASE_PLAN, preparationTasks, caseDetail } from './evidence-
 import { planFieldRoute } from './field.js';
 import './image-viewer.js';
 import { watchNight, sightingPromptReady } from './watch-story.js';
-import { stepGuide, turnGuide, inspectGuide, spareGuide, fireGuide, focusGuide, nearbyGuideSite, isGuideAftermath } from './guide.js';
+import { guideTravel, guideRouteStatus, inspectGuide, spareGuide, fireGuide, focusGuide, nearbyGuideSite, isGuideAftermath } from './guide.js';
 import { createGame, startShift, advance, reload, shoot, focusNext, enterField, move, inspect, canEatCrop, eatCrop, prepareEvidence, nearbySite, FIELD_SITES, investigationPressure, investigationComplete, beginDebrief, chooseFieldEncounter, continueFieldEncounter, getQuestion, getEnding, answer, serialize, restore, BRIEFINGS, EVIDENCE, ENDINGS, DATES, REPORT_DATES, SHIFT_LENGTH, COMPULSION_NOTICE } from './engine.js';
 import { Renderer, visibleGuideTarget } from './renderer.js';
 import { FieldMap } from './field-ui.js';
@@ -135,7 +135,7 @@ function sceneDialog() {
     const q=decisionQuestion(game);
     showModal('debrief',paper('For the record.',`<p class="eyebrow">${REPORT_DATES[game.shift]}, <span class="redacted-text">19XX</span></p>${game.question<3?`<span class="question-num" aria-label="Question ${game.question+1} of 3">${game.question+1} / 3</span>`:''}<div class="interview-question"><span class="speaker-label">SUPERVISOR</span><p>${esc(q.prompt)}</p></div><p class="note"><span class="decision-note-label">${esc(q.contextLabel)}</span> ${esc(q.context)}</p><div class="choices" role="group" aria-label="Your response"><span class="speaker-label">YOUR RESPONSE</span>${q.options.map((o,i)=>`<button class="choice" data-action="answer" data-value="${o.id}" ${o.disabled?'disabled':''}><span class="response-key" aria-hidden="true">${String.fromCharCode(65+i)}</span><span>${esc(o.label)}${o.detail?`<small>${esc(o.detail)}</small>`:''}</span></button>`).join('')}</div>`, 'DEBRIEF TRANSCRIPT'));
   } else if(game.phase==='guide' && game.guide.steps === 0) {
-    showModal('guide-intro',paper('Between the rows.', '<p>Three recovery personnel wait beneath the tower. You take the rifle. They take lamps.</p><p class="note">“You know the way,” one of them says.</p><p class="small"><span class="touch-help">Use the arrow pad to walk and turn. Tap Examine when your light catches a clue.</span><span class="keyboard-help"><b>W/S</b> or <b>↑/↓</b> walk · <b>A/D</b> or <b>←/→</b> turn · <b>E</b> examine.</span></p><button class="primary" data-action="close">Lead them in ↗</button>', 'RECOVERY DETAIL'));
+    showModal('guide-intro',paper('Between the rows.', '<p>Three recovery personnel wait beneath the tower. You take the rifle. They take lamps.</p><p class="note">“You know the way,” one of them says.</p><p class="small"><span class="touch-help">Tap Lead to follow the path. The team stops at each discovery so you can examine it.</span><span class="keyboard-help"><b>Space</b> or <b>W</b> leads onward or stops. The path turns for you. Press <b>E</b> to examine each discovery.</span></p><button class="primary" data-action="close">Lead them in ↗</button>', 'RECOVERY DETAIL'));
   } else if(game.phase==='ending') {
     archiveRun();
     const e=getEnding(game);
@@ -181,7 +181,7 @@ function updateUI(force=false) {
   $('controls').hidden=active||field;
   $('evidence-count').textContent=String(game.evidence.length).padStart(2,'0');
   $('control-hint').textContent=field?'ARROWS / WASD TO MOVE · E TO INSPECT':active?'CLICK / TAP FIRE · R RELOAD':'STATION 04';
-  canvas.setAttribute('aria-label',field?`Field survey. Your position is column ${game.player.x+1}, row ${game.player.y+1}. ${site?site.label+'. ':''}Gold page markers show tonight’s unread discoveries. Check marks show searched locations. Use arrow keys or WASD to move. E to inspect. Watchtower is column 2 row 8; pump house column 4 row 4; drainage channel column 8 row 6; northeast corner column 10 row 2.`:'Watchtower shooting gallery. Click moving corn to fire. X selects a crop. Space fires. R reloads.');
+  if(phase!=='guide'&&!aftermath)canvas.setAttribute('aria-label',field?`Field survey. Your position is column ${game.player.x+1}, row ${game.player.y+1}. ${site?site.label+'. ':''}Gold page markers show tonight’s unread discoveries. Check marks show searched locations. Use arrow keys or WASD to move. E to inspect. Watchtower is column 2 row 8; pump house column 4 row 4; drainage channel column 8 row 6; northeast corner column 10 row 2.`:'Watchtower shooting gallery. Click moving corn to fire. X selects a crop. Space fires. R reloads.');
   const controlKey=[phase,paused,game.incident,game.rounds,game.reserve,game.reload>0,site?.id,game.inspected.join(',')].join(':');
   if(phase!=='guide'&&(force||controlKey!==lastControlsKey)) {
     lastControlsKey=controlKey;
@@ -220,25 +220,33 @@ function updateUI(force=false) {
   syncAudio();
 }
 function updateGuideUI() {
-  const g=game.guide, escaping=g.stage==='escape';
+  const g=game.guide, escaping=g.stage==='escape', route=guideRouteStatus(game);
+  const stops=['First crossing','Central crossing','Northeast corner'];
+  const destinations=['Lead to the first crossing','Continue to the central crossing','Lead to the northeast corner'];
+  const examination=['Examine the boot print','Examine the radio','Search the bare earth'];
+  const remaining=g.team.filter(t=>t.status==='running').length, revealing=escaping&&g.time<.65;
   $('phase-label').textContent='RECOVERY DETAIL';
   $('station-status').textContent='RADIO SILENT';
   $('objective').textContent=escaping?'The team is leaving.':'Lead them through.';
-  $('objective-detail').textContent=escaping?'The lights are heading south.':'Follow the crossings to the northeast corner.';
-  $('stats').innerHTML=stat('CROSSINGS SEARCHED',g.clues.length,'/ 3')+stat('RIFLE',6-g.fired,'rounds');
-  $('control-hint').textContent='W/S WALK · A/D TURN · E EXAMINE · X AIM · SPACE FIRE';
-  canvas.setAttribute('aria-label', `First-person cornfield. ${g.message} ${escaping?'The team is heading south. X aims at a visible person; Space fires. You can lower your rifle to let them leave.':'Follow the row north to the first crossing, then the central crossing, then the northeast corner.'}`);
-  const compass=['E','S','W','N'][((Math.round(g.angle/(Math.PI/2))%4)+4)%4];
-  const message=`${compass} · ${g.message}`;
-  if($('guide-message').textContent!==message)$('guide-message').textContent=message;
-  const key=`guide:${paused}:${g.stage}:${g.clues.length}:${g.x}:${g.y}:${g.angle}:${g.fired}`;
-  if(lastControlsKey===key)return;
-  lastControlsKey=key;
-  const focusedAction=$('controls').contains(document.activeElement)?document.activeElement.dataset.action:null;
-  const focusedValue=document.activeElement?.dataset.value;
-  $('controls').innerHTML=`<div class="guide-deck"><div class="dpad" role="group" aria-label="Walk and turn"><button class="up" data-action="guide-step" data-value="1" aria-label="Walk forward">↑</button><button class="left" data-action="guide-turn" data-value="-1" aria-label="Turn left">↶</button><button class="down" data-action="guide-step" data-value="-1" aria-label="Step back">↓</button><button class="right" data-action="guide-turn" data-value="1" aria-label="Turn right">↷</button></div><div class="guide-actions">${escaping?'<button data-action="guide-focus">Aim</button><button data-action="guide-fire">Fire</button><button class="primary" data-action="guide-spare">Lower rifle</button>':`<button data-action="guide-inspect" ${nearbyGuideSite(game)?'':'disabled'}>Examine</button><small>${['North to the first crossing.','East, then north to the central crossing.','East to the far row, then north.'][g.clues.length]}</small>`}</div></div>`;
-  if(paused)$('controls').querySelectorAll('button').forEach(button=>button.disabled=true);
-  if(focusedAction)[...$('controls').querySelectorAll('button')].find(b=>b.dataset.action===focusedAction&&b.dataset.value===focusedValue)?.focus({preventScroll:true});
+  $('objective-detail').textContent=escaping?'The road is behind you. The choice is yours.':'Your light leads. The team follows.';
+  $('stats').innerHTML=escaping?stat('LIGHTS STILL MOVING',remaining,'/ 3')+stat('RIFLE',6-g.fired,'rounds'):stat('ROUTE SEARCHED',g.clues.length,'/ 3')+stat('FOLLOWING YOU',3,'people');
+  $('control-hint').textContent=escaping?'X AIM · SPACE FIRE · L LOWER RIFLE':'SPACE / W LEAD OR STOP · E EXAMINE';
+  const description=`Recovery team in the cornfield. ${g.message} ${escaping?'The team is in front of you, heading toward the road. X aims at a person; Space fires; L lowers your rifle and lets them leave.':`${stops[g.clues.length]}. Space or W leads onward or stops walking. The route turns automatically and stops at each discovery. E examines a discovery.`}`;
+  if(canvas.getAttribute('aria-label')!==description)canvas.setAttribute('aria-label',description);
+  if($('guide-message').textContent!==g.message)$('guide-message').textContent=g.message;
+  const key=`guide:${paused}:${g.stage}:${g.clues.length}:${route?.walking}:${route?.ready}:${g.fired}:${remaining}:${revealing}`;
+  if(lastControlsKey!==key){
+    lastControlsKey=key;
+    const focused=$('controls').contains(document.activeElement);
+    const focusedAction=focused?document.activeElement.dataset.action:null;
+    $('controls').innerHTML=escaping
+      ? `<div class="guide-deck guide-decision"><p class="guide-instruction">They are leaving for the road.</p><div class="guide-actions"><button data-action="guide-focus">Aim at next light</button><button data-action="guide-fire" ${g.fired>=6||revealing?'disabled':''}>Fire rifle</button><button class="primary" data-action="guide-spare" ${revealing?'disabled':''}>Lower rifle · let them leave</button></div><p class="guide-help">Tap a person to fire, or let the lights go.</p></div>`
+      : `<div class="guide-deck"><ol class="guide-route" aria-label="Search route">${stops.map((label,i)=>`<li class="${i<g.clues.length?'searched':i===g.clues.length?'current':''}" ${i===g.clues.length?'aria-current="step"':''}><span>${i<g.clues.length?'✓':String(i+1).padStart(2,'0')}</span>${label}</li>`).join('')}</ol><div class="guide-progress" aria-hidden="true"><i></i></div><button class="${route.ready||!route.walking?'primary':'secondary'}" data-action="${route.ready?'guide-inspect':'guide-travel'}">${route.ready?examination[g.clues.length]:route.walking?'Stop here':destinations[g.clues.length]}</button><p class="guide-help">${route.ready?'The team waits while you examine the ground.':route.walking?'Your light follows the path. You can stop at any time.':'Follow the path. You stop at each discovery.'}</p></div>`;
+    if(paused)$('controls').querySelectorAll('button').forEach(button=>button.disabled=true);
+    if(focused)($('controls').querySelector(`[data-action="${focusedAction}"]`)||$('controls').querySelector('button'))?.focus({preventScroll:true});
+  }
+  const progress=$('controls').querySelector('.guide-progress i');
+  if(progress)progress.style.width=`${route.progress*100}%`;
 }
 function showCasePreparation() {
   const tasks=preparationTasks(game,nearbySite(game)?.id);
@@ -246,6 +254,7 @@ function showCasePreparation() {
   const returning=planFieldRoute(game,FIELD_SITES.find(s=>s.id==='tower')).exposure;
   showModal('preparation',paper('Something that can leave.', `<p>Notes alone will not survive a denial. Prepare an exhibit here for the outside case.</p><p class="note">Exposure ${Math.ceil(game.exposure)} / 100 · return to tower at least +${Math.ceil(returning)}. ${investigationComplete(game)?'All sites searched.':'Other sites still need searching.'}</p><div class="choices">${tasks.map(t=>`<button class="choice" data-action="prepare-evidence" data-value="${t.id}"><span>${esc(t.title)}</span><small>+${t.cost} exposure · ${Math.ceil(game.exposure+t.cost)} / 100 afterward${game.exposure+t.cost>=100?' · reaches 100':game.exposure+t.cost+returning>=100?' · too exposed to return':''}</small></button>`).join('')}<button class="choice" data-action="close">Leave for now. I can return to this site later.</button></div>`, 'OUTSIDE CASE'));
 }
+
 function act(action,value) {
   if(action==='select-share-link'){const input=dialog.querySelector('.share-link');input?.focus();input?.select();return;}
   if(action==='share-ending'){if(game?.phase==='ending')shareDisposition(game.ending,getEnding(game).stamp);return;}
@@ -298,8 +307,7 @@ function act(action,value) {
     showModal('record',paper(esc(r.title),`<p>${esc(r.text)}</p><p class="note">${esc(r.last)}</p><div class="transcript">${r.reports.map(t=>`<section><p class="eyebrow">SHIFT ${Number(t.shift)+1}</p><p>${esc(t.question)}</p><p><b>YOU</b> ${esc(t.answer)}</p>${t.supervisorReply?`<p class="note">SUPERVISOR: ${esc(t.supervisorReply)}</p>`:''}</section>`).join('')}</div><div class="paper-actions"><button class="secondary" data-action="share-record" data-value="${Number(value)}">Share ending ↗</button><button class="primary" data-action="records">Back to records</button><button class="secondary" data-action="close">Close</button></div>`,'PAST ASSIGNMENT'));return;
   }
   if(action==='records'){$('records').click();return;}
-  if(action==='guide-step'){stepGuide(game,Number(value));game.guide.focused=null;}
-  if(action==='guide-turn'){turnGuide(game,Number(value));game.guide.focused=null;}
+  if(action==='guide-travel')guideTravel(game);
   if(action==='guide-inspect')inspectGuide(game);
   if(action==='guide-spare')spareGuide(game);
   if(action==='guide-focus'){
@@ -310,9 +318,9 @@ function act(action,value) {
       if(visibleGuideTarget(game.guide,target,renderer.view)){aim=p;break;}
     }
     if(aim)renderer.pointer=aim;
-    else {game.guide.focused=null;toast('Turn toward the footsteps to bring them into view.');}
+    else {game.guide.focused=null;toast('The lights have moved beyond your sight. You can let them leave.');}
   }
-  if(action==='guide-fire'){const t=game?.guide?.team.find(t=>t.id===game.guide.focused&&t.status==='running');const p=t&&visibleGuideTarget(game.guide,t,renderer.view);if(t&&!p){game.guide.focused=null;toast('Turn toward the footsteps to bring them into view.');return;}if(p)renderer.pointer={x:p.x,y:p.y-p.height*.5};fire(renderer.pointer);}
+  if(action==='guide-fire'){const t=game?.guide?.team.find(t=>t.id===game.guide.focused&&t.status==='running');const p=t&&visibleGuideTarget(game.guide,t,renderer.view);if(t&&!p){game.guide.focused=null;toast('The lights have moved beyond your sight. You can let them leave.');return;}if(p)renderer.pointer={x:p.x,y:p.y-p.height*.5};fire(renderer.pointer);}
   if(action==='close'){closeModal();if(game&&['briefing','debrief','ending'].includes(game.phase)){lastModalKey='';updateUI(true);}return;}
   if(action==='start'){closeModal();startShift(game);canvas.focus({preventScroll:true});}
   if(action==='answer'){closeModal();answer(game,value);}
@@ -358,11 +366,11 @@ $('notebook').addEventListener('click',()=>{
   if(game)showModal('notebook',notebookMarkup(game,0));
 });
 
-canvas.addEventListener('pointermove',event=>{if(['tower','guide'].includes(game?.phase)){renderer.pointer=renderer.coords(event);game.focused=null;}});
+canvas.addEventListener('pointermove',event=>{if(['tower','guide'].includes(game?.phase)){renderer.pointer=renderer.coords(event);game.focused=null;if(game.guide)game.guide.focused=null;}});
 canvas.addEventListener('pointerdown',event=>{
   if(!game||paused||dialog.open||menuOpen())return;
   canvas.focus({preventScroll:true});
-  if(game.phase==='guide'){renderer.pointer=renderer.coords(event);fire(renderer.pointer);}
+  if(game.phase==='guide'&&game.guide.stage==='escape'){game.guide.focused=null;renderer.pointer=renderer.coords(event);fire(renderer.pointer);}
   else if(game.phase==='tower'){
     const p=renderer.coords(event);renderer.pointer=p;
     fire(p,event.pointerType==='touch'?22/Math.max(.1,renderer.view.scale):0);
@@ -384,7 +392,9 @@ document.addEventListener('keydown',event=>{
   }
   if(game.phase==='guide'){
     if(event.repeat)return;
-    const actions={w:['guide-step','1'],arrowup:['guide-step','1'],s:['guide-step','-1'],arrowdown:['guide-step','-1'],a:['guide-turn','-1'],arrowleft:['guide-turn','-1'],d:['guide-turn','1'],arrowright:['guide-turn','1'],e:['guide-inspect'],x:['guide-focus'],' ':['guide-fire']};
+    const escaping=game.guide.stage==='escape';
+    const actions=escaping?{x:['guide-focus'],' ':['guide-fire'],l:['guide-spare']}:{w:['guide-travel'],arrowup:['guide-travel'],e:['guide-inspect'],' ':[nearbyGuideSite(game)?'guide-inspect':'guide-travel']};
+    if(!escaping&&['s','arrowdown'].includes(k)&&game.guide.walking){event.preventDefault();act('guide-travel');return;}
     if(actions[k] && !(k===' ' && ['BUTTON','A'].includes(event.target.tagName))){event.preventDefault();act(...actions[k]);}
   }
   if(game.phase==='field'){
@@ -579,6 +589,12 @@ function frame(now) {
       else {updateUI(true);save();}
     });
     const focused=game.targets.find(t=>t.id===game.focused);if(focused)renderer.pointer={x:focused.x,y:focused.y-34};
+    if(game.phase==='guide'&&game.guide.focused){
+      const target=game.guide.team.find(t=>t.id===game.guide.focused&&t.status==='running');
+      const aim=target&&visibleGuideTarget(game.guide,target,renderer.view);
+      if(aim)renderer.pointer={x:aim.x,y:aim.y-aim.height*.5};
+      else game.guide.focused=null;
+    }
     if(now-lastUI>100){updateUI();lastUI=now;}
     if(now-lastSave>1200){save();lastSave=now;}
   }
