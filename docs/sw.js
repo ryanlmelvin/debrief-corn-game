@@ -1,6 +1,6 @@
 // Bump this version whenever a shipped asset changes. An active game keeps its
 // current worker; the new version activates after all old game tabs close.
-const VERSION = 'debrief-v59-distinct-encounters';
+const VERSION = 'debrief-v60-new-endings-copy';
 const DEVELOPMENT = ['localhost', '127.0.0.1', '[::1]'].includes(self.location.hostname);
 const SCOPE = new URL('./', self.location.href).pathname;
 const CACHE_PREFIX = `debrief:${SCOPE}:`;
