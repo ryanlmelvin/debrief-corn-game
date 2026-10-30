@@ -8,7 +8,7 @@ export function sightingPromptReady(s) {
 export const WATCH_NIGHTS = [
   { role:'dress', count:1, crop:'corn', log:'A white dress. Northeast corner. Someone went in.', notice:'Someone in a white dress went into the rows.' },
   { role:'retrieval', count:3, crop:'corn-roots', log:'A recovery team enters the northeast corner. Their lights move between the rows. No radio response.', notice:'Three recovery workers enter the northeast corner. Their lights move between the rows. No one answers the radio.' },
-  { role:'retrieval', count:3, crop:'corn-teeth', log:'Three lights in the northeast. Another recovery team has gone in.', notice:'Another three-person recovery team enters the northeast corner. For now, all three lights are still visible.' }
+  { role:'retrieval', count:3, crop:'corn-teeth', log:'Three lights in the northeast. Another recovery team has gone in, wearing hooded protective suits.', notice:'Another three-person recovery team enters the northeast corner in hooded protective suits. For now, all three lights are still visible.' }
 ];
 export const watchNight = shift => WATCH_NIGHTS[shift] || WATCH_NIGHTS[0];
 export function sightingPeople(shift) {
@@ -28,7 +28,7 @@ export function personLight(shift,time,target) {
   return shift===2?Math.max(0,Math.min(1,(18+(target.member||0)*3-time)/.65)):1;
 }
 export function targetArtwork(shift,target) {
-  return target.kind==='corn'?watchNight(shift).crop:personRole(shift,target)==='retrieval'?`retrieval-${target.member||0}`:'dress';
+  return target.kind==='corn'?watchNight(shift).crop:personRole(shift,target)==='retrieval'?`${shift===2?'hazmat':'retrieval'}-${target.member||0}`:'dress';
 }
 
 export function observedSighting(s) {

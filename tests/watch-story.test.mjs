@@ -13,10 +13,10 @@ for(const shift of [0,1,2]) {
     assert.equal(new Set(people.map(t=>t.id)).size,people.length);
     assert.deepEqual(people.map(t=>t.member),shift===0?[0]:[0,1,2]);
     assert.ok(people.every(t=>t.role===(shift===0?'dress':'retrieval')));
-    assert.ok(people.every(t=>targetArtwork(shift,t)===(shift===0?'dress':`retrieval-${t.member}`)));
+    assert.ok(people.every(t=>targetArtwork(shift,t)===(shift===0?'dress':`${shift===2?'hazmat':'retrieval'}-${t.member}`)));
     for(let i=0;i<s.targets.length;i++){focusNext(s);assert.equal(s.targets.find(t=>t.id===s.focused).kind,'corn');}
     assert.deepEqual(restore(serialize(s)),s);
-    assert.match(dialogArtwork('sighting',shift),shift===0?/field-sighting.webp/:/field-retrieval.webp/);
+    assert.match(dialogArtwork('sighting',shift),[/field-sighting.webp/,/field-retrieval.webp/,/field-hazmat.webp/][shift]);
   });
 }
 
@@ -25,6 +25,8 @@ test('crop anatomy progresses by night, including existing saves without appeara
   assert.deepEqual([0,1,2].map(shift=>targetArtwork(shift,crop)),['corn','corn-roots','corn-teeth']);
   assert.equal(targetArtwork(1,{kind:'person'}),'retrieval-0');
   assert.equal(targetArtwork(0,{kind:'person'}),'dress');
+  assert.equal(targetArtwork(2,{kind:'person'}),'hazmat-0');
+  assert.equal(targetArtwork(2,{kind:'person',role:'retrieval',member:2}),'hazmat-2');
   assert.match(watchNight(1).notice,/Three recovery workers/);
 });
 

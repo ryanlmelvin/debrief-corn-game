@@ -12,7 +12,10 @@ const TARGET_SPRITES = {
   dress: { file:'watch-figure.webp', source:[96,20,160,464], destination:[-12,-70,25.5,74] },
   'retrieval-0': { file:'watch-retrieval.webp', source:[124,9,281,579], destination:[-18,-72,36,76] },
   'retrieval-1': { file:'watch-retrieval.webp', source:[474,42,274,545], destination:[-18,-68,36,72] },
-  'retrieval-2': { file:'watch-retrieval.webp', source:[855,76,233,510], destination:[-16,-66,32,70] }
+  'retrieval-2': { file:'watch-retrieval.webp', source:[855,76,233,510], destination:[-16,-66,32,70] },
+  'hazmat-0': { file:'watch-hazmat.webp', source:[121,16,302,576], destination:[-20,-72,40,76] },
+  'hazmat-1': { file:'watch-hazmat.webp', source:[464,34,294,558], destination:[-19,-68,38,72] },
+  'hazmat-2': { file:'watch-hazmat.webp', source:[853,79,264,510], destination:[-18,-66,36,70] }
 };
 function rng(seed) { return () => { seed = (Math.imul(seed,1664525)+1013904223)>>>0; return seed/4294967296; }; }
 function line(c,x1,y1,x2,y2,color,width=1) { c.strokeStyle=color; c.lineWidth=width; c.beginPath(); c.moveTo(x1,y1); c.lineTo(x2,y2); c.stroke(); }
@@ -305,14 +308,19 @@ export class Renderer {
     if(brightness!==1)c.filter=`brightness(${brightness})`;
     c.drawImage(image,...art.source,...art.destination);c.restore();return true;
   }
-  drawRetrievalMember(member,phase,light=1) {
+  drawRetrievalMember(member,phase,light=1,artwork=`retrieval-${member}`) {
     const c=this.c,lean=this.reduced?0:Math.sin(phase*Math.PI*2)*.012;
-    if(!this.drawSprite(`retrieval-${member}`,lean,light?1.2:.48)) {
+    if(!this.drawSprite(artwork,lean,light?1.2:.48)) {
+      const hazmat=artwork.startsWith('hazmat-');
       // Distinct civilian kit remains readable if an image has not downloaded.
       c.save();c.globalAlpha=light?1:.45;
-      c.fillStyle=['#858b69','#aaa080','#67775a'][member];c.fillRect(-8,-52,16,35);
+      c.fillStyle=hazmat?['#b4aa87','#c7bfa2','#a8ad94'][member]:['#858b69','#aaa080','#67775a'][member];c.fillRect(-8,-52,16,35);
       c.fillStyle='#b0ac8c';c.beginPath();c.arc(0,-61,5,0,Math.PI*2);c.fill();
-      if(member!==1){c.fillStyle=member===2?'#c0b692':'#617051';c.fillRect(-7,-65,14,5);}
+      if(hazmat) {
+        c.fillStyle='#c4bca0';c.beginPath();c.ellipse(0,-61,8,10,0,0,Math.PI*2);c.fill();
+        c.fillStyle='#27382e';c.fillRect(-8,-65,7,8);c.fillRect(-10,-58,5,4);
+        c.fillStyle='#303d31';c.fillRect(-12,-29,5,8);
+      } else if(member!==1){c.fillStyle=member===2?'#c0b692':'#617051';c.fillRect(-7,-65,14,5);}
       c.fillStyle='#4d5842';c.fillRect(4,-45,9,19);
       line(c,-4,-17,-7,4,'#69735b',4);line(c,4,-17,7,4,'#69735b',4);c.restore();
     }
@@ -331,7 +339,7 @@ export class Renderer {
     c.save();c.translate(p.x,p.y);c.scale(p.size,p.size);
     c.fillStyle='#07120ba0';c.beginPath();c.ellipse(0,4,22,5,0,0,Math.PI*2);c.fill();
     if(target.kind==='person'&&personRole(shift,target)==='retrieval') {
-      this.drawRetrievalMember(target.member||0,phase,personLight(shift,this.scene.time,target));
+      this.drawRetrievalMember(target.member||0,phase,personLight(shift,this.scene.time,target),form);
     } else if(target.kind==='person') {
       if(!this.drawSprite('dress',this.reduced?0:Math.sin(phase*Math.PI*2)*.012)) {
         const step=this.reduced?0:Math.sin(phase*Math.PI*2)*3;
