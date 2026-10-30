@@ -260,9 +260,73 @@ function shotSound(hit) {
   oscillator.type='triangle';oscillator.frequency.setValueAtTime(hit?170:130,now);oscillator.frequency.exponentialRampToValueAtTime(45,now+.14);
   gain.gain.setValueAtTime(.9,now);gain.gain.exponentialRampToValueAtTime(.001,now+.18);oscillator.connect(gain);gain.connect(master);oscillator.start(now);oscillator.stop(now+.2);
 }
-window.addEventListener('beforeinstallprompt',event=>{event.preventDefault();installPrompt=event;$('install').hidden=false;});
-$('install').addEventListener('click',async()=>{if(installPrompt){await installPrompt.prompt();installPrompt=null;$('install').hidden=true;}});
-window.addEventListener('appinstalled',()=>{$('install').hidden=true;toast('Debrief installed. Your saved shift stays on this device.');});
+const isInstalled = () => window.matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
+function refreshInstallGuide() {
+  if(modalKind !== 'install' || !dialog.open)return;
+  const button=$('install-now');
+  button.hidden=isInstalled() || !installPrompt;
+  $('install-status').textContent=isInstalled() ? 'Debrief is running as an installed app.' : installPrompt ? 'Your browser is ready. Use Install now, then confirm in its installation window.' : 'Use the steps below if your browser does not offer an install button.';
+}
+function showInstallGuide() {
+  save();
+  showModal('install',paper('Install on device.',`
+    <h3>1. Add Debrief to your device</h3>
+    <p class="small" id="install-status" role="status"></p>
+    <button class="primary" id="install-now" hidden>Install now ↗</button>
+    <ul class="small">
+      <li><b>iPhone / iPad:</b> Open this page in Safari, open Share (sometimes inside the page menu), choose Add to Home Screen, enable Open as Web App if offered, then tap Add.</li>
+      <li><b>Android:</b> Open the browser menu and choose Install app or Add to Home screen, then confirm.</li>
+      <li><b>Computer:</b> Look for the install icon in the address bar or Install app in the browser menu. In Safari on Mac, use File → Add to Dock. If unavailable, try a browser that supports installation.</li>
+    </ul>
+    <p class="small">Open Debrief from its new icon, then return to Settings → Install on device to protect storage there. Saves may be separate between browsers and installed apps. Let the game finish loading online before playing offline.</p>
+    <h3>2. Protect local storage</h3>
+    <p class="small">Ask your browser to keep this site's data when freeing space. It may decide automatically without showing a permission prompt.</p>
+    <button id="protect-storage" class="secondary">Request persistent storage</button>
+    <p id="storage-status" class="small" role="status" aria-live="polite">Storage protection has not been checked.</p>
+    <p class="note"><b>Your saves live only on this device.</b> Clearing browser data that includes this site's data deletes your progress and records, even with persistent storage. Clearing cached files alone normally does not erase saves. Installation is not a backup; private browsing may discard data when closed.</p>
+    <button class="primary" data-action="close">Done ↗</button>`, 'DEVICE SETUP'));
+  refreshInstallGuide();
+  const status=$('storage-status'), protect=$('protect-storage');
+  if(!navigator.storage?.persist || !navigator.storage?.persisted){
+    status.textContent='This browser cannot request persistent storage. You can still play and save, but automatic cleanup may remove data.';
+    protect.disabled=true;
+  } else {
+    navigator.storage.persisted().then(granted=>{
+      if(!status.isConnected || protect.disabled)return;
+      status.textContent=granted ? 'Persistent storage is enabled. Manually clearing site data still deletes saves.' : 'Persistent storage is not enabled. You can request it below.';
+      if(granted){protect.disabled=true;protect.textContent='Storage protected';}
+    }).catch(()=>{if(status.isConnected)status.textContent='Storage status could not be checked. You can try requesting protection.';});
+  }
+  protect.addEventListener('click',async()=>{
+    protect.disabled=true;
+    status.textContent='Requesting storage protection…';
+    try {
+      const granted=await navigator.storage.persist();
+      status.textContent=granted ? 'Persistent storage is enabled. Manually clearing site data still deletes saves.' : 'The browser did not grant persistent storage. You can keep playing; try again after installing and opening the app.';
+      protect.textContent=granted ? 'Storage protected' : 'Try again';
+      protect.disabled=granted;
+    } catch {
+      status.textContent='Storage protection could not be requested. Browser settings or private browsing may prevent it.';
+      protect.disabled=false;
+    }
+  });
+  $('install-now').addEventListener('click',async()=>{
+    const prompt=installPrompt;
+    if(!prompt)return;
+    installPrompt=null;
+    refreshInstallGuide();
+    try {
+      await prompt.prompt();
+      const choice=await prompt.userChoice;
+      if(modalKind==='install' && dialog.open)$('install-status').textContent=choice.outcome==='accepted' ? 'Installation accepted. Open the app from its icon, then request persistent storage there.' : 'Installation canceled. You can install later using your browser menu.';
+    } catch {
+      if(modalKind==='install' && dialog.open)$('install-status').textContent='Installation could not start. Follow the browser steps below.';
+    }
+  });
+}
+window.addEventListener('beforeinstallprompt',event=>{event.preventDefault();installPrompt=event;refreshInstallGuide();});
+$('install').addEventListener('click',showInstallGuide);
+window.addEventListener('appinstalled',()=>{installPrompt=null;refreshInstallGuide();toast('Debrief installed. Open it from its icon to protect storage.');});
 if ('serviceWorker' in navigator && ['https:', 'http:'].includes(location.protocol)) {
   let waitingWorker = null, applyingUpdate = false, refreshing = false;
   const showUpdate = () => {
