@@ -79,7 +79,7 @@ export class GameAudio {
     this.master = context.createGain(); this.master.gain.value = 0; this.master.connect(context.destination);
     const noise = brownNoise(context);
     this.ambient = context.createBufferSource(); this.ambient.buffer = noise; this.ambient.loop = true;
-    this.ambientLevel = context.createGain(); this.ambientLevel.gain.value = .16;
+    this.ambientLevel = context.createGain(); this.ambientLevel.gain.value = .55;
     this.ambient.connect(this.ambientLevel); this.ambientLevel.connect(this.master); this.ambient.start();
     this.drone = new PressureDrone(context, this.master, noise);
   }
@@ -102,14 +102,27 @@ export class GameAudio {
     if (!this.active) {
       clearTimeout(this.suspendTimer); this.suspendTimer = null;
       this.drone.reset(); this.active = true;
-      ramp(this.master.gain, .08, now, .06);
+      ramp(this.master.gain, .32, now, .06);
       this.context.resume().catch(() => {});
     }
     const p = Number.isFinite(pressure) ? Math.max(0, Math.min(1, pressure)) : 0;
     if (p === this.pressure) return;
     this.pressure = p;
     this.drone.setPressure(p);
-    ramp(this.ambientLevel.gain, .16 * (1 - .88 * p), now, .4);
+    ramp(this.ambientLevel.gain, .55 * (1 - .88 * p), now, .4);
+  }
+  preview() {
+    // Bypass the paused mix so enabling sound in the menu always confirms it.
+    clearTimeout(this.suspendTimer); this.suspendTimer = null;
+    const context = this.context, now = context.currentTime;
+    const tone = context.createOscillator(), gain = context.createGain();
+    tone.type = 'sine'; tone.frequency.setValueAtTime(660, now);
+    gain.gain.setValueAtTime(0, now);
+    gain.gain.linearRampToValueAtTime(.12, now + .02);
+    gain.gain.exponentialRampToValueAtTime(.001, now + .3);
+    tone.connect(gain); gain.connect(context.destination);
+    tone.onended = () => { tone.disconnect(); gain.disconnect(); };
+    tone.start(); tone.stop(now + .32);
   }
   shot(hit) {
     if (!this.active) return;

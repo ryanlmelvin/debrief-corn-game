@@ -60,7 +60,7 @@ test('the takeover cuts the entire mix and any shot, even without an open dialog
   await new Promise(resolve=>setTimeout(resolve,40));
   assert.equal(context.suspends,1);assert.equal(sound.drone.output.gain.value,0);
   sound.sync({enabled:true,held:false,pressure:0});
-  assert.equal(sound.drone.output.gain.value,0);assert.equal(sound.ambientLevel.gain.value,.16);
+  assert.equal(sound.drone.output.gain.value,0);assert.equal(sound.ambientLevel.gain.value,.55);
 });
 
 test('mute and pause resume the current pressure without a stale suspension or another sound graph', async () => {
@@ -99,4 +99,22 @@ test('the game sends sound preference, pressure, all pause gates and the takeove
   context.soundEnabled=false;vm.runInContext('syncAudio()',context);assert.equal(calls.at(-1).enabled,false);
   const worker = readFileSync(new URL('../docs/sw.js',import.meta.url),'utf8');
   assert.ok(worker.includes("'./audio.js'"));
+});
+
+
+test('sound confirmation is audible through the destination while the game mix is paused', async () => {
+  const context = new Context(), sound = new GameAudio(context);
+  sound.sync({enabled:true,held:false});
+  sound.sync({enabled:true,held:true});
+  sound.preview();
+  await new Promise(resolve=>setTimeout(resolve,40));
+  assert.equal(context.suspends,0);
+  assert.equal(sound.active,false);
+  const tone = context.nodes.at(-2), gain = context.nodes.at(-1);
+  assert.equal(tone.frequency.value,660);
+  assert.ok(gain.gain.events.some(e=>e[0]==='linear' && e[1]===.12));
+  assert.deepEqual(gain.connections,[context.destination]);
+  assert.equal(tone.stops.length,1);
+  tone.onended();
+  assert.equal(tone.connections.length,0);assert.equal(gain.connections.length,0);
 });

@@ -386,14 +386,20 @@ function exportRecord() {
 async function initAudio() {
   const Audio=window.AudioContext||window.webkitAudioContext;if(!Audio){toast('Sound is not available in this browser.');return false;}
   if(!audioContext){
-    audioContext=new Audio();soundscape=new GameAudio(audioContext);
+    audioContext=new Audio();
   }
-  await audioContext.resume();return true;
+  // Resume during the button gesture before building the sound graph (mobile).
+  await audioContext.resume();
+  if(audioContext.state!=='running')throw new Error('Audio is suspended');
+  if(!soundscape)soundscape=new GameAudio(audioContext);
+  return true;
 }
 function syncAudio(){soundscape?.sync({enabled:soundEnabled,held:paused||dialog.open||menuOpen()||document.hidden||game?.phase==='ending',pressure:game?investigationPressure(game)?.strength||0:0,takeover:game?.phase==='field'&&game.compulsionNotice===true});}
 $('sound').addEventListener('click',async()=>{
   if(!soundEnabled){try{if(!await initAudio())return;}catch{toast('Sound could not start. You can keep playing silently.');return;}}
-  soundEnabled=!soundEnabled;$('sound').textContent=soundEnabled?'Sound on':'Sound off';$('sound').setAttribute('aria-pressed',String(soundEnabled));syncAudio();
+  soundEnabled=!soundEnabled;$('sound').textContent=soundEnabled?'Sound: ON · Turn off':'Sound: OFF · Turn on';$('sound').setAttribute('aria-pressed',String(soundEnabled));syncAudio();
+  if(soundEnabled){soundscape.preview();toast('Sound is on. A short tone confirms playback. Ambient sound resumes when you return to play.');}
+  else toast('Sound is off.');
 });
 function shotSound(hit) {
   if(soundEnabled)soundscape?.shot(hit);
