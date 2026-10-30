@@ -1,0 +1,47 @@
+Debrief environmental sound effects
+
+All four assets below are used under CC0 1.0 Universal:
+https://creativecommons.org/publicdomain/zero/1.0/
+Source pages and downloads verified on 2026-10-30.
+Credit is provided voluntarily; CC0 does not require attribution.
+The recordings are served with the game and cached for offline playback.
+
+crickets.mp3
+Title: Crickets Ambient Noise - loopable
+Artist: Ted Kerr (OpenGameArt user Wolfgang_)
+Source: https://opengameart.org/content/crickets-ambient-noise-loopable
+Original audio: https://opengameart.org/sites/default/files/crickets_1.mp3
+License: CC0 1.0 Universal
+Preparation: Resampled to 32 kHz stereo, encoded as 96 kbps MP3;
+gain raised by 12 dB, with 12 ms endpoint fades to prevent loop clicks.
+Full 11.452-second recording retained.
+
+footstep.mp3
+Title: Random Sounds Samples - foot left stereo
+Artist: Augmentality (Brandon Morris), submitted by HaelDB
+Source: https://opengameart.org/content/random-sounds-samples
+Original audio: https://opengameart.org/sites/default/files/foot%20left%20stereo.ogg
+License: CC0 1.0 Universal (selected from the licenses offered)
+Preparation: Removed 0.24 seconds of leading silence; resampled to
+32 kHz stereo, encoded as 96 kbps MP3; gain raised by 3 dB with
+8 ms endpoint fades. Result is approximately 0.420 seconds.
+
+leaves.mp3
+Title: Random Sounds Samples - moving leaves stereo
+Artist: Augmentality (Brandon Morris), submitted by HaelDB
+Source: https://opengameart.org/content/random-sounds-samples
+Original audio: https://opengameart.org/sites/default/files/moving%20leaves%20stereo.ogg
+License: CC0 1.0 Universal (selected from the licenses offered)
+Preparation: Resampled to 32 kHz stereo, encoded as 96 kbps MP3;
+gain raised by 2 dB with 8 ms endpoint fades.
+Full 1.402-second recording retained.
+
+radio-static.mp3
+Title: Static
+Artist: xhunterko
+Source: https://opengameart.org/content/static
+Original audio: https://opengameart.org/sites/default/files/ScatterNoise1.mp3
+License: CC0 1.0 Universal
+Preparation: Three-second excerpt beginning at 5 seconds; resampled to
+32 kHz mono, encoded as 64 kbps MP3; gain lowered by 4 dB with
+8 ms endpoint fades.

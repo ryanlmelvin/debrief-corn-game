@@ -5,7 +5,8 @@ import { createGame, startShift, advance, reload, shoot, focusNext, enterField, 
 import { Renderer, visibleGuideTarget } from './renderer.js';
 import { FieldMap } from './field-ui.js';
 import { dialogArtwork, evidenceMount, notebookMarkup, encounterMarkup, interviewRecord } from './art.js';
-import { GameAudio, loadMusic } from './audio.js';
+import { GameAudio, loadMusic, loadEffects } from './audio.js';
+import { SoundEvents } from './audio-events.js';
 import { pressureWordMarkup } from './pressure-word.js';
 import { DialogPager } from './pager.js';
 import { endingShareData, shareEnding } from './sharing.js';
@@ -25,6 +26,7 @@ const HISTORY_KEY=`debrief-history-v1:${new URL('.',location.href).pathname}`;
 const SAVE_KEY=`debrief-save-v1:${new URL('.',location.href).pathname}`;
 let game=null, paused=false, modalKind='', lastModalKey='', lastControlsKey='', lastLog='', lastFrame=0, lastSave=0, lastUI=0, toastTimer, installPrompt=null;
 let audioContext=null, soundscape=null, soundEnabled=false, storageWarned=false;
+const soundEvents=new SoundEvents();
 const esc = value => String(value).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 function readSave() { try { return restore(localStorage.getItem(SAVE_KEY)); } catch { return null; } }
 let history={ collected: [], runs: [] };
@@ -98,6 +100,7 @@ function begin(mode,fromSave=false) {
   if($('guide-aftermath').matches(':popover-open'))$('guide-aftermath').hidePopover();
   game=fromSave?readSave():createGame(mode);
   if(!game){toast('The saved shift could not be read. You can start a new one.');return;}
+  soundEvents.reset(game);
   paused=false;lastModalKey='';lastControlsKey='';lastLog='';
   fieldMap.reset();
   $('notebook').hidden=false;$('menu-radio').hidden=false;$('assignment').hidden=false;
@@ -314,7 +317,7 @@ $('pause').addEventListener('click',()=>togglePause());$('unpause').addEventList
 dialog.addEventListener('cancel',event=>{if(['briefing','debrief','ending','encounter'].includes(modalKind))event.preventDefault();else{event.preventDefault();closeModal();}});
 $('manual').addEventListener('click',()=>showModal('manual',paper('The field manual.',`<ol class="orders"><li><span>01</span>Watch the corn. Shoot any that try to escape.</li><li><span>02</span>Remain in the watchtower.</li><li><span>03</span>Do not consume the crop.</li><li><span>04</span>Remember any irregularities for your debrief at the end of the night.</li></ol><button class="primary" data-action="close">Understood ↗</button>`)));
 
-$('about').addEventListener('click',()=>showModal('about',paper('About Debrief.', '<p>An interactive adaptation of the short story by Ryan L. Melvin.</p><p>Three shifts. About ten minutes. Headphones optional.</p><p class="small">Music: <a href="https://opengameart.org/content/lost-in-a-bad-place-horror-ambience-loop" target="_blank" rel="noopener">Lost in a Bad Place</a> by congusbongus · <a href="https://creativecommons.org/publicdomain/zero/1.0/" target="_blank" rel="noopener">CC0</a>.</p><p>The goal is to find your way through every possible ending. New endings added all the time.</p><p class="small">Your progress and records stay in this browser or app, on this device. Clearing site data deletes them; installation is not a backup.</p><button class="primary" data-action="close">Back ↗</button>', 'STATION 04')));
+$('about').addEventListener('click',()=>showModal('about',paper('About Debrief.', '<p>An interactive adaptation of the short story by Ryan L. Melvin.</p><p>Three shifts. About ten minutes. Headphones optional.</p><p class="small">Music: <a href="https://opengameart.org/content/lost-in-a-bad-place-horror-ambience-loop" target="_blank" rel="noopener">Lost in a Bad Place</a> by congusbongus · <a href="https://creativecommons.org/publicdomain/zero/1.0/" target="_blank" rel="noopener">CC0</a>.</p><p class="small">Field sounds (CC0): <a href="https://opengameart.org/content/crickets-ambient-noise-loopable" target="_blank" rel="noopener">crickets by Ted Kerr</a>; <a href="https://opengameart.org/content/random-sounds-samples" target="_blank" rel="noopener">footsteps and leaves by Brandon Morris</a>; <a href="https://opengameart.org/content/static" target="_blank" rel="noopener">radio static by xhunterko</a>.</p><p>The goal is to find your way through every possible ending. New endings added all the time.</p><p class="small">Your progress and records stay in this browser or app, on this device. Clearing site data deletes them; installation is not a backup.</p><button class="primary" data-action="close">Back ↗</button>', 'STATION 04')));
 $('assignment').addEventListener('click',()=>{
   if(!game)return;
   showModal('assignment',paper($('objective').textContent,`<p>${esc($('objective-detail').textContent)}</p><p class="small">Shift ${game.shift+1} of 3 · ${esc($('station-status').textContent)}</p><button class="primary" data-action="close">Return to duty ↗</button>`, 'CURRENT ORDERS'));
@@ -393,10 +396,19 @@ async function initAudio() {
   // Resume during the button gesture before building the sound graph (mobile).
   await audioContext.resume();
   if(audioContext.state!=='running')throw new Error('Audio is suspended');
-  if(!soundscape)soundscape=new GameAudio(audioContext,await loadMusic(audioContext));
+  if(!soundscape){
+    const [music,effects]=await Promise.all([loadMusic(audioContext),loadEffects(audioContext)]);
+    soundscape=new GameAudio(audioContext,music,effects);
+  }
   return true;
 }
-function syncAudio(){soundscape?.sync({enabled:soundEnabled,held:paused||dialog.open||menuOpen()||document.hidden||game?.phase==='ending',pressure:game?investigationPressure(game)?.strength||0:0,takeover:game?.phase==='field'&&game.compulsionNotice===true});}
+function syncAudio(){
+  const encounter=game?.phase==='field'?game.fieldEvents?.pending:null;
+  const held=paused||(dialog.open&&modalKind!=='encounter')||menuOpen()||document.hidden||!game||game.phase==='ending';
+  const takeover=game?.phase==='field'&&game.compulsionNotice===true;
+  soundscape?.sync({enabled:soundEnabled,held,pressure:game?investigationPressure(game)?.strength||0:0,takeover,scene:game?.phase,night:game?.shift||0,encounter});
+  soundEvents.update(game,soundscape,soundEnabled&&!held&&!takeover,fieldMap.style);
+}
 $('sound').addEventListener('click',async()=>{
   const button=$('sound');button.disabled=true;
   try {

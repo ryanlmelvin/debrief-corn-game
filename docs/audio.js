@@ -1,4 +1,4 @@
-// Recorded CC0 music plus synthesized gameplay effects; see assets/MUSIC-LICENSE.txt.
+// Recorded CC0 music and field sounds; see assets/MUSIC-LICENSE.txt and SOUND-LICENSE.txt.
 function ramp(param, value, time, duration = .25) {
   if (typeof param.cancelAndHoldAtTime === 'function') param.cancelAndHoldAtTime(time);
   else { const held = param.value; param.cancelScheduledValues(time); param.setValueAtTime(held, time); }
@@ -25,6 +25,18 @@ export async function loadMusic(context, fetchFile = fetch) {
   const response = await fetchFile(new URL('./assets/lost-in-a-bad-place.mp3', import.meta.url));
   if (!response.ok) throw new Error(`Music download failed: ${response.status}`);
   return context.decodeAudioData(await response.arrayBuffer());
+}
+
+export async function loadEffects(context, fetchFile = fetch) {
+  const files = {crickets:'crickets.mp3', footstep:'footstep.mp3', leaves:'leaves.mp3', radio:'radio-static.mp3'};
+  const sounds = await Promise.all(Object.entries(files).map(async ([name, file]) => {
+    try {
+      const response = await fetchFile(new URL(`./assets/${file}`, import.meta.url));
+      if (!response.ok) return null;
+      return [name, await context.decodeAudioData(await response.arrayBuffer())];
+    } catch { return null; } // One unavailable effect must never prevent music or play.
+  }));
+  return Object.fromEntries(sounds.filter(Boolean));
 }
 
 export class PressureDrone {
@@ -80,25 +92,41 @@ export class PressureDrone {
 }
 
 export class GameAudio {
-  constructor(context, musicBuffer) {
+  constructor(context, musicBuffer, effects = {}) {
     this.context = context; this.active = false; this.pressure = -1; this.suspendTimer = null; this.shots = new Set();
+    this.effects = effects; this.voices = new Map(); this.stepCount = 0; this.lastStepAt = -Infinity;
+    this.encounterKey = ''; this.scene = ''; this.mixKey = '';
     this.master = context.createGain(); this.master.gain.value = 0; this.master.connect(context.destination);
     const noise = brownNoise(context);
     this.ambient = context.createBufferSource(); this.ambient.buffer = musicBuffer; this.ambient.loop = true;
     this.ambientLevel = context.createGain(); this.ambientLevel.gain.value = .55;
     this.ambient.connect(this.ambientLevel); this.ambientLevel.connect(this.master); this.ambient.start();
     this.drone = new PressureDrone(context, this.master, noise);
+    if (effects.crickets) {
+      this.crickets = context.createBufferSource(); this.crickets.buffer = effects.crickets; this.crickets.loop = true;
+      this.cricketLevel = context.createGain(); this.cricketLevel.gain.value = 0;
+      const filter = context.createBiquadFilter(); filter.type = 'lowpass'; filter.frequency.value = 4200;
+      this.crickets.connect(filter); filter.connect(this.cricketLevel); this.cricketLevel.connect(this.master); this.crickets.start();
+    }
   }
-  sync({ enabled, held, pressure = 0, takeover = false }) {
+  sync({ enabled, held, pressure = 0, takeover = false, scene = 'tower', night = 0, encounter = null }) {
     const active = enabled && !held && !takeover, now = this.context.currentTime;
+    const encounterKey = encounter ? `${encounter.id}:${encounter.choice || ''}` : '';
+    if (scene !== this.scene || encounterKey !== this.encounterKey) {
+      // Cancel scheduled scares on every story transition; they must not follow
+      // the player into the next page or resume after a pause.
+      this.stopEffects(); this.lastStepAt = -Infinity;
+      this.scene = scene; this.encounterKey = encounterKey;
+    }
     if (!active) {
       if (!this.active) return;
-      this.active = false; this.pressure = -1;
+      this.active = false; this.pressure = -1; this.mixKey = '';
       // Twelve milliseconds avoids a speaker click but reads as an abrupt cut.
       // This is after the delay, so neither the drone nor its tail can escape it.
       ramp(this.master.gain, 0, now, .012);
       for (const shot of this.shots) shot.stop(now + .012);
       this.shots.clear();
+      this.stopEffects();
       this.suspendTimer = setTimeout(() => {
         this.suspendTimer = null;
         if (!this.active) { this.drone.reset(); this.context.suspend().catch(() => {}); }
@@ -112,10 +140,75 @@ export class GameAudio {
       this.context.resume().catch(() => {});
     }
     const p = Number.isFinite(pressure) ? Math.max(0, Math.min(1, pressure)) : 0;
-    if (p === this.pressure) return;
-    this.pressure = p;
-    this.drone.setPressure(p);
-    ramp(this.ambientLevel.gain, .55 * (1 - .88 * p), now, .4);
+    if (p !== this.pressure) { this.pressure = p; this.drone.setPressure(p); }
+    const mixKey = `${p}:${scene}:${night}:${encounterKey}`;
+    if (mixKey === this.mixKey) return;
+    this.mixKey = mixKey;
+    const ordinaryField = encounter?.id === 'second-call' && encounter.choice === 'compare';
+    ramp(this.ambientLevel.gain, .55 * (1 - .88 * p) * (encounter ? .78 : 1), now, .4);
+    if (this.cricketLevel) {
+      const outdoors = ['tower', 'field', 'guide'].includes(scene);
+      const insects = outdoors && (!encounter || ordinaryField) ? .18 * (1 - p) ** 2 : 0;
+      ramp(this.cricketLevel.gain, insects, now, insects ? 1.2 : .18);
+    }
+  }
+  stopEffects() {
+    const now = this.context.currentTime;
+    for (const [source, voice] of this.voices) {
+      ramp(voice.gain.gain, 0, now, .012);
+      source.stop(now + .012);
+    }
+    this.voices.clear();
+  }
+  sample(name, {level = .25, pan = 0, toPan = pan, rate = 1, delay = 0, duration, cutoff = 3200} = {}) {
+    const buffer = this.effects[name];
+    if (!this.active || !buffer || this.voices.size >= 8) return;
+    const context = this.context, source = context.createBufferSource(), gain = context.createGain();
+    const position = context.createStereoPanner(), filter = context.createBiquadFilter();
+    const start = context.currentTime + delay, length = Math.min(duration || buffer.duration / rate, buffer.duration / rate);
+    source.buffer = buffer; source.playbackRate.value = rate;
+    filter.type = 'lowpass'; filter.frequency.value = cutoff; filter.Q.value = .7;
+    gain.gain.setValueAtTime(0, start);
+    gain.gain.linearRampToValueAtTime(level, start + Math.min(.02, length / 4));
+    gain.gain.setValueAtTime(level, start + Math.max(length / 2, length - .12));
+    gain.gain.linearRampToValueAtTime(0, start + length);
+    position.pan.setValueAtTime(pan, start); position.pan.linearRampToValueAtTime(toPan, start + length);
+    source.connect(filter); filter.connect(gain); gain.connect(position); position.connect(this.master);
+    this.voices.set(source, {gain, name});
+    source.onended = () => {
+      this.voices.delete(source); source.disconnect(); filter.disconnect(); gain.disconnect(); position.disconnect();
+    };
+    source.start(start); source.stop(start + length);
+    return source;
+  }
+  step({night = 0, style = 'quiet'} = {}) {
+    const now = this.context.currentTime;
+    if (!this.active || now - this.lastStepAt < .14) return;
+    this.lastStepAt = now; this.stepCount++;
+    this.sample('footstep', {level:.34, pan:this.stepCount % 2 ? -.1 : .1, rate:[1,.96,1.035,.985][this.stepCount % 4], cutoff:2200});
+    if (this.stepCount % 3 === 0) {
+      const shift = Math.max(0, Math.min(2, night));
+      const side = this.stepCount % 2 ? -1 : 1;
+      this.sample('leaves', {level:(style === 'direct' ? .26 : .18) + .025 * shift, pan:side * (.6 - .15 * shift), rate:.94 + .025 * shift});
+    }
+  }
+  cueEncounter({id, choice = null}, night = 0) {
+    if (!this.active) return;
+    if (!choice) {
+      const radioNight = ['first-call', 'second-call', 'future-call'].indexOf(id);
+      if (radioNight >= 0) this.sample('radio', {level:[.26,.22,.18][radioNight], duration:[1.2,.7,.3][radioNight], cutoff:3200, pan:-.18});
+      if (id === 'extra-step' || id === 'paired-tracks') this.sample('footstep', {level:.36, delay:id === 'extra-step' ? .55 : .35, pan:.45, rate:.93, cutoff:1700});
+      if (id === 'last-follower') this.sample('leaves', {level:.31, delay:.15, pan:-.65, toPan:.55, rate:.9});
+      if (id === 'lamp-keeper' || id === 'your-outline') this.sample('leaves', {level:.18 + Math.min(2, Math.max(0, night)) * .025, pan:.5, delay:.2, rate:.91});
+    } else if (id === 'first-call' && choice === 'answer') {
+      this.sample('leaves', {level:.25, pan:.6, delay:.12, rate:.95});
+    } else if (id === 'extra-step' && choice === 'turn') {
+      this.sample('leaves', {level:.2, pan:.35, rate:.9});
+    } else if (id === 'second-call' && choice === 'disconnect') {
+      this.sample('footstep', {level:.2, pan:-.18, delay:.12, cutoff:1100});
+    }
+    // Comparing recordings restores the ordinary insects through sync(). The
+    // final radio choices intentionally add nothing after the follower stops.
   }
   preview() {
     // Bypass the paused mix so enabling sound in the menu always confirms it.

@@ -47,7 +47,7 @@ Repository: https://github.com/ryanlmelvin/debrief-corn-game
 
 Play online: https://ryanlmelvin.github.io/debrief-corn-game/
 
-With sound enabled, the investigate pressure starts as a distant low drone. The pulse and close, beating tones build as the outdoor ambience recedes. The entire mix cuts to silence when the compulsion wins; ordinary ambience returns after the map notice closes. Pause, menus, and background tabs mute the sound; turning it back on resumes the current pressure level.
+With sound enabled, the investigate pressure starts as a distant low drone. The pulse and close, beating tones build as the outdoor ambience recedes. The entire mix cuts to silence when the compulsion wins; ordinary ambience returns after the map notice closes. Quiet crickets establish the outdoor ambience and recede with pressure. Successful walking adds soft footsteps and occasional leaves; radio encounters use brief static, and the extra-step encounter adds one delayed footstep after you stop. Story encounters keep their soundscape, while pause, menus, other documents, and background tabs mute the sound. All effects, including delayed cues, cut off during compulsion. Resuming a save or unmuting never replays an old encounter cue. The four CC0 effects add about 187 KB and are cached with the game for offline playback; credits and source details are in `docs/assets/SOUND-LICENSE.txt`.
 
 ## Phone and desktop play
 

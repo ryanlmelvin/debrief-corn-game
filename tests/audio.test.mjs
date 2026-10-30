@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import vm from 'node:vm';
 import { readFileSync } from 'node:fs';
-import { GameAudio, PressureDrone, loadMusic } from '../docs/audio.js';
+import { GameAudio, PressureDrone, loadMusic, loadEffects } from '../docs/audio.js';
 
 class Param {
   constructor(value = 0) { this.value = value; this.events = []; }
@@ -13,10 +13,10 @@ class Param {
   exponentialRampToValueAtTime(value, time) { this.value = value; this.events.push(['exponential', value, time]); }
 }
 class Node {
-  constructor() { for (const key of ['gain', 'frequency', 'pan', 'delayTime', 'Q']) this[key] = new Param(); this.connections = []; this.stops = []; }
+  constructor() { for (const key of ['gain', 'frequency', 'pan', 'delayTime', 'Q', 'playbackRate']) this[key] = new Param(); this.connections = []; this.stops = []; this.starts = []; }
   connect(node) { this.connections.push(node); }
   disconnect() { this.connections = []; }
-  start() { this.started = true; }
+  start(...args) { this.started = true; this.starts.push(args); }
   stop(time) { this.stops.push(time); }
 }
 class Context {
@@ -28,7 +28,7 @@ class Context {
   createBufferSource() { return this.node(); }
   createBiquadFilter() { return this.node(); }
   createDelay() { return this.node(); }
-  createBuffer(channels, length) { const data = Array.from({length:channels}, () => new Float32Array(length)); return {getChannelData: channel => data[channel]}; }
+  createBuffer(channels, length) { const data = Array.from({length:channels}, () => new Float32Array(length)); return {duration:length/this.sampleRate,getChannelData: channel => data[channel]}; }
   async resume() { this.resumes++; }
   async suspend() { this.suspends++; }
 }
@@ -87,12 +87,18 @@ test('AudioParam fallback cancels previous ramps before applying a new envelope'
 
 test('the game sends sound preference, pressure, all pause gates and the takeover to the mixer', () => {
   const source = readFileSync(new URL('../docs/app.js',import.meta.url),'utf8');
-  const calls = [], context = vm.createContext({soundscape:{sync:state=>calls.push(state)},soundEnabled:true,paused:false,dialog:{open:false},menuOpen:()=>false,document:{hidden:false},game:{phase:'tower'},investigationPressure:()=>({strength:.7})});
+  const calls = [], context = vm.createContext({soundscape:{sync:state=>calls.push(state)},soundEvents:{update(){}},fieldMap:{style:'quiet'},soundEnabled:true,paused:false,modalKind:'',dialog:{open:false},menuOpen:()=>false,document:{hidden:false},game:{phase:'tower'},investigationPressure:()=>({strength:.7})});
   vm.runInContext(source.slice(source.indexOf('function syncAudio()'),source.indexOf("$('sound').addEventListener")),context);
   vm.runInContext('syncAudio()',context);assert.equal(calls.at(-1).pressure,.7);
   for(const gate of ['paused','dialog.open','document.hidden']) {
     vm.runInContext(`${gate}=true;syncAudio();${gate}=false`,context);assert.equal(calls.at(-1).held,true);
   }
+  context.modalKind='encounter';context.dialog.open=true;
+  vm.runInContext('syncAudio()',context);assert.equal(calls.at(-1).held,false);
+  for(const gate of ['paused','document.hidden']) {
+    vm.runInContext(`${gate}=true;syncAudio();${gate}=false`,context);assert.equal(calls.at(-1).held,true);
+  }
+  context.dialog.open=false;context.modalKind='';
   context.menuOpen=()=>true;vm.runInContext('syncAudio()',context);assert.equal(calls.at(-1).held,true);
   context.menuOpen=()=>false;context.game.phase='field';context.game.compulsionNotice=true;vm.runInContext('syncAudio()',context);assert.equal(calls.at(-1).takeover,true);
   context.game.compulsionNotice=false;vm.runInContext('syncAudio()',context);assert.equal(calls.at(-1).takeover,false);
@@ -134,4 +140,92 @@ test('recorded music loads from the game host and decodes before playback', asyn
   assert.equal(sound.ambient.buffer,music);assert.equal(sound.ambient.loop,true);
   const worker = readFileSync(new URL('../docs/sw.js',import.meta.url),'utf8');
   assert.ok(worker.includes("'./assets/lost-in-a-bad-place.mp3'"));
+});
+
+const fieldEffects = () => ({crickets:{duration:11.45},footstep:{duration:.42},leaves:{duration:1.4},radio:{duration:3}});
+
+test('field samples load independently so a missing or unsupported clip cannot block sound', async () => {
+  const requested = [], bytes = new ArrayBuffer(2);
+  const clips = await loadEffects({decodeAudioData:async()=>({duration:1})},async url => {
+    requested.push(url.pathname);
+    if (url.pathname.endsWith('/leaves.mp3')) throw new Error('offline');
+    return {ok:!url.pathname.endsWith('/radio-static.mp3'),arrayBuffer:async()=>bytes};
+  });
+  assert.equal(requested.length,4);
+  assert.ok(requested.every(path=>path.includes('/assets/')));
+  assert.deepEqual(Object.keys(clips).sort(),['crickets','footstep']);
+  assert.deepEqual(await loadEffects({decodeAudioData:async()=>{throw new Error('unsupported');}},async()=>({ok:true,arrayBuffer:async()=>bytes})),{});
+});
+
+test('crickets recede with pressure and story danger, return for the recording comparison, and reuse one loop', () => {
+  const context = new Context(), effects = fieldEffects(), sound = new GameAudio(context,{duration:134},effects);
+  const count = context.nodes.length;
+  sound.sync({enabled:true,scene:'field'});
+  assert.equal(sound.crickets.buffer,effects.crickets);assert.equal(sound.crickets.loop,true);
+  assert.equal(sound.cricketLevel.gain.value,.18);
+  sound.sync({enabled:true,scene:'tower',pressure:.7});
+  assert.ok(sound.cricketLevel.gain.value < .02);
+  sound.sync({enabled:true,scene:'field',encounter:{id:'extra-step',choice:null}});
+  assert.equal(sound.cricketLevel.gain.value,0);
+  sound.sync({enabled:true,scene:'field',encounter:{id:'second-call',choice:'compare'}});
+  assert.equal(sound.cricketLevel.gain.value,.18);
+  sound.sync({enabled:true,scene:'ending'});
+  assert.equal(sound.cricketLevel.gain.value,0);
+  assert.equal(context.nodes.length,count);
+});
+
+test('successful movement sounds are quiet, varied, bounded, and add only sparse rustles', () => {
+  const context = new Context(), sound = new GameAudio(context,{duration:134},fieldEffects());
+  sound.step();assert.equal(sound.voices.size,0);
+  sound.sync({enabled:true,scene:'field'});
+  sound.step();const first = [...sound.voices.keys()][0];
+  sound.step();assert.equal(sound.voices.size,1);
+  context.currentTime += .2;sound.step();
+  const second = [...sound.voices.keys()][1];
+  assert.notEqual(first.playbackRate.value,second.playbackRate.value);
+  context.currentTime += .2;sound.step({night:2,style:'direct'});
+  assert.deepEqual([...sound.voices.values()].map(v=>v.name),['footstep','footstep','footstep','leaves']);
+  for (const {gain} of sound.voices.values()) assert.ok(gain.gain.events.filter(e=>['linear','set'].includes(e[0])).every(e=>e[1] <= .34));
+  for (let i=0;i<20;i++) {context.currentTime += .2;sound.step();}
+  assert.equal(sound.voices.size,8);
+  first.onended();assert.equal(sound.voices.size,7);assert.equal(first.connections.length,0);
+});
+
+test('the extra footstep is delayed and every pause gate cancels it without replay on resume', async () => {
+  for (const gate of [{held:true},{enabled:false},{takeover:true}]) {
+    const context = new Context(), sound = new GameAudio(context,{duration:134},fieldEffects());
+    const state = {enabled:true,held:false,scene:'field',encounter:{id:'extra-step',choice:null}};
+    sound.sync(state);sound.cueEncounter(state.encounter);
+    assert.equal(sound.voices.size,1);
+    const source = [...sound.voices.keys()][0];
+    assert.equal(source.starts[0][0],context.currentTime+.55);
+    sound.sync({...state,...gate});
+    assert.equal(sound.master.gain.value,0);assert.equal(sound.voices.size,0);
+    assert.ok(source.stops.at(-1) < source.starts[0][0]);
+    sound.cueEncounter(state.encounter);sound.step();assert.equal(sound.voices.size,0);
+    await new Promise(resolve=>setTimeout(resolve,35));
+    sound.sync(state);assert.equal(sound.voices.size,0);
+  }
+});
+
+test('radio interference shortens over the nights and a story transition cancels the previous cue', () => {
+  const context = new Context(), sound = new GameAudio(context,{duration:134},fieldEffects());
+  const lengths = [];
+  for (const id of ['first-call','second-call','future-call']) {
+    const previous = [...sound.voices.keys()][0], encounter = {id,choice:null};
+    sound.sync({enabled:true,scene:'field',encounter});
+    if (previous) assert.equal(previous.stops.at(-1),context.currentTime+.012);
+    sound.cueEncounter(encounter);
+    const source = [...sound.voices.keys()][0];
+    assert.equal(sound.voices.size,1);assert.equal(source.buffer,sound.effects.radio);
+    lengths.push(source.stops[0]-source.starts[0][0]);
+    context.currentTime += .1;
+  }
+  assert.ok(lengths[0] > lengths[1] && lengths[1] > lengths[2]);
+  const encounter = {id:'last-follower',choice:null};
+  sound.sync({enabled:true,scene:'field',encounter});sound.cueEncounter(encounter,2);
+  assert.equal([...sound.voices.values()][0].name,'leaves');
+  sound.sync({enabled:true,scene:'field',encounter:{...encounter,choice:'leave'}});
+  sound.cueEncounter({...encounter,choice:'leave'},2);
+  assert.equal(sound.voices.size,0);
 });
