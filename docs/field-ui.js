@@ -10,7 +10,7 @@ export class FieldMap {
   constructor(root) {
     this.root=root;this.selected=null;this.style='quiet';this.travel=null;this.lastKey='';
     root.innerHTML=`<header class="field-heading"><p class="eyebrow" id="field-night"></p><div class="field-exposure"><span>EXPOSURE <b id="field-exposure-value"></b></span><div class="field-meter"><i id="field-exposure-fill"></i></div></div></header>
-      <div class="field-board"><span class="field-north">N ↑</span><div class="field-map-surface">
+      <div class="field-board"><span class="field-north" aria-label="North">N<svg viewBox="0 0 24 32" aria-hidden="true"><path d="M12 1L21 29L12 23L3 29Z" fill="#e8e3c9" stroke="currentColor" stroke-width="1.5"/><path d="M12 1V23L3 29Z" fill="currentColor"/></svg></span><div class="field-map-surface">
         <svg viewBox="-.5 -.5 11 9" preserveAspectRatio="none" aria-hidden="true"><defs><pattern id="corn-rows" width="1" height="1" patternUnits="userSpaceOnUse"><path d="M.2 .15L.15 .8M.55 .15L.5 .8M.85 .15L.8 .8" stroke="#768352" stroke-opacity=".18" stroke-width=".025"/></pattern></defs><rect x="-.5" y="-.5" width="11" height="9" fill="url(#corn-rows)"/>
         ${FIELD_PATHS.map(points=>`<polyline points="${points.map(p=>p.join(',')).join(' ')}" class="field-path"/>`).join('')}<g id="field-footprints"></g><polyline id="field-route" class="field-route"/><g id="field-traces"></g></svg>
         ${FIELD_SITES.map(p=>`<button class="field-landmark" data-action="field-select" data-value="${p.id}" style="left:${percent(p.x,11)};top:${percent(p.y,9)}"><span class="field-site-icon" aria-hidden="true">${landmarkDrawing(p.id)}</span><span>${p.label}</span><small></small></button>`).join('')}

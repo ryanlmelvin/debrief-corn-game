@@ -36,6 +36,12 @@ export function evidenceMount(id) {
   return specimen ? `<div class="evidence-mount">${scenePlate(specimen.site)}${specimenStudy(id)}</div>` : '';
 }
 
+// Only completed answers belong on the tape; field notes remain private.
+export function interviewRecord(game) {
+  const reports=game.reports.filter(r=>r.shift===game.shift), last=reports.at(-1);
+  return `<aside class="interview-record" aria-label="Recorded testimony"><div class="tape-heading"><svg viewBox="0 0 72 28" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true"><circle cx="15" cy="13" r="10"/><circle cx="57" cy="13" r="10"/><circle cx="15" cy="13" r="2"/><circle cx="57" cy="13" r="2"/><path d="M15 3V8M5 13H10M15 18V23M20 13H25M57 3V8M47 13H52M57 18V23M62 13H67M15 23L27 26H45L57 23"/></svg><span>ON RECORD<small>${String(reports.length).padStart(2,'0')} / 03 RECORDED</small></span></div><p class="record-caption">${last?'LAST STATEMENT':'AWAITING TESTIMONY'}</p><p class="record-quote">${last?escape(last.answer):'No statement on record.'}</p></aside>`;
+}
+
 export function dialogArtwork(kind, shift = 0) {
   if (kind === 'debrief') return `<div class="interview-scene">${scenePlate('debrief')}<span class="recording-label"><i></i> REC / TAPE 0${shift + 1}</span></div>`;
   if (kind === 'guide-intro') return scenePlate('retrieval');
