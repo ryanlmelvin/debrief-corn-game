@@ -157,3 +157,18 @@ body[data-phase="guide"] .sidebar .controls { display: block; max-width: 520px; 
   .field-board { min-height: 0; }
   .field-map-surface { inset: 28px 62px 32px; }
 }
+
+/* Let the home screen breathe on phones, including shorter displays. */
+@media (max-width: 760px) and (orientation: portrait) {
+  .welcome { justify-content: flex-start; overflow-y: auto; padding: 36px max(24px, env(safe-area-inset-right)) 40px max(24px, env(safe-area-inset-left)); }
+  .welcome-content { flex-shrink: 0; margin-block: auto; width: 100%; }
+  .welcome-content::before { font-size: 8px; margin-bottom: 24px; padding: 7px 10px; }
+  .welcome h1 { font-size: clamp(54px, 10vw, 76px); margin: 0 0 28px; }
+  .welcome .opening { font-size: 20px; line-height: 1.65; margin-bottom: 30px; }
+  .welcome .start-actions { display: flex; flex-wrap: wrap; gap: 14px; }
+  .welcome .start-actions button { min-height: 52px; padding: 15px 20px; font-size: 12px; }
+  .welcome .start-actions .primary span { display: inline; }
+  .welcome .welcome-meta { font-size: 10px; line-height: 1.9; letter-spacing: .4px; margin: 26px 0 0; }
+  .welcome .difficulty { flex-direction: column; align-items: flex-start; gap: 10px; font-size: 9px; margin-top: 28px; }
+  .welcome .difficulty select { max-width: 100%; }
+}
