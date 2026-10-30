@@ -6,7 +6,7 @@ export const ENCOUNTERS=[
     text:'A radio lies half buried in the furrow. Your own voice comes through its grille: “Stay where you are. I can see you.” Your issued set is still clipped to your belt.',
     report:'A radio in the soil spoke in my voice while my own set was silent.',choices:[
       choice('leave','Leave the set in the mud.',0,'You step past it. The voice keeps describing a place you have not reached yet.'),
-      choice('answer','Ask it where you are.',3,'It gives your exact position, then names the row behind you. Leaves scrape together there. You do not look.','answered-radio'),
+      choice('answer','Ask it where you are.',3,'It gives your exact position, then whispers, “Do not turn around.” Leaves scrape together behind you. You do not look.','answered-radio'),
       choice('record','Hold your recorder to the grille.',5,'You keep a few seconds of your other voice. On the tape, it stops speaking just before you do.','recording')
     ]},
   {id:'paired-tracks',night:0,step:9,art:'tracks',title:'Someone is keeping pace.',
