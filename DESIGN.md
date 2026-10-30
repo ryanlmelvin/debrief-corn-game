@@ -20,7 +20,7 @@ Leaving early is possible. Any mobile crop already loose escapes when the post i
 
 ## Investigation
 
-Field investigation is turn based. Three landmarks provide evidence; at least one must be inspected before returning for debrief. Walking adds exposure, and it only partially clears between shifts. Revisiting a familiar route is deliberate: the northeast corner gives different evidence each time, and ordinary infrastructure becomes increasingly difficult to explain.
+Field investigation is turn based. Three landmarks provide evidence; all three must be inspected before returning for debrief. Walking adds exposure, and it only partially clears between shifts. Revisiting a familiar route is deliberate: the northeast corner gives different evidence each time, and ordinary infrastructure becomes increasingly difficult to explain.
 
 The current map has no obstacles or tactical pathfinding. Waiting for relief enters this map automatically; leaving at the sighting starts it early. The detours still cost exposure. It is not yet a full exploration system.
 

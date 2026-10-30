@@ -158,8 +158,11 @@ export function inspect(s) {
   addLog(s, 'Private observation saved. Open your notebook to read it.', 'story');
   return id;
 }
+export function investigationComplete(s) {
+  return ['corner', 'pump', 'drain'].every(id => s.inspected.includes(id));
+}
 export function beginDebrief(s) {
-  if (s.phase !== 'field' || nearbySite(s)?.id !== 'tower' || !s.inspected.some(id => ['corner', 'pump', 'drain'].includes(id))) return false;
+  if (s.phase !== 'field' || nearbySite(s)?.id !== 'tower' || !investigationComplete(s)) return false;
   s.phase = 'debrief'; s.question = 0; return true;
 }
 export function getQuestion(s) {
