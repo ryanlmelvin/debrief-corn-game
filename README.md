@@ -4,7 +4,7 @@ A playable rural horror game based on **Debrief**, the short story by **Ryan L. 
 
 Work three watchtower shifts. Shoot corn that tries to escape, distinguish human figures from moving crops, try to resist an intrusive urge to investigate, and choose what goes into the official debrief. After the sighting, roots gradually fill the stationary word “investigate” across the watchtower view. Holding your post until relief leads straight to the map with a brief notice that you could no longer resist; your later testimony remembers whether you chose to leave or were compelled. Inspect all three locations and return to the tower for debrief; your evidence changes your answers and available endings.
 
-This is a first playable adaptation, with original additional scenes and ten endings. The source manuscript has not been copied into the project. The application records and environmental anomalies are fictional story elements.
+This is a first playable adaptation, with original additional scenes and fifteen endings. The source manuscript has not been copied into the project. The application records and environmental anomalies are fictional story elements.
 
 ## Play locally
 
@@ -36,6 +36,8 @@ Clean containments build a streak and bonus points. A miss or breach resets the 
 People are not targets, whether they wear a white dress or recovery equipment. Six total perimeter breaches end the assignment. Leaving the tower early allows currently loose crops to escape. Investigations offer slower, lower-exposure paths or fast shortcuts through the rows. The map previews exposure before departure; walking can be stopped at any time. Each discovery opens on arrival, and the map suggests the next unread location. Inspect all three sites, then return to the tower before reaching 100 exposure. Debrief answers and retained exhibits affect the final disposition. The final refusal shows green and red requirements based on the assignment’s discoveries and choices. No ending checklist or evidence-preparation tasks appear earlier in play.
 
 Walking between locations brings twelve illustrated encounters across three nights: buried radios, impossible tracks, abandoned lamps, and things that follow. The walk pauses for a choice. You can always move on without extra exposure; investigating can cost exposure, uncover an aid, or change an encounter on a later night. Your choices go into the notebook, mark the map, and can become testimony in the debrief. Mid-encounter saves preserve the choice and destination, including after an update.
+
+At the last debrief, **I need to do something first** opens five more ways out: hand your post to your double, bring a witness, rescue the person at the lantern, accept a promotion, or return to the second tower. Earlier encounters and reports unlock them. Each route has three scenes, a choice to leave before committing, its own illustration, and a share card. The replacement can hear the truth about relief; the rescue costs your recordings. Every scene saves automatically.
 
 ## Publish on GitHub Pages
 
@@ -86,6 +88,7 @@ The game-rule tests cover ammunition, shooting, civilian encounters, timing, con
 | `docs/engine.js` | Game rules, branching narrative, save validation |
 | `docs/field.js` / `docs/field-ui.js` | Route planning, exposure previews, responsive touch investigation map |
 | `docs/encounters.js` | Between-location scenes, choices, consequences, and field notes |
+| `docs/alternate-endings.js` / `docs/resolution-ui.js` | Five final-night routes, choices, requirements, and saved scenes |
 | `docs/renderer.js` | Layered canvas landscape, illustrated actors, root motion and field survey |
 | `docs/watch-story.js` | Nightly sightings, crop anatomy, and retrieval-team light timing |
 | `docs/app.js` | Controls, paper documents, audio, saving, installation |
@@ -97,6 +100,8 @@ The game-rule tests cover ammunition, shooting, civilian encounters, timing, con
 | `DESIGN.md` | Adaptation choices and proposed next iteration |
 
 The original landscape is drawn in code. Custom moving crop and retrieval-team sprites, field photographs, nine specimen studies, notebook and survey textures, and station props are bundled locally in `docs/assets/`. The private notebook has an exhibit index and pages; discovered evidence keeps its own study and location image. The map uses a worn survey sheet and drawn landmarks, and briefings and interviews use illustrated station equipment. Asset prompts are recorded in `ASSET-PROMPTS.md`; each of the twelve walking encounters has its own illustration, documented with its prompt in `ENCOUNTER-ART.md`. Fonts use the system’s installed serif and monospace families. No font service, CDN, analytics, or external network call is used during play.
+
+The five additional ending illustrations and their social previews are documented in `ENDING-ART.md`.
 
 ## Inspiration
 

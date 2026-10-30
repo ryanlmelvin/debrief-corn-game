@@ -10,7 +10,12 @@ export const ENDING_SHARES = {
   dissent: { code: '04', line: 'I made it an HR problem.', art: 'encounter-radio', alt: 'A field radio waits in the dark.' },
   breach: { code: '05', line: 'I had one job.', art: 'field-corner', alt: 'A fence marks the edge of a dark cornfield.' },
   assimilation: { code: '06', line: 'I let the intrusive thoughts win.', art: 'encounter-tracks', alt: 'Footprints and exposed roots mark a muddy path between corn rows.' },
-  consumption: { code: '07', line: 'I ate the corn.', art: 'pump-stove', alt: 'Corn boils on a camping stove beside a plate and butter.' }
+  consumption: { code: '07', line: 'I ate the corn.', art: 'pump-stove', alt: 'Corn boils on a camping stove beside a plate and butter.' },
+  relief: { code: '11', line: 'I trained my replacement. He’s me.', art: 'ending-relief', alt: 'Two guards in matching coats exchange a badge beneath a watchtower.' },
+  witness_present: { code: '12', line: 'I brought a plus-one.', art: 'ending-witness', alt: 'An empty chair waits across from a running recorder in the interview room.' },
+  rescue: { code: '13', line: 'I chose people over paperwork.', art: 'ending-rescue', alt: 'A guard helps an exhausted person out of the corn toward the road.' },
+  vacancy: { code: '14', line: 'I became the problem.', art: 'ending-vacancy', alt: 'An uncapped pen and release form wait at an empty supervisor’s chair.' },
+  transmission: { code: '15', line: 'I took my own advice.', art: 'ending-transmission', alt: 'A radio in one wooden tower overlooks another light above the corn.' }
 };
 
 export const GUIDE_TEAM_SHARE = ENDING_SHARES.guide_shot;

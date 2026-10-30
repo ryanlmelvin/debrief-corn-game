@@ -13,6 +13,8 @@ import { pressureWordMarkup } from './pressure-word.js';
 import { DialogPager } from './pager.js';
 import { endingShareData, shareEnding } from './sharing.js';
 import { decisionQuestion } from './decision-copy.js';
+import { chooseResolution } from './alternate-endings.js';
+import { resolutionMarkup } from './resolution-ui.js';
 import { InstallHandoff, recoverInstallHandoff, progressSnapshot, encodeProgress, decodeProgress, storeProgress, MAX_PROGRESS_BYTES } from './progress.js';
 
 const $ = id => document.getElementById(id);
@@ -110,12 +112,12 @@ const REDACTED_TOWN = '<span class="censor-bar" role="img" aria-label="Town name
 function paper(title,body,tag='') {
   return `<article class="paper"><button id="dialog-update" class="secondary" data-update hidden>Update ready. Download?</button>${tag?`<div class="paper-top"><span>STATION 04</span><span>${tag}</span></div>`:''}<h2 id="dialog-title" tabindex="-1">${title}</h2>${body}</article>`;
 }
-function showModal(kind,html) {
+function showModal(kind,html,art=null) {
   modalReturnFocus=menuOpen()?$('game-menu-toggle'):null;
   if(menuOpen())menu.hidePopover();
   modalKind=kind;$('dialog-content').innerHTML=html;
   dialog.dataset.kind=kind;
-  const artwork=dialogArtwork(kind,game?.shift);
+  const artwork=dialogArtwork(kind,game?.shift,art);
   if(artwork)$('dialog-content').querySelector('.paper')?.insertAdjacentHTML('afterbegin',artwork);
   if(kind==='debrief')$('dialog-content').querySelector('.interview-scene')?.insertAdjacentHTML('beforeend',interviewRecord(game));
   if(!dialog.open)dialog.showModal();
@@ -141,7 +143,7 @@ function begin(mode,fromSave=false) {
 function sceneDialog() {
   if(!game)return;
   const pending=game.fieldEvents.pending;
-  const key=`${game.phase}:${game.shift}:${game.question}:${game.ending}:${game.incident}:${sightingPromptReady(game)}:${pending?.id}:${pending?.choice}:${game.guide?.stage}:${game.guide?.debriefQuestion}`;
+  const key=`${game.phase}:${game.shift}:${game.question}:${game.ending}:${game.incident}:${sightingPromptReady(game)}:${pending?.id}:${pending?.choice}:${game.guide?.stage}:${game.guide?.debriefQuestion}:${game.resolution?.route}:${game.resolution?.step}`;
   if(key===lastModalKey)return;
   lastModalKey=key;
   if(game.phase==='field'&&pending){showModal('encounter',encounterMarkup(game));save();return;}
@@ -155,6 +157,8 @@ function sceneDialog() {
   } else if(game.phase==='debrief') {
     const q=decisionQuestion(game);
     showModal('debrief',paper('For the record.',`<p class="eyebrow">${REPORT_DATES[game.shift]}, <span class="redacted-text">19XX</span></p>${game.question<3?`<span class="question-num" aria-label="Question ${game.question+1} of 3">${game.question+1} / 3</span>`:''}<div class="interview-question"><span class="speaker-label">SUPERVISOR</span><p>${esc(q.prompt)}</p></div><p class="note"><span class="decision-note-label">${esc(q.contextLabel)}</span> ${esc(q.context)}</p><div class="choices" role="group" aria-label="Your response"><span class="speaker-label">YOUR RESPONSE</span>${q.options.map((o,i)=>`<button class="choice" data-action="answer" data-value="${o.id}" ${o.disabled?'disabled':''}><span class="response-key" aria-hidden="true">${String.fromCharCode(65+i)}</span><span>${esc(o.label)}${o.detail?`<small>${esc(o.detail)}</small>`:''}${o.requirements?`<small class="ending-requirements">${o.requirements.map(r=>`<span class="ending-requirement ${r.met?'requirement-met':'requirement-unmet'}"><span aria-hidden="true">${r.met?'✓':'✗'}</span> <span class="sr-only">${r.met?'Met':'Unmet'}: </span>${esc(r.label)}${r.target>1?` ${r.current}/${r.target}`:''}</span>`).join('')}</small>`:''}</span></button>`).join('')}</div>`, 'DEBRIEF TRANSCRIPT'));
+  } else if(game.phase==='resolution') {
+    showModal(game.resolution.route === null ? 'resolution-menu' : 'resolution',resolutionMarkup(game));
   } else if(game.phase==='guide' && game.guide.stage==='debrief') {
     const q=guideDebrief(game);
     showModal('guide-debrief',paper('After the recovery.',`<p class="eyebrow">RECOVERY DETAIL / RECORDED INTERVIEW</p><span class="question-num" aria-label="Question ${game.guide.debriefQuestion+1} of 2">${game.guide.debriefQuestion+1} / 2</span><div class="interview-question"><span class="speaker-label">${esc(q.speaker||'SUPERVISOR')}</span><p>${esc(q.prompt)}</p></div><p class="note">${esc(q.context)}</p><div class="choices" role="group" aria-label="Your response"><span class="speaker-label">YOUR RESPONSE</span>${q.options.map((o,i)=>`<button class="choice" data-action="guide-answer" data-value="${o.id}"><span class="response-key" aria-hidden="true">${String.fromCharCode(65+i)}</span><span>${esc(o.label)}${o.detail?`<small>${esc(o.detail)}</small>`:''}</span></button>`).join('')}</div>`, 'RECOVERY DEBRIEF'));
@@ -168,7 +172,7 @@ function sceneDialog() {
       if(!$('guide-aftermath').matches(':popover-open'))$('guide-aftermath').showPopover();
       return;
     }
-    showModal('ending',paper(e.title,`<p class="eyebrow">ENDING ${e.code} / ${String(Object.keys(ENDINGS).length).padStart(2,'0')}</p><p${e.transcript?' class="ending-transcript"':''}>${esc(e.text).replace(/\[redacted\]|██████/g,'<span class="censor-bar" role="img" aria-label="Speaker name redacted"></span>').replaceAll('\n','<br>')}</p>${e.last?`<p class="note">${esc(e.last)}</p>`:''}<div class="stamp">${e.stamp}</div><div class="receipt-stats"><span>CROPS CONTAINED<strong>${game.kills}</strong></span><span>EXHIBITS RETAINED<strong>${game.evidence.length}</strong></span><span>PERIMETER BREACHES<strong>${game.breaches}</strong></span></div><div class="paper-actions"><button class="primary" data-action="restart">New game</button><button class="secondary" data-action="share-ending">Share ending ↗</button><button class="secondary" data-action="export">Download transcript ↓</button><button class="secondary" data-action="records">Endings</button></div>`, 'ENDING ACHIEVED'));
+    showModal('ending',paper(e.title,`<p class="eyebrow">ENDING ${e.code} / ${String(Object.keys(ENDINGS).length).padStart(2,'0')}</p><p${e.transcript?' class="ending-transcript"':''}>${esc(e.text).replace(/\[redacted\]|██████/g,'<span class="censor-bar" role="img" aria-label="Speaker name redacted"></span>').replaceAll('\n','<br>')}</p>${e.last?`<p class="note">${esc(e.last)}</p>`:''}<div class="stamp">${e.stamp}</div><div class="receipt-stats"><span>CROPS CONTAINED<strong>${game.kills}</strong></span><span>EXHIBITS RETAINED<strong>${game.evidence.length}</strong></span><span>PERIMETER BREACHES<strong>${game.breaches}</strong></span></div><div class="paper-actions"><button class="primary" data-action="restart">New game</button><button class="secondary" data-action="share-ending">Share ending ↗</button><button class="secondary" data-action="export">Download transcript ↓</button><button class="secondary" data-action="records">Endings</button></div>`, 'ENDING ACHIEVED'),e.art);
   }
 }
 function stat(label,value,sub='',percent=null,warning=false) {return `<div class="stat ${warning?'warning':''}"><label>${label}</label><strong>${value}</strong><small> ${sub}</small>${percent!==null?`<div class="meter"><span style="width:${Math.min(100,Math.max(0,percent))}%"></span></div>`:''}</div>`;}
@@ -176,12 +180,12 @@ function updateUI(force=false) {
   if(!game)return;
   document.body.dataset.phase=game.phase;
   const aftermath=isGuideAftermath(game);
-  $('stats').hidden=aftermath;
+  $('stats').hidden=aftermath||game.phase==='resolution';
   $('pause').hidden=game.phase==='ending';
   const phase=game.phase,field=phase==='field',site=nearbySite(game),active=phase==='tower';
   $('date-label').textContent=`${DATES[game.shift]}, ████`;
   $('station-status').textContent=field?'RADIO SIGNAL WEAK':phase==='ending'?'FILE CLOSED':'PERIMETER ACTIVE';
-  $('phase-label').textContent=field?'FIELD INVESTIGATION':phase==='debrief'?'RECORDED INTERVIEW':'WATCHTOWER';
+  $('phase-label').textContent=field?'FIELD INVESTIGATION':phase==='debrief'?'RECORDED INTERVIEW':phase==='resolution'?'AFTER THE WATCH':'WATCHTOWER';
   $('shift-number').textContent=`0${game.shift+1} / 03`;
   $('objective').textContent=field?(site?.label||'Find your way through.'):'Watch the corn.';
   $('objective-detail').textContent=field?(investigationComplete(game)?'Return to the watchtower.':'Follow the unread markers.'):'Shoot any that try to escape.';
@@ -282,6 +286,11 @@ function act(action,value) {
   if(action==='select-share-link'){const input=dialog.querySelector('.share-link');input?.focus();input?.select();return;}
   if(action==='share-ending'){if(game?.phase==='ending')shareDisposition(endingId(game),getEnding(game).stamp);return;}
   if(action==='share-record'){const run=history.runs[Number(value)];if(run)shareDisposition(run.ending,run.stamp);return;}
+  if(action==='resolution-answer'){
+    if(!game||game.phase!=='resolution'||!['resolution','resolution-menu'].includes(modalKind))return;
+    if(!chooseResolution(game,value))return;
+    closeModal();lastModalKey='';save();updateUI(true);return;
+  }
   if(action==='guide-answer'){
     if(!game||game.phase!=='guide'||game.guide.stage!=='debrief'||modalKind!=='guide-debrief')return;
     if(!answerGuideDebrief(game,value))return;
@@ -324,7 +333,7 @@ function act(action,value) {
   }
   if(action==='record-run') {
     const r=history.runs[Number(value)];if(!r)return;
-    showModal('record',paper(esc(r.title),`<p${ENDINGS[r.ending]?.transcript?' class="ending-transcript"':''}>${esc(r.text).replace(/\[redacted\]|██████/g,'<span class="censor-bar" role="img" aria-label="Speaker name redacted"></span>').replaceAll('\n','<br>')}</p>${r.last?`<p class="note">${esc(r.last)}</p>`:''}<div class="transcript">${r.reports.map(t=>`<section><p class="eyebrow">${t.kind==='recovery'?'RECOVERY DEBRIEF':`SHIFT ${Number(t.shift)+1}`}</p><p>${esc(t.question)}</p><p><b>YOU</b> ${esc(t.answer)}</p>${t.supervisorReply?`<p class="note">${esc(t.replySpeaker||'SUPERVISOR')}: ${esc(t.supervisorReply)}</p>`:''}</section>`).join('')}</div><div class="paper-actions"><button class="secondary" data-action="share-record" data-value="${Number(value)}">Share ending ↗</button><button class="primary" data-action="records">Back to endings</button><button class="secondary" data-action="close">Close</button></div>`,'ENDING & TRANSCRIPT'));return;
+    showModal('record',paper(esc(r.title),`<p${ENDINGS[r.ending]?.transcript?' class="ending-transcript"':''}>${esc(r.text).replace(/\[redacted\]|██████/g,'<span class="censor-bar" role="img" aria-label="Speaker name redacted"></span>').replaceAll('\n','<br>')}</p>${r.last?`<p class="note">${esc(r.last)}</p>`:''}<div class="transcript">${r.reports.map(t=>`<section><p class="eyebrow">${t.kind==='recovery'?'RECOVERY DEBRIEF':t.kind==='resolution'?'AFTER THE WATCH':`SHIFT ${Number(t.shift)+1}`}</p><p>${esc(t.question)}</p><p><b>YOU</b> ${esc(t.answer)}</p>${t.supervisorReply?`<p class="note">${esc(t.replySpeaker||'SUPERVISOR')}: ${esc(t.supervisorReply)}</p>`:''}</section>`).join('')}</div><div class="paper-actions"><button class="secondary" data-action="share-record" data-value="${Number(value)}">Share ending ↗</button><button class="primary" data-action="records">Back to endings</button><button class="secondary" data-action="close">Close</button></div>`,'ENDING & TRANSCRIPT'),ENDINGS[r.ending]?.art);return;
   }
   if(action==='records'){$('records').click();return;}
   if(action==='guide-travel')guideTravel(game);
@@ -341,7 +350,7 @@ function act(action,value) {
     else {game.guide.focused=null;toast(game.guide.fired?'They have reached cover. Someone is calling for help.':'The lights have reached cover. You can let them leave.');}
   }
   if(action==='guide-fire'){const t=game?.guide?.team.find(t=>t.id===game.guide.focused&&t.status==='running');const p=t&&visibleGuideTarget(game.guide,t,renderer.view);if(t&&!p){game.guide.focused=null;toast(game.guide.fired?'They have reached cover. Someone is calling for help.':'The lights have reached cover. You can let them leave.');return;}if(p)renderer.pointer={x:p.x,y:p.y-p.height*.5};fire(renderer.pointer);}
-  if(action==='close'){closeModal();if(game&&(['briefing','debrief','ending'].includes(game.phase)||game.guide?.stage==='debrief')){lastModalKey='';updateUI(true);}return;}
+  if(action==='close'){closeModal();if(game&&(['briefing','debrief','resolution','ending'].includes(game.phase)||game.guide?.stage==='debrief')){lastModalKey='';updateUI(true);}return;}
   if(action==='start'){closeModal();startShift(game);canvas.focus({preventScroll:true});}
   if(action==='answer'){closeModal();answer(game,value);}
   if(action==='reload')reload(game);
@@ -370,7 +379,7 @@ $('new-game').addEventListener('click',()=>{
 $('resume').addEventListener('click',()=>begin(null,true));
 function togglePause(force) {if(!game||game.phase==='ending'||dialog.open)return;paused=typeof force==='boolean'?force:!paused;updateUI();save();syncAudio();}
 $('pause').addEventListener('click',()=>togglePause());$('unpause').addEventListener('click',()=>{togglePause(false);canvas.focus({preventScroll:true});});
-dialog.addEventListener('cancel',event=>{if(['briefing','debrief','guide-debrief','ending','encounter'].includes(modalKind))event.preventDefault();else{event.preventDefault();closeModal();}});
+dialog.addEventListener('cancel',event=>{if(modalKind==='resolution-menu'){event.preventDefault();act('resolution-answer','back');}else if(['briefing','debrief','guide-debrief','resolution','ending','encounter'].includes(modalKind))event.preventDefault();else{event.preventDefault();closeModal();}});
 $('manual').addEventListener('click',()=>showModal('manual',paper('Field manual',`<ol class="orders"><li><span>01</span>Watch the corn. Shoot any that try to escape.</li><li><span>02</span>Remain in the watchtower.</li><li><span>03</span>Do not consume the crop.</li><li><span>04</span>Remember any irregularities for your debrief at the end of the night.</li></ol><p class="watch-tips"><b>Runners</b> move fast. <b>Husks</b> take two hits. Clean hits build a streak; misses and breaches break it.</p><p class="small"><b>R / Reload:</b> tap again as the marker reaches gold to finish early. Waiting always completes a normal reload.<br><b>F / Flare:</b> slows all crops for 4.5 seconds. Two per watch. Use one when several crops are close to escaping.</p><button class="primary" data-action="close">Close</button>`)));
 
 $('about').addEventListener('click',()=>showModal('about',paper('About Debrief.', '<p>An interactive adaptation of the short story by Ryan L. Melvin.</p><p>Three shifts. About ten minutes. Headphones optional.</p><p class="small">Music: <a href="https://opengameart.org/content/lost-in-a-bad-place-horror-ambience-loop" target="_blank" rel="noopener">Lost in a Bad Place</a> by congusbongus · <a href="https://creativecommons.org/publicdomain/zero/1.0/" target="_blank" rel="noopener">CC0</a>.</p><p class="small">Field sounds (CC0): <a href="https://opengameart.org/content/crickets-ambient-noise-loopable" target="_blank" rel="noopener">crickets by Ted Kerr</a>; <a href="https://opengameart.org/content/random-sounds-samples" target="_blank" rel="noopener">footsteps and leaves by Brandon Morris</a>; <a href="https://opengameart.org/content/static" target="_blank" rel="noopener">radio static by xhunterko</a>.</p><p>The goal is to find your way through every possible ending. New endings added all the time.</p><p class="small">Your saved game, achieved endings, and transcripts stay in this browser or app, on this device. Clearing site data deletes them; installation is not a backup.</p><button class="primary" data-action="close">Back ↗</button>', 'STATION 04')));
@@ -444,7 +453,7 @@ async function shareDisposition(ending,stamp) {
 }
 function exportRecord() {
   const e=getEnding(game);
-  const body=`DEBRIEF — PRIVATE TRANSCRIPT\nBased on the story by Ryan L. Melvin\n\n${e.title}\n${e.stamp}\n\n${e.text}\n${e.last}\n\nTESTIMONY\n\n${game.reports.map(r=>`${r.kind==='recovery'?'RECOVERY DEBRIEF':`SHIFT ${r.shift+1}`}\nQ: ${r.question}\nA: ${r.answer}${r.redacted?' [official wording]':''}${r.supervisorReply ? `\n${r.replySpeaker||'SUPERVISOR'}: ${r.supervisorReply}` : ''}`).join('\n\n')}\n\nEXHIBITS\n\n${game.evidence.map(id=>`${EVIDENCE[id].title}\n${EVIDENCE[id].text}`).join('\n\n')}`;
+  const body=`DEBRIEF — PRIVATE TRANSCRIPT\nBased on the story by Ryan L. Melvin\n\n${e.title}\n${e.stamp}\n\n${e.text}\n${e.last}\n\nTESTIMONY\n\n${game.reports.map(r=>`${r.kind==='recovery'?'RECOVERY DEBRIEF':r.kind==='resolution'?'AFTER THE WATCH':`SHIFT ${r.shift+1}`}\nQ: ${r.question}\nA: ${r.answer}${r.redacted?' [official wording]':''}${r.supervisorReply ? `\n${r.replySpeaker||'SUPERVISOR'}: ${r.supervisorReply}` : ''}`).join('\n\n')}\n\nEXHIBITS\n\n${game.evidence.map(id=>`${EVIDENCE[id].title}\n${EVIDENCE[id].text}`).join('\n\n')}`;
   const url=URL.createObjectURL(new Blob([body],{type:'text/plain;charset=utf-8'}));const a=document.createElement('a');a.href=url;a.download='debrief-private-transcript.txt';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
 }
 async function initAudio() {

@@ -1,6 +1,7 @@
 import { SIGHTING_TIME, sightingPeople, watchNight, personExitTime, observedSighting } from './watch-story.js';
 import { startGuide, advanceGuide, guideDisposition, restoreGuideRoute } from './guide.js';
 import { ENDING_SHARES } from './sharing.js';
+import { ALTERNATE_ENDINGS, startResolution, validResolution, resolutionEnding } from './alternate-endings.js';
 import { witnessRequirements, canTakeEvidenceOutside, retirePreparations } from './ending-requirements.js';
 import { fieldStepCost } from './field.js';
 import { freshFieldEvents, encounterAfterStep, resolveEncounter, dismissEncounter, migrateFieldEvents, validFieldEvents, encounterById } from './encounters.js';
@@ -320,6 +321,7 @@ export function getQuestion(s) {
   return { prompt: `${response} I am authorizing another search of the northeast corner. Will you assist the team, or sign the report and return to your post?`, context: 'He unfolds a field map over the report. Three names are penciled along its edge.', options: [
     { id: 'expose', label: 'No more teams. I will take my evidence outside the department.', requirements: witnessRequirements(s), disabled: !canTakeEvidenceOutside(s) },
     { id: 'guide', label: s.searched.some(place => /^shift-/.test(place)) ? 'I have been inside the field. I will lead the team to the northeast corner.' : 'I will go in with the team and help search the northeast corner.' },
+    { id: 'follow-lead', label: 'I need to do something first.' },
     { id: 'sign', label: 'I will sign the report and return to the watchtower.' }
   ] };
 }
@@ -333,6 +335,7 @@ export function answer(s, id) {
   }
   const q = getQuestion(s), option = q.options.find(o => o.id === id && !o.disabled);
   if (!option) return false;
+  if (id === 'follow-lead') return startResolution(s);
   s.honesty += option.honesty || 0; s.trust += option.trust || 0;
   s.reports.push({ shift: s.shift, choice: id, question: q.prompt, answer: option.label, redacted: ['redact', 'comply', 'sign'].includes(id) });
   if (s.question === 2 && id === 'question' && s.shift < 2) {
@@ -365,7 +368,8 @@ export const ENDINGS = {
   compliance: { code: '03', title: 'Within acceptable limits.', stamp: 'REPORT APPROVED', text: 'The corrections are filed. The next treatment is authorized. From the tower, the road looks narrower than it did yesterday. Your replacement asks if the corn has always grown on both sides.', last: 'You watch the corn grow.' },
   dissent: { code: '04', title: 'Unfit for field duty.', stamp: 'TESTIMONY DISPUTED', text: 'Your final report is approved. The earlier objections are attached to your medical evaluation. They take your badge and issue a transfer. From the bus window, field after field passes in the dark.', last: 'You cannot see where this one ends.' },
   breach: { code: '05', title: 'Beyond the perimeter.', stamp: 'CONTAINMENT LOST', text: 'The sixth movement crosses the road. Dispatch tells you to stay on the line. From somewhere beyond the station comes the sound of stalks brushing together. There are no fields on that side.', last: '[static]' },
-  assimilation: { code: '06', title: 'Expected growth.', stamp: 'PERSONNEL UNACCOUNTED FOR', text: 'You stop to catch your breath. The rows stop with you. Somewhere a radio calls your number, then calls it again. You understand at last why the field has been so patient.', last: 'Nothing here is wasted.' }
+  assimilation: { code: '06', title: 'Expected growth.', stamp: 'PERSONNEL UNACCOUNTED FOR', text: 'You stop to catch your breath. The rows stop with you. Somewhere a radio calls your number, then calls it again. You understand at last why the field has been so patient.', last: 'Nothing here is wasted.' },
+  ...ALTERNATE_ENDINGS
 };
 for (const [id, card] of Object.entries(ENDING_SHARES)) ENDINGS[id].title = card.line;
 export function endingId(s) {
@@ -377,7 +381,8 @@ export function endingId(s) {
   return 'guide';
 }
 export function getEnding(s) {
-  return s.ending === 'guide' && s.guide ? { ...ENDINGS[endingId(s)], ...guideDisposition(s), title: ENDINGS[endingId(s)].title } : ENDINGS[s.ending];
+  if (!Object.hasOwn(ENDINGS,s.ending)) return undefined;
+  return s.ending === 'guide' && s.guide ? { ...ENDINGS[endingId(s)], ...guideDisposition(s), title: ENDINGS[endingId(s)].title } : { ...ENDINGS[s.ending], ...resolutionEnding(s) };
 }
 function finish(s, ending) { s.phase = 'ending'; s.ending = ending; s.targets = [];s.compulsionNotice=false;s.fieldEvents.pending=null;s.fieldEvents.journey=null; }
 
@@ -385,7 +390,7 @@ export function serialize(s) { return JSON.stringify(s); }
 export function restore(raw) {
   try {
     const s = JSON.parse(raw);
-    if (!s || ![1,SAVE_VERSION].includes(s.version) || !(s.version === 1 ? ['standard','story'] : ['story','hard']).includes(s.mode) || !['briefing','tower','decision','field','debrief','guide','ending'].includes(s.phase)) return null;
+    if (!s || ![1,SAVE_VERSION].includes(s.version) || !(s.version === 1 ? ['standard','story'] : ['story','hard']).includes(s.mode) || !['briefing','tower','decision','field','debrief','resolution','guide','ending'].includes(s.phase)) return null;
     if (!Number.isInteger(s.shift) || s.shift < 0 || s.shift > 2 || !Number.isInteger(s.question) || s.question < 0 || s.question > 3) return null;
     for (const key of ['time','rounds','reserve','reload','kills','shots','breaches','exposure','trust','honesty','rng','nextSpawn','nextId','fieldSteps']) if (!Number.isFinite(s[key])) return null;
     if (s.time < 0 || s.time > SHIFT_LENGTH + 1 || s.rounds < 0 || s.rounds > 6 || s.reserve < 0 || s.exposure < 0 || s.exposure > 100) return null;
@@ -409,6 +414,7 @@ export function restore(raw) {
     }
     if (!s.log.every(l => typeof l.message === 'string') || !s.reports.every(r => typeof r.question === 'string' && typeof r.answer === 'string')) return null;
     if (!retirePreparations(s)) return null;
+    if (!validResolution(s)) return null;
     if (s.phase === 'ending' && !Object.hasOwn(ENDINGS,s.ending)) return null;
     if (s.ending === 'guide_interrupted' && (s.phase !== 'ending' || !s.guide)) return null;
     if (s.phase === 'debrief' && s.question === 3 && (s.shift >= 2 || typeof s.reports.at(-1)?.supervisorReply !== 'string')) return null;

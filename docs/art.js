@@ -1,5 +1,6 @@
 import { EVIDENCE } from './engine.js';
 import { currentEncounter, encounterById } from './encounters.js';
+import { ENDING_SHARES } from './sharing.js';
 
 const escape = value => String(value).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 export const FIELD_ART = {
@@ -11,7 +12,8 @@ export const FIELD_ART = {
   hazmat: { file: 'field-hazmat', alt: 'A second recovery team in pale hooded hazmat suits and dark respirators enters the corn, each carrying a light.' },
   sighting: { file: 'field-sighting', alt: 'A distant pale human figure disappears between corn rows, seen from the watchtower.' },
   stove: { file: 'pump-stove', alt: 'Corn steams on a camping stove beside a clean plate, butter and salt in the dirty pump shed.' },
-  debrief: { file: 'debrief-desk', alt: 'A reel-to-reel recorder and blank report sheets on a worn desk under lamplight.' }
+  debrief: { file: 'debrief-desk', alt: 'A reel-to-reel recorder and blank report sheets on a worn desk under lamplight.' },
+  ...Object.fromEntries(Object.values(ENDING_SHARES).filter(card => card.art.startsWith('ending-')).map(card => [card.art, { file: card.art, alt: card.alt }]))
 };
 export const SPECIMENS = {
   dress: { cell: 0, site: 'corner' }, ledger: { cell: 1, site: 'pump' }, roots: { cell: 2, site: 'drain' },
@@ -39,11 +41,12 @@ export function evidenceMount(id) {
 
 // Only completed answers belong on the tape; field notes remain private.
 export function interviewRecord(game) {
-  const reports=game.reports.filter(r=>r.shift===game.shift), last=reports.at(-1);
+  const reports=game.reports.filter(r=>r.shift===game.shift&&r.kind!=='resolution'), last=reports.at(-1);
   return `<aside class="interview-record" aria-label="Recorded testimony"><div class="tape-heading"><svg viewBox="0 0 72 28" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true"><circle cx="15" cy="13" r="10"/><circle cx="57" cy="13" r="10"/><circle cx="15" cy="13" r="2"/><circle cx="57" cy="13" r="2"/><path d="M15 3V8M5 13H10M15 18V23M20 13H25M57 3V8M47 13H52M57 18V23M62 13H67M15 23L27 26H45L57 23"/></svg><span>ON RECORD<small>${String(reports.length).padStart(2,'0')} / 03 RECORDED</small></span></div><p class="record-caption">${last?'LAST STATEMENT':'AWAITING TESTIMONY'}</p><p class="record-quote">${last?escape(last.answer):'No statement on record.'}</p></aside>`;
 }
 
-export function dialogArtwork(kind, shift = 0) {
+export function dialogArtwork(kind, shift = 0, art = null) {
+  if (art) return scenePlate(art);
   if (kind === 'debrief') return `<div class="interview-scene">${scenePlate('debrief')}<span class="recording-label"><i></i> REC / TAPE 0${shift + 1}</span></div>`;
   if (kind === 'guide-intro') return scenePlate('retrieval');
   if (kind === 'guide-debrief') return scenePlate('debrief');
@@ -72,7 +75,7 @@ export function notebookMarkup(game, requestedPage = 0) {
   const page = Math.max(0, Math.min(pages.length - 1, Number(requestedPage) || 0)), id = pages[page];
   let content;
   if (id === 'empty') content = `${scenePlate('tower')}`;
-  else if (id === 'testimony') content = `<h3>What went on record.</h3><div class="notebook-testimony">${game.reports.map(r => `<section><p class="eyebrow">${r.kind==='recovery'?'RECOVERY DEBRIEF':`SHIFT 0${r.shift + 1}`}</p><h4>${escape(r.question)}</h4><p>${r.redacted ? '<span class="withheld-note">Observation withheld</span> ' : ''}${escape(r.answer)}</p>${r.supervisorReply ? `<p class="pencil-note">${escape(r.replySpeaker||'Supervisor')}: ${escape(r.supervisorReply)}</p>` : ''}</section>`).join('')}</div>`;
+  else if (id === 'testimony') content = `<h3>What went on record.</h3><div class="notebook-testimony">${game.reports.map(r => `<section><p class="eyebrow">${r.kind==='recovery'?'RECOVERY DEBRIEF':r.kind==='resolution'?'AFTER THE WATCH':`SHIFT 0${r.shift + 1}`}</p><h4>${escape(r.question)}</h4><p>${r.redacted ? '<span class="withheld-note">Observation withheld</span> ' : ''}${escape(r.answer)}</p>${r.supervisorReply ? `<p class="pencil-note">${escape(r.replySpeaker||'Supervisor')}: ${escape(r.supervisorReply)}</p>` : ''}</section>`).join('')}</div>`;
   else if(id==='encounters')content=`<h3>Between the rows.</h3><div class="notebook-encounters">${game.fieldEvents.journal.map(j=>{const e=encounterById(j.id),c=e.choices.find(c=>c.id===j.choice);return `<section><p class="eyebrow">NIGHT 0${e.night+1} · CROSSING ${j.x+1}, ${j.y+1}</p><h4>${escape(e.title)}</h4><p>${escape(e.report)}</p><p class="pencil-note">${escape(c.label)} ${escape(c.result)}</p></section>`;}).join('')}</div>`;
   else {
     const e = EVIDENCE[id];

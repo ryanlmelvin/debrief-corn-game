@@ -83,7 +83,7 @@ export function decisionQuestion(game) {
         : 'The record will show you could not account for the corner.';
     prompt = game.shift < 2
       ? 'The report calls this routine and continues the watch. Will you sign?'
-      : 'I’m sending another team to the northeast corner. Will you go or sign?';
+      : 'Another team is going in. Will you lead them?';
     labels.question = game.evidence.includes('ledger')
       ? 'I found rising doses in the pump-house ledger. What’s the treatment?'
       : game.evidence.includes('sample')

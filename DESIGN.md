@@ -56,3 +56,15 @@ The handbook contains only the three watch orders. A human sighting introduces t
 Ending 02 now follows a playable first-person recovery walk through three crossings. The familiar instruction returns as slowly fading red text when the team tries to leave. The player may fire, let them go, or wait; the aftermath records the choice without explaining its cause. Reduced-motion preferences replace the fades with steady text. The tower background and palette are preserved. A local archive retains six ending badges and the last 30 completed transcripts independently of the active save.
 
 After the human sighting, a quiet red “investigate” begins to appear above the field. Its opacity, weight, and size increase with time remaining at the post. Clicking the word leaves the tower; waiting for relief ends with the character already descending the ladder. The pressure is narrative, with no extra exposure penalty for waiting. Reduced-motion preferences keep the type size steady and remove transitions.
+
+## Five more endings
+
+The final debrief offers a separate menu for unresolved encounters. Requirements appear there, after the three shifts; field exploration keeps its existing pacing and exposure costs. All five routes are reachable in Story and Hard. Each contains three scenes and an explicit last choice. Leaving a scene returns to the final debrief, preserving the original options.
+
+- **Relief Accepted (11):** speaking to the relief and acknowledging the double unlock a handover. The last choice distinguishes a false promise from an honest answer.
+- **I Brought a Witness (12):** both field recordings and the invitation let the follower enter the recorded interview.
+- **One Person Recovered (13):** recording the first radio, comparing it on the second night, and helping the rooted figure establish a way to pull someone free. The rescue leaves the recordings in the field. The survivor remains a real success.
+- **The Vacancy (14):** supporting the routine account and signing both earlier reports earns the supervisor’s offer. His release stays conditional until the player approves the open report, so rejecting the handover remains coherent.
+- **First Transmission (15):** approaching the second tower and comparing the future recording lead back to the first radio encounter. The replay reflects what the player actually did, including recording without answering.
+
+The original ten endings remain available. New scenes, ending variants, transcripts, collection entries, and progress transfers retain their state through reloads. Separate illustrations and static share pages use the approved first-person captions; the existing backgrounds and palette are preserved.

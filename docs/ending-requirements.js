@@ -1,7 +1,7 @@
 // Derive the final refusal from actions already taken. No separate preparation
 // state or early objective list: requirements are shown only at the last choice.
 export function witnessRequirements(s) {
-  const recordings = new Set(s.fieldEvents.journal
+  const recordings = s.resolution?.recordingsRelinquished ? 0 : new Set(s.fieldEvents.journal
     .filter(entry => ['first-call', 'future-call'].includes(entry.id) && entry.choice === 'record')
     .map(entry => entry.id)).size;
   const objections = new Set(s.reports
