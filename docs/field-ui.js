@@ -1,6 +1,7 @@
 import { FIELD_SITES, investigationComplete, nearbySite } from './engine.js';
 import { FIELD_PATHS, fieldStepCost, planFieldRoute } from './field.js';
 import { FIELD_ART, landmarkDrawing } from './art.js';
+import { watchSummary } from './watch-play.js';
 
 const descriptions={pump:'A light beneath the pump-house door.',corner:'Something pale at the edge of the field.',drain:'Water moving against the slope.',tower:'The ladder. The radio. A way out.'};
 const percent=(n,size)=>`${(n+.5)/size*100}%`;
@@ -9,7 +10,7 @@ const cost=n=>(Math.ceil(n*10)/10).toFixed(1);
 export class FieldMap {
   constructor(root) {
     this.root=root;this.selected=null;this.style='quiet';this.travel=null;this.lastKey='';
-    root.innerHTML=`<header class="field-heading"><p class="eyebrow" id="field-night"></p><div class="field-exposure"><span>EXPOSURE <b id="field-exposure-value"></b></span><div class="field-meter"><i id="field-exposure-fill"></i></div></div></header>
+    root.innerHTML=`<header class="field-heading"><p class="eyebrow" id="field-night"></p><button id="field-watch-record" class="watch-record-link" data-action="watch-record" hidden></button><div class="field-exposure"><span>EXPOSURE <b id="field-exposure-value"></b></span><div class="field-meter"><i id="field-exposure-fill"></i></div></div></header>
       <div class="field-board"><span class="field-north" aria-label="North">N<svg viewBox="0 0 24 32" aria-hidden="true"><path d="M12 1L21 29L12 23L3 29Z" fill="#e8e3c9" stroke="currentColor" stroke-width="1.5"/><path d="M12 1V23L3 29Z" fill="currentColor"/></svg></span><div class="field-map-surface">
         <svg viewBox="-.5 -.5 11 9" preserveAspectRatio="none" aria-hidden="true"><defs><pattern id="corn-rows" width="1" height="1" patternUnits="userSpaceOnUse"><path d="M.2 .15L.15 .8M.55 .15L.5 .8M.85 .15L.8 .8" stroke="#768352" stroke-opacity=".18" stroke-width=".025"/></pattern></defs><rect x="-.5" y="-.5" width="11" height="9" fill="url(#corn-rows)"/>
         ${FIELD_PATHS.map(points=>`<polyline points="${points.map(p=>p.join(',')).join(' ')}" class="field-path"/>`).join('')}<g id="field-footprints"></g><polyline id="field-route" class="field-route"/><g id="field-traces"></g></svg>
@@ -64,6 +65,8 @@ export class FieldMap {
     const returning=planFieldRoute({...s,player:site},FIELD_SITES.find(p=>p.id==='tower'));
     const fatal=s.exposure+route.exposure>=100,unsafeReturn=s.exposure+route.exposure+returning.exposure>=100;
     q('field-night').textContent=`NIGHT 0${s.shift+1}`;
+    q('field-watch-record').hidden=!s.watch?.shots;
+    if(s.watch?.shots){const record=watchSummary(s);q('field-watch-record').textContent=`Watch · ${record.score} pts ↗`;q('field-watch-record').setAttribute('aria-label',`Watch record. Grade ${record.grade}, ${record.score} points.`);q('field-watch-record').disabled=paused;}
     q('field-exposure-value').textContent=`${Math.floor(s.exposure)} / 100`;
     q('field-exposure-fill').style.width=`${s.exposure}%`;
     this.root.classList.toggle('field-danger',s.exposure>=70);

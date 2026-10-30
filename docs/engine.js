@@ -4,6 +4,7 @@ import { ENDING_SHARES } from './sharing.js';
 import { witnessRequirements, canTakeEvidenceOutside, retirePreparations } from './ending-requirements.js';
 import { fieldStepCost } from './field.js';
 import { freshFieldEvents, encounterAfterStep, resolveEncounter, dismissEncounter, migrateFieldEvents, validFieldEvents, encounterById } from './encounters.js';
+import { RELOAD_DURATION, RELOAD_WINDOW_MIN, RELOAD_WINDOW_MAX, FLARE_DURATION, FLARE_SLOWDOWN, CROP_VARIANTS, freshWatch, watchFeedback, migrateWatch, validWatch } from './watch-play.js';
 // All simulation and story state lives here. Rendering and storage are separate.
 export const SAVE_VERSION = 2;
 export const SHIFT_LENGTH = 55;
@@ -33,7 +34,7 @@ export function createGame(mode = 'story', seed = Date.now()) {
     rounds: 6, reserve: 24, reload: 0, kills: 0, shots: 0, breaches: 0, exposure: 0,
     trust: 0, honesty: 0, evidence: [], reports: [], log: [], targets: [], nextSpawn: 3, nextId: 1,
     incident: false, lightsOut: [], entered: false, departure: null, compulsionNotice: false, searched: [], question: 0, ending: null, lastShot: null,
-    player: { x: 1, y: 7 }, visited: ['1,7'], fieldSteps: 0, inspected: [], focused: null, fieldEvents: freshFieldEvents() };
+    player: { x: 1, y: 7 }, visited: ['1,7'], fieldSteps: 0, inspected: [], focused: null, fieldEvents: freshFieldEvents(), watch: freshWatch() };
   return s;
 }
 function random(s) { s.rng = (Math.imul(1664525, s.rng) + 1013904223) >>> 0; return s.rng / 4294967296; }
@@ -41,18 +42,34 @@ export function addLog(s, message, tone = 'normal') { s.log.unshift({ message, t
 export function startShift(s) {
   if (s.phase !== 'briefing') return false;
   s.fieldEvents.pending=null;s.fieldEvents.journey=null;
+  s.watch = freshWatch(s.breaches);
   Object.assign(s, { phase: 'tower', time: 0, rounds: 6, reserve: 24, reload: 0, targets: [], nextSpawn: 3,
     incident: false, lightsOut: [], incidentPrompted: false, entered: false, departure: null, compulsionNotice: false, question: 0, player: { x: 1, y: 7 }, visited: ['1,7'], fieldSteps: 0, inspected: [], focused: null, lastShot: null });
   addLog(s, `Station 04. Shift ${s.shift + 1}. Perimeter check complete.`);
   return true;
 }
-function spawn(s) {
+function spawnCrop(s, variant) {
   const direction = random(s) < 0.5 ? -1 : 1;
   const x = 330 + random(s) * 300;
   const y = 360 + random(s) * 90;
-  const speed = (17 + s.shift * 4 + random(s) * 9) * (s.mode === 'hard' ? 1.4 : 1);
-  s.targets.push({ id: s.nextId++, x, y, direction, speed, kind: 'corn', wobble: random(s) * 6.28 });
-  addLog(s, 'Movement in the rows. Confirm your target.', 'alert');
+  const speed = (17 + s.shift * 4 + random(s) * 9) * (s.mode === 'hard' ? 1.4 : 1) * CROP_VARIANTS[variant].speed;
+  s.targets.push({ id: s.nextId++, x, y, direction, speed, kind: 'corn', wobble: random(s) * 6.28, variant, hp: CROP_VARIANTS[variant].hp });
+}
+function spawn(s) {
+  const wave = s.watch.spawnCount++;
+  const variant = ['stalker','runner','husk','stalker'][wave % 4];
+  spawnCrop(s, variant);
+  if (wave % 4 === 3) {
+    spawnCrop(s, 'runner');
+    // The second specimen breaks in the other direction, giving the surge a clear shape.
+    s.targets.at(-1).direction = -s.targets.at(-2).direction;
+    addLog(s, 'Two movements. They are splitting toward the road.', 'alert');
+    watchFeedback(s, 'SPLIT SURGE · Both sides', 'alert');
+  } else {
+    const message = variant === 'runner' ? 'Runner in the rows. It is moving fast.' : variant === 'husk' ? 'Armored husk. Break the shell, then fire again.' : 'Movement in the rows. Confirm your target.';
+    addLog(s, message, 'alert');
+    if (wave < 3) watchFeedback(s, variant === 'runner' ? 'RUNNER · Fast, one shot' : variant === 'husk' ? 'HUSK · Two shots' : 'STALKER · One shot', 'ready');
+  }
 }
 export function advance(s, dt) {
   if (s.phase === 'guide') { advanceGuide(s, dt); return; }
@@ -65,8 +82,7 @@ export function advance(s, dt) {
     if (s.reload > 0) {
       s.reload = Math.max(0, s.reload - step);
       if (s.reload === 0) {
-        const n = Math.min(6 - s.rounds, s.reserve); s.rounds += n; s.reserve -= n;
-        addLog(s, 'Rifle ready.');
+        completeReload(s);
       }
     }
     if (s.time >= s.nextSpawn && s.time < SHIFT_LENGTH - 13) {
@@ -80,7 +96,8 @@ export function advance(s, dt) {
       addLog(s, 'You look toward the tower latch, then back to the gap in the rows.', 'story');
     }
     for (const target of s.targets) {
-      target.x += target.direction * target.speed * step;
+      const slowed = target.kind === 'corn' ? Math.max(0, Math.min(step, s.watch.flareUntil - (s.time - step))) : 0;
+      target.x += target.direction * target.speed * (step - slowed * (1 - FLARE_SLOWDOWN));
       if (target.kind === 'person') {
         if(s.shift===2) {
           const out=18+(target.member||0)*3;
@@ -93,6 +110,8 @@ export function advance(s, dt) {
       }
       if (target.kind === 'corn' && (target.x < 65 || target.x > 895)) {
         target.gone = true; s.breaches++;
+        s.watch.streak = 0;
+        watchFeedback(s, 'BREACH · Chain broken', 'alert', target);
         addLog(s, 'Perimeter breach. Something reached the road.', 'alert');
       }
     }
@@ -115,8 +134,32 @@ export function investigationPressure(s) {
   return { strength, stage };
 }
 export function reload(s) {
-  if (s.phase !== 'tower' || s.reload > 0 || s.rounds === 6 || s.reserve <= 0) return false;
-  s.reload = 1.65; addLog(s, 'Reloading…'); return true;
+  if (s.phase !== 'tower' || s.rounds === 6 || s.reserve <= 0) return false;
+  if (s.reload > 0) {
+    if (s.watch.reloadAttempted) return false;
+    s.watch.reloadAttempted = true;
+    if (s.reload >= RELOAD_WINDOW_MIN && s.reload <= RELOAD_WINDOW_MAX) {
+      completeReload(s); s.watch.fastReloads++;
+      watchFeedback(s, 'QUICK RELOAD · Rifle ready', 'ready');
+      return true;
+    }
+    watchFeedback(s, 'Keep loading · Rifle ready shortly', 'alert');
+    return false;
+  }
+  s.reload = RELOAD_DURATION; s.watch.reloadAttempted = false;
+  addLog(s, 'Reloading… Tap again in the marked band for a quick reload.'); return true;
+}
+function completeReload(s) {
+  const n = Math.min(6 - s.rounds, s.reserve);
+  s.rounds += n; s.reserve -= n; s.reload = 0;
+  addLog(s, 'Rifle ready.');
+}
+export function flare(s) {
+  if (s.phase !== 'tower' || s.watch.flares <= 0 || s.watch.flareUntil > s.time) return false;
+  s.watch.flares--; s.watch.flareUntil = s.time + FLARE_DURATION;
+  watchFeedback(s, 'FLARE UP · The crop recoils', 'ready');
+  addLog(s, 'The flare burns over the rows. The crop slows in its light.');
+  return true;
 }
 export function targetAt(s, x, y, padding = 0) {
   return [...s.targets].reverse().find(t => t.kind === 'corn' && ((x-t.x)/(24+padding))**2 + ((y-(t.y-34))/(45+padding))**2 <= 1);
@@ -124,11 +167,29 @@ export function targetAt(s, x, y, padding = 0) {
 export function shoot(s, x, y, padding = 0) {
   if (s.phase !== 'tower' || s.reload > 0) return 'blocked';
   if (!s.rounds) { addLog(s, 'Empty. Reload your rifle.', 'alert'); return 'empty'; }
-  s.rounds--; s.shots++; s.lastShot = { x, y, time: s.time };
+  s.rounds--; s.shots++; s.watch.shots++;
+  s.lastShot = { x, y, time: s.time, result: 'miss', points: 0, variant: null, streak: 0 };
   const target = targetAt(s, x, y, padding);
-  if (!target) return 'miss';
+  if (!target) {
+    s.watch.streak = 0; watchFeedback(s, 'MISS · Chain broken', 'alert', { x, y });
+    return 'miss';
+  }
+  const variant = target.variant || 'stalker';
+  s.watch.hits++;
+  target.hp = (target.hp ?? 1) - 1;
+  if (target.hp > 0) {
+    Object.assign(s.lastShot, { result: 'armor', variant, streak: s.watch.streak });
+    watchFeedback(s, 'SHELL BROKEN · Hit it again', 'armor', target);
+    return 'armor';
+  }
   s.targets = s.targets.filter(t => t.id !== target.id);
-  s.kills++; addLog(s, 'Mobile crop contained.'); return 'hit';
+  s.kills++; s.watch.contained++; s.watch.streak++;
+  s.watch.bestStreak = Math.max(s.watch.bestStreak, s.watch.streak);
+  const points = CROP_VARIANTS[variant].points + Math.min(5, s.watch.streak - 1) * 25;
+  s.watch.score += points;
+  Object.assign(s.lastShot, { result: 'hit', points, variant, streak: s.watch.streak });
+  watchFeedback(s, `+${points}${s.watch.streak > 1 ? ` · ${s.watch.streak} IN A ROW` : ' · CONTAINED'}`, 'hit', target);
+  addLog(s, 'Mobile crop contained.'); return 'hit';
 }
 export function focusNext(s) {
   const targets = s.targets.filter(t => t.kind === 'corn');
@@ -143,6 +204,7 @@ export function enterField(s) {
   if (s.phase === 'tower') {
     const loose = s.targets.filter(t => t.kind === 'corn').length;
     s.breaches += loose;
+    if (loose) s.watch.streak = 0;
     if (loose) addLog(s, `${loose} mobile specimen${loose === 1 ? '' : 's'} crossed while the tower was unattended.`, 'alert');
   }
   s.targets = [];
@@ -334,6 +396,8 @@ export function restore(raw) {
     if(!validFieldEvents(s))return null;
     if (!s.targets.every(t => Number.isFinite(t.x) && Number.isFinite(t.y) && Number.isFinite(t.speed) && Number.isFinite(t.wobble) && [-1,1].includes(t.direction) && ['corn','person'].includes(t.kind))) return null;
     if (!s.targets.every(t=>(t.role===undefined||['dress','retrieval'].includes(t.role))&&(t.member===undefined||(Number.isInteger(t.member)&&t.member>=0&&t.member<3)))) return null;
+    migrateWatch(s);
+    if (!validWatch(s)) return null;
     if (s.lightsOut===undefined)s.lightsOut=[];
     if (!Array.isArray(s.lightsOut)||s.lightsOut.length>3||new Set(s.lightsOut).size!==s.lightsOut.length||!s.lightsOut.every(i=>Number.isInteger(i)&&i>=0&&i<3))return null;
     // Both former intensities continue as Story, with the former Standard balance.

@@ -15,6 +15,7 @@
   <link rel="stylesheet" href="./mobile.css">
   <link rel="stylesheet" href="./pager.css">
   <link rel="stylesheet" href="./image-viewer.css">
+  <link rel="stylesheet" href="./watch-play.css">
   <script type="module" src="./app.js"></script>
 </head>
 <body>
@@ -35,6 +36,7 @@
         <button id="install" class="quiet">Install on device</button>
         <button id="move-progress" class="quiet">Move saved progress</button>
         <button id="assignment" class="quiet" hidden>Current objective</button>
+        <button id="watch-record" class="quiet" data-action="watch-record" hidden>Watch record</button>
         <button id="notebook" class="notebook-button" hidden>Notebook <span id="evidence-count">00</span></button>
         <button id="menu-radio" class="quiet" hidden>Recent events</button>
       </div>
@@ -63,7 +65,15 @@
             </div>
           </div>
           <div id="stats" class="stats"></div>
-          <div id="tower-hud" class="tower-hud" hidden><span id="hud-ammo" aria-label="Rifle ammunition"></span><button id="hud-reload" data-action="reload" aria-label="Reload rifle">↻ Reload</button></div>
+          <section id="watch-scoreboard" class="watch-scoreboard" aria-label="Watch performance" hidden>
+            <span class="watch-eyebrow">CONTAINMENT</span><strong id="watch-score">0000</strong>
+          </section>
+          <div id="watch-radio" class="watch-radio" hidden><span>FIELD RADIO</span><p id="watch-radio-text"></p></div>
+          <div id="tower-hud" class="tower-hud" hidden>
+            <div class="watch-rifle"><span class="watch-eyebrow">RIFLE / .22</span><span id="hud-ammo" aria-label="Rifle ammunition"></span><span id="watch-rounds" class="watch-rounds" aria-hidden="true"></span></div>
+            <div class="watch-reload"><button id="hud-reload" data-action="reload" aria-label="Reload rifle">↻ Reload <kbd>R</kbd></button><div id="reload-timing" class="reload-timing" hidden aria-hidden="true"><i class="reload-window"></i><i id="reload-cursor" class="reload-cursor"></i></div><span id="reload-hint" class="watch-control-note">Tap again in gold for a fast reload</span></div>
+            <div class="watch-flare"><button id="hud-flare" data-action="flare" aria-label="Fire emergency flare">◇ Flare · 2 <kbd>F</kbd></button><span id="flare-hint" class="watch-control-note">Slows every crop · 2 per watch</span></div>
+          </div>
           <div id="scene-caption" class="scene-caption" hidden></div>
         </section>
         <aside id="sidebar" class="sidebar" hidden>

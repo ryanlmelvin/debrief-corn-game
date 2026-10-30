@@ -1,0 +1,68 @@
+/* Field equipment and immediate feedback; the original landscape stays in view. */
+.watch-eyebrow{display:block;font:9px/1.4 ui-monospace,monospace;letter-spacing:1.8px;color:#b8bda2}
+.watch-scoreboard{position:absolute;top:calc(72px + env(safe-area-inset-top));right:max(20px,env(safe-area-inset-right));min-width:170px;text-align:right;pointer-events:none;text-shadow:0 2px 10px #10180e}
+.watch-scoreboard strong{display:block;font:36px/1.15 ui-monospace,monospace;letter-spacing:2px;color:var(--ink);font-variant-numeric:tabular-nums}
+.has-streak strong{color:var(--gold)}
+.watch-radio{position:absolute;left:50%;bottom:calc(133px + env(safe-area-inset-bottom));transform:translateX(-50%);width:max-content;max-width:min(520px,calc(100% - 40px));text-align:center;pointer-events:none;color:var(--ink);text-shadow:0 2px 5px #000}
+.watch-radio>span{font-size:8px;letter-spacing:2px;color:var(--gold)}
+.watch-radio p{margin:5px 0 0;font:15px/1.4 Georgia,serif}
+.watch-radio[data-tone="alert"] p{color:#e1a389}
+.watch-radio[data-tone="hit"] p,.watch-radio[data-tone="ready"] p{color:#eee0aa}
+.playing .tower-hud{display:grid;grid-template-columns:1fr minmax(175px,230px) minmax(170px,230px);align-items:end;gap:16px;max-width:920px;margin:auto;padding:14px 18px 12px;border:1px solid #88947155;background:linear-gradient(110deg,#141e17f5,#1e281eeb);box-shadow:0 8px 24px #0004}
+.watch-rifle{align-self:center;min-width:0}
+.playing .tower-hud #hud-ammo{display:block;white-space:nowrap;flex-shrink:0;padding:0;margin:4px 0;background:none;border:0;box-shadow:none;color:var(--ink);font:23px/1 ui-monospace,monospace;font-variant-numeric:tabular-nums}
+.watch-rounds{display:flex;align-items:center;gap:4px;margin-top:8px}
+.watch-rounds i{width:5px;height:13px;border:1px solid var(--gold);border-radius:3px 3px 0 0;background:var(--gold)}
+.watch-rounds i.spent{background:none;border-color:#647052}
+.watch-rounds small{margin-left:5px;white-space:nowrap;font-size:9px;color:#b8bda2}
+.playing .tower-hud button{width:100%;min-width:0;display:flex;justify-content:center;align-items:center;gap:10px;min-height:46px;padding:10px;font-size:13px;border:1px solid #8a9470;background:#283324}
+.tower-hud kbd{font:9px ui-monospace,monospace;border:1px solid #a0a88266;padding:2px 4px;color:#b8bda2}
+.watch-reload,.watch-flare{position:relative;min-width:0}
+.watch-control-note{display:block;margin-top:8px;min-height:22px;font-size:9px;line-height:1.4;color:#b8bda2;text-align:center}
+.reload-timing{position:absolute;top:-12px;left:0;right:0;height:6px;background:#0b140d;border:1px solid #8c9770}
+.reload-window{position:absolute;inset:-1px auto;left:var(--window-start);width:var(--window-width);background:var(--gold)}
+.reload-cursor{position:absolute;top:-4px;width:3px;height:12px;background:#f4eed6;transform:translateX(-50%)}
+.reload-timing.attempted{opacity:.4}
+.playing .tower-hud button.reload-sweet{background:var(--gold);border-color:var(--gold);color:var(--dark)}
+.playing .tower-hud button.reload-sweet kbd{color:var(--dark);border-color:#26312480}
+.playing .tower-hud #hud-reload.needs-reload{position:static;transform:none;min-width:0;min-height:46px;font-size:13px;z-index:auto}
+.watch-record-link{display:inline-flex;align-items:center;gap:7px;min-height:32px;padding:5px 9px;font-size:10px;background:#233221;border-color:#86956b;color:var(--ink);white-space:nowrap}
+.watch-record-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin:20px 0}
+.watch-record-grid>div{border-top:1px solid #8b947267;padding-top:12px}
+.watch-record-grid strong{display:block;font:26px ui-monospace,monospace;color:#364330}
+.watch-record-grid strong.watch-grade{font-size:16px;line-height:1.35;overflow-wrap:anywhere}
+.watch-record-grid span{display:block;font-size:10px;line-height:1.5;margin-top:5px}
+.watch-tips{padding:12px 15px;border:1px solid #8c94744d;background:#67754c0c;font:13px/1.5 Georgia,serif}
+.watch-tips b{font-weight:700;color:#39452d}
+@media(max-width:600px){
+ .watch-scoreboard{top:calc(68px + env(safe-area-inset-top));right:13px;min-width:130px}
+ .watch-scoreboard strong{font-size:29px}
+ .playing .tower-hud{left:10px;right:10px;bottom:max(10px,env(safe-area-inset-bottom));grid-template-columns:1fr 1fr;gap:10px;padding:11px 12px}
+ .watch-rifle{grid-column:1/-1;display:flex;align-items:center;gap:10px;justify-content:space-between}
+ .watch-rifle .watch-eyebrow{font-size:8px;letter-spacing:1px}
+ .playing .tower-hud #hud-ammo{font-size:20px;margin:0}
+ .watch-rounds{margin:0;gap:3px}.watch-rounds small{font-size:8px}
+ .watch-control-note{min-height:24px;font-size:8px;margin-top:6px}
+ .playing .tower-hud button{font-size:12px;min-height:46px}
+ .reload-timing{top:-6px;bottom:auto;height:4px;left:2px;right:2px}
+ .watch-radio{bottom:calc(160px + env(safe-area-inset-bottom));max-width:calc(100% - 30px)}
+ .watch-radio p{font-size:13px}.watch-radio>span{font-size:7px}
+ .field-heading{flex-wrap:wrap;gap:6px}.field-heading .field-exposure{margin-left:auto}
+ .watch-record-grid{gap:9px}.watch-record-grid strong{font-size:22px}
+}
+@media(max-height:500px) and (min-width:480px){
+ .playing .tower-hud{grid-template-columns:1fr 1fr 1fr;gap:12px;padding:8px 12px;bottom:8px;max-width:760px}
+ .watch-rifle{display:block;grid-column:auto}.watch-rifle .watch-eyebrow{display:none}.watch-rounds{margin-top:5px}
+ .watch-control-note{min-height:0;font-size:8px;margin-top:5px}.playing .tower-hud button{min-height:42px;padding:6px}
+ .watch-scoreboard{top:62px}.watch-scoreboard strong{font-size:26px}
+ .watch-radio{bottom:105px}.watch-radio>span{display:none}.watch-radio p{font-size:12px;margin:0}
+ .reload-timing{top:-7px;bottom:auto;height:4px}
+}
+@media(pointer:coarse){.tower-hud kbd{display:none}}
+@media(max-width:340px){
+ .watch-rifle .watch-eyebrow{white-space:nowrap;font-size:7px}
+ .watch-rounds small,.tower-hud kbd{display:none}
+ .playing .tower-hud button{white-space:nowrap;padding:8px 5px;font-size:11px;gap:5px}
+ .playing .tower-hud #hud-ammo{font-size:19px}
+}
+@media(prefers-reduced-motion:reduce){.tower-hud button.needs-reload{animation:none}}

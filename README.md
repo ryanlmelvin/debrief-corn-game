@@ -20,10 +20,15 @@ The recovery detail ends with a recorded interview. If any of its six rounds rem
 
 The game lasts roughly 8–15 minutes, depending on reading and exploration. **Story** is the default intensity and uses the former Standard balance. **Hard** makes crops 40% faster, shortens spawn intervals by 25%, and raises walking exposure by about 30%. The former easy Story setting has been removed. Existing Story and Standard saves continue as the new Story mode with their progress intact.
 
+The watch now mixes ordinary stalkers, fast runners, two-hit husks, and paired escapes toward opposite sides of the road. Two flares per watch slow every crop for 4.5 seconds, including crops that emerge during the burn. Press **F** or tap **Flare** when you need time to reload or contain a rush. Reload normally with **R**; optionally press again while the timing marker is in the gold band to finish early. A mistimed press still completes the normal reload.
+
+Clean containments build a streak and bonus points. A miss or breach resets the streak. Crop markers identify runners and remaining husk health, and fence warnings show imminent escapes. Open **Watch record** in the kit, or the score button on the investigation map, to see accuracy, best streak, containment grade, and the best score for that night and intensity on this browser. Scores do not change the story endings. Best-score records are separate from transferable story progress.
+
 | Action | Mouse or touch | Keyboard |
 | --- | --- | --- |
 | Fire | Click or tap a moving crop | X selects a crop; Space fires |
 | Reload | Reload button | R |
+| Emergency flare | Flare button | F |
 | Travel | Tap a landmark, choose a route, then Walk | Tab between destinations; arrows/WASD for individual steps |
 | Inspect | Opens automatically on arrival | E |
 | Pause | Pause button | P or Escape |

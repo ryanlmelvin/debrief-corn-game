@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createGame, startShift, shoot, focusNext } from '../docs/engine.js';
-import { Renderer, cameraFor, targetProjection, aimProjection, updateGroundTracks, visibleGuideTarget } from '../docs/renderer.js';
+import { Renderer, cameraFor, targetProjection, aimProjection, updateGroundTracks, visibleGuideTarget, perimeterWarnings } from '../docs/renderer.js';
 import { startGuide, guideTravel, guideRouteStatus, inspectGuide, advanceGuide, fireGuide, projectGuide } from '../docs/guide.js';
 
 for (const [width,height] of [[390,844],[844,390],[1440,900]]) {
@@ -75,6 +75,31 @@ test('soil trails record actual crop movement, survive a shot, and expire in sim
   assert.deepEqual(updateGroundTracks(tracks,[],10),paused);
   assert.deepEqual(updateGroundTracks(tracks,[],22),[]);
   assert.deepEqual(corn,{id:1,kind:'corn',x:460,y:410});
+});
+
+test('perimeter warnings prioritize the nearest escape at each edge and account for flares', () => {
+  const s={time:10,watch:{flareUntil:0},targets:[
+    {id:1,kind:'corn',x:120,y:410,direction:-1,speed:20},
+    {id:2,kind:'corn',x:90,y:430,direction:-1,speed:20},
+    {id:3,kind:'corn',x:830,y:390,direction:1,speed:20},
+    {id:4,kind:'person',x:894,y:400,direction:1,speed:20},
+    {id:5,kind:'corn',x:470,y:400,direction:1,speed:20}
+  ]};
+  assert.deepEqual(perimeterWarnings(s).map(w=>[w.target.id,w.side,w.remaining]),[[2,-1,1.25],[3,1,3.25]]);
+  s.watch.flareUntil=14.5;
+  assert.deepEqual(perimeterWarnings(s),[],'Slowed crops no longer imply an immediate escape.');
+  s.time=14.5;
+  assert.equal(perimeterWarnings(s).length,2,'Warnings return as soon as normal movement resumes.');
+});
+
+test('near-expiry flares warn about escapes after crops return to full speed', () => {
+  const target={kind:'corn',x:835,y:410,direction:1,speed:20};
+  const s={time:14.25,watch:{flareUntil:14.5},targets:[target]};
+  const [warning]=perimeterWarnings(s);
+  assert.ok(warning,'The remaining quarter-second of slowdown cannot hide an imminent escape.');
+  assert.equal(warning.remaining,3.2125);
+  target.x=894.7;
+  assert.ok(Math.abs(perimeterWarnings(s)[0].remaining-.1)<1e-10,'A crop at the edge can escape before the flare expires.');
 });
 
 test('guide aim assistance excludes people outside the portrait camera', () => {

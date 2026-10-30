@@ -7,6 +7,8 @@ import { FieldMap } from './field-ui.js';
 import { dialogArtwork, evidenceMount, notebookMarkup, encounterMarkup, interviewRecord } from './art.js';
 import { GameAudio, loadMusic, loadEffects } from './audio.js';
 import { SoundEvents } from './audio-events.js';
+import { flare } from './engine.js';
+import { updateWatchUI, updateReloadUI, watchRecord } from './watch-ui.js';
 import { pressureWordMarkup } from './pressure-word.js';
 import { DialogPager } from './pager.js';
 import { endingShareData, shareEnding } from './sharing.js';
@@ -145,7 +147,7 @@ function sceneDialog() {
   if(game.phase==='field'&&pending){showModal('encounter',encounterMarkup(game));save();return;}
   if(game.phase==='briefing') {
     const b=BRIEFINGS[game.shift];
-    showModal('briefing',paper(b.title,`<p class="eyebrow">SHIFT ${game.shift+1} / ${DATES[game.shift]}, <span class="redacted-text">19XX</span></p><p>${esc(b.text).replaceAll('██████', REDACTED_TOWN)}</p><ol class="orders">${b.orders.map((o,i)=>`<li><span>0${i+1}</span>${o}</li>`).join('')}</ol>${b.note?`<p class="note">${b.note}</p>`:''}${game.shift===0?'<p class="small"><span class="touch-help">Tap moving corn to fire. Tap Reload to refill your rifle. People are not targets.</span><span class="keyboard-help">Click to fire. <b>X</b> aims, <b>Space</b> fires, <b>R</b> reloads. People are not targets.</span></p>':''}<button class="primary" data-action="start">Start shift <span>↗</span></button>`, 'SHIFT ORDERS'));
+    showModal('briefing',paper(b.title,`<p class="eyebrow">SHIFT ${game.shift+1} / ${DATES[game.shift]}, <span class="redacted-text">19XX</span></p><p>${esc(b.text).replaceAll('██████', REDACTED_TOWN)}</p><ol class="orders">${b.orders.map((o,i)=>`<li><span>0${i+1}</span>${o}</li>`).join('')}</ol>${b.note?`<p class="note">${b.note}</p>`:''}${game.shift===0?'<p class="small"><span class="touch-help">Tap moving corn to fire. Reload refills your rifle. Flare slows the crops. People are not targets.</span><span class="keyboard-help">Click to fire. <b>X</b> aims, <b>Space</b> fires, <b>R</b> reloads, <b>F</b> fires a flare. People are not targets.</span></p>':''}<button class="primary" data-action="start">Start shift <span>↗</span></button>`, 'SHIFT ORDERS'));
   } else if(sightingPromptReady(game) && !game.incidentPrompted) {
     game.incidentPrompted=true;
     showModal('sighting',paper('Movement in the field.', `<p>${watchNight(game.shift).notice}</p><p class="small">Leaving now means any loose crops can cross the perimeter.</p><div class="paper-actions"><button class="primary" data-action="confirm-enter">Investigate now ↗</button><button class="secondary" data-action="close">Stay at my post</button></div>`, 'FIELD OBSERVATION'));
@@ -192,15 +194,11 @@ function updateUI(force=false) {
     pressureLayer.style.setProperty('--pressure',String(pressure.strength));
   }
   $('tower-hud').hidden=!active;
-  $('hud-ammo').textContent=`${game.rounds} / ${game.reserve} · .22`;
-  $('hud-reload').disabled=paused||game.reload>0||game.rounds===6||game.reserve===0;
-  $('hud-reload').classList.toggle('needs-reload',active&&!$('hud-reload').disabled&&game.rounds===0);
-  $('hud-reload').textContent=game.reload>0?'↻ Reloading…':'↻ Reload';
-  $('hud-reload').setAttribute('aria-label',`Reload rifle. ${game.rounds} rounds loaded, ${game.reserve} in reserve.`);
+  updateWatchUI(game,paused);
   $('controls').hidden=active||field;
   $('evidence-count').textContent=String(game.evidence.length).padStart(2,'0');
-  $('control-hint').textContent=field?'ARROWS / WASD TO MOVE · E TO INSPECT':active?'CLICK / TAP FIRE · R RELOAD':'STATION 04';
-  if(phase!=='guide'&&!aftermath)canvas.setAttribute('aria-label',field?`Field survey. Your position is column ${game.player.x+1}, row ${game.player.y+1}. ${site?site.label+'. ':''}Gold page markers show tonight’s unread discoveries. Check marks show searched locations. Use arrow keys or WASD to move. E to inspect. Watchtower is column 2 row 8; pump house column 4 row 4; drainage channel column 8 row 6; northeast corner column 10 row 2.`:'Watchtower shooting gallery. Click moving corn to fire. X selects a crop. Space fires. R reloads.');
+  $('control-hint').textContent=field?'ARROWS / WASD TO MOVE · E TO INSPECT':active?'CLICK / TAP FIRE · R RELOAD · F FLARE':'STATION 04';
+  if(phase!=='guide'&&!aftermath)canvas.setAttribute('aria-label',field?`Field survey. Your position is column ${game.player.x+1}, row ${game.player.y+1}. ${site?site.label+'. ':''}Gold page markers show tonight’s unread discoveries. Check marks show searched locations. Use arrow keys or WASD to move. E to inspect. Watchtower is column 2 row 8; pump house column 4 row 4; drainage channel column 8 row 6; northeast corner column 10 row 2.`:'Watchtower shooting gallery. Click moving corn to fire. X selects a crop. Space fires. R reloads; press again in gold to reload faster. F fires a flare to slow crops.');
   const controlKey=[phase,paused,game.incident,game.rounds,game.reserve,game.reload>0,site?.id,game.inspected.join(',')].join(':');
   if(phase!=='guide'&&(force||controlKey!==lastControlsKey)) {
     lastControlsKey=controlKey;
@@ -274,6 +272,13 @@ function updateGuideUI() {
   if(progress)progress.style.width=`${route.progress*100}%`;
 }
 function act(action,value) {
+  if(action==='watch-record'){
+    if(!game?.watch)return;
+    const r=watchRecord(game), active=game.phase==='tower';
+    showModal('watch-record',paper(active?'Your watch so far.':'Watch complete.',`<p class="eyebrow">SHIFT 0${game.shift+1} · ${game.mode==='hard'?'HARD':'STORY'}</p><div class="watch-record-grid"><div><strong class="watch-grade">${esc(r.grade)}</strong><span>WATCH GRADE${active?' · IN PROGRESS':''}</span></div><div><strong>${r.score}</strong><span>POINTS</span></div><div><strong>${r.accuracy}%</strong><span>ACCURACY</span></div><div><strong>${r.contained}</strong><span>CROPS CONTAINED</span></div><div><strong>${r.bestStreak}</strong><span>BEST STREAK</span></div><div><strong>${r.breaches}</strong><span>BREACHES THIS WATCH</span></div></div><p class="small">${r.fastReloads} fast reload${r.fastReloads===1?'':'s'} · Best score for this night and intensity: ${r.best}</p><p class="watch-tips"><b>Keep it clean.</b> Runners are worth more. Husks take two hits. Consecutive containments build a bonus; a miss or breach breaks your streak. Use a flare to buy time, then reload or pick off the nearest escape.</p><button class="primary" data-action="close">${active?'Back to my post':'Back to the field'} ↗</button>`, 'PERIMETER LOG'));
+    return;
+  }
+  if(['reload','flare','focus'].includes(action)&&(!game||game.phase!=='tower'||paused||dialog.open||menuOpen()))return;
   if(action==='select-share-link'){const input=dialog.querySelector('.share-link');input?.focus();input?.select();return;}
   if(action==='share-ending'){if(game?.phase==='ending')shareDisposition(endingId(game),getEnding(game).stamp);return;}
   if(action==='share-record'){const run=history.runs[Number(value)];if(run)shareDisposition(run.ending,run.stamp);return;}
@@ -340,6 +345,7 @@ function act(action,value) {
   if(action==='start'){closeModal();startShift(game);canvas.focus({preventScroll:true});}
   if(action==='answer'){closeModal();answer(game,value);}
   if(action==='reload')reload(game);
+  if(action==='flare')flare(game);
   if(action==='focus'){const p=focusNext(game);if(p)renderer.pointer=p;else toast('No moving crops in view.');canvas.focus({preventScroll:true});}
   if(action==='confirm-enter'&&game?.phase==='tower'&&!paused){closeModal();enterField(game);}
   if(action==='move'){fieldMap.stop(game);const [dx,dy]=value.split(',').map(Number);move(game,dx,dy);}
@@ -365,7 +371,7 @@ $('resume').addEventListener('click',()=>begin(null,true));
 function togglePause(force) {if(!game||game.phase==='ending'||dialog.open)return;paused=typeof force==='boolean'?force:!paused;updateUI();save();syncAudio();}
 $('pause').addEventListener('click',()=>togglePause());$('unpause').addEventListener('click',()=>{togglePause(false);canvas.focus({preventScroll:true});});
 dialog.addEventListener('cancel',event=>{if(['briefing','debrief','guide-debrief','ending','encounter'].includes(modalKind))event.preventDefault();else{event.preventDefault();closeModal();}});
-$('manual').addEventListener('click',()=>showModal('manual',paper('Field manual',`<ol class="orders"><li><span>01</span>Watch the corn. Shoot any that try to escape.</li><li><span>02</span>Remain in the watchtower.</li><li><span>03</span>Do not consume the crop.</li><li><span>04</span>Remember any irregularities for your debrief at the end of the night.</li></ol><button class="primary" data-action="close">Close</button>`)));
+$('manual').addEventListener('click',()=>showModal('manual',paper('Field manual',`<ol class="orders"><li><span>01</span>Watch the corn. Shoot any that try to escape.</li><li><span>02</span>Remain in the watchtower.</li><li><span>03</span>Do not consume the crop.</li><li><span>04</span>Remember any irregularities for your debrief at the end of the night.</li></ol><p class="watch-tips"><b>Runners</b> move fast. <b>Husks</b> take two hits. Clean hits build a streak; misses and breaches break it.</p><p class="small"><b>R / Reload:</b> tap again as the marker reaches gold to finish early. Waiting always completes a normal reload.<br><b>F / Flare:</b> slows all crops for 4.5 seconds. Two per watch. Use one when several crops are close to escaping.</p><button class="primary" data-action="close">Close</button>`)));
 
 $('about').addEventListener('click',()=>showModal('about',paper('About Debrief.', '<p>An interactive adaptation of the short story by Ryan L. Melvin.</p><p>Three shifts. About ten minutes. Headphones optional.</p><p class="small">Music: <a href="https://opengameart.org/content/lost-in-a-bad-place-horror-ambience-loop" target="_blank" rel="noopener">Lost in a Bad Place</a> by congusbongus · <a href="https://creativecommons.org/publicdomain/zero/1.0/" target="_blank" rel="noopener">CC0</a>.</p><p class="small">Field sounds (CC0): <a href="https://opengameart.org/content/crickets-ambient-noise-loopable" target="_blank" rel="noopener">crickets by Ted Kerr</a>; <a href="https://opengameart.org/content/random-sounds-samples" target="_blank" rel="noopener">footsteps and leaves by Brandon Morris</a>; <a href="https://opengameart.org/content/static" target="_blank" rel="noopener">radio static by xhunterko</a>.</p><p>The goal is to find your way through every possible ending. New endings added all the time.</p><p class="small">Your saved game, achieved endings, and transcripts stay in this browser or app, on this device. Clearing site data deletes them; installation is not a backup.</p><button class="primary" data-action="close">Back ↗</button>', 'STATION 04')));
 $('assignment').addEventListener('click',()=>{
@@ -391,7 +397,7 @@ canvas.addEventListener('pointerdown',event=>{
     fire(p,event.pointerType==='touch'?22/Math.max(.1,renderer.view.scale):0);
   }
 });
-function fire(p,padding=0) {const result=game.phase==='guide'?fireGuide(game,p.x,p.y):shoot(game,p.x,p.y,padding);if(!['blocked','empty'].includes(result))shotSound(result==='hit');updateUI();save();}
+function fire(p,padding=0) {const result=game.phase==='guide'?fireGuide(game,p.x,p.y):shoot(game,p.x,p.y,padding);if(!['blocked','empty'].includes(result))shotSound(result==='hit'||result==='armor');updateUI();save();}
 document.addEventListener('keydown',event=>{
   if(!game||dialog.open||menuOpen()||event.ctrlKey||event.metaKey||event.altKey||['INPUT','SELECT','TEXTAREA'].includes(event.target.tagName))return;
   const k=event.key.toLowerCase();
@@ -400,9 +406,10 @@ document.addEventListener('keydown',event=>{
   if(k==='p'||k==='escape'){event.preventDefault();togglePause();return;}
   if(paused)return;
   if(game.phase==='tower'){
-    if(event.repeat && k===' ')return;
+    if(event.repeat && [' ','r','f'].includes(k))return;
     if(k==='x'){event.preventDefault();act('focus');}
     if(k==='r'){event.preventDefault();act('reload');}
+    if(k==='f'){event.preventDefault();act('flare');}
     if(k===' '&&!['BUTTON','A'].includes(event.target.tagName)){event.preventDefault();const target=game.targets.find(t=>t.id===game.focused);if(target)renderer.pointer={x:target.x,y:target.y-34};fire(renderer.pointer);}
   }
   if(game.phase==='guide'){
@@ -665,6 +672,7 @@ function frame(now) {
   const dt=lastFrame?Math.min((now-lastFrame)/1000,.1):0;lastFrame=now;
   if(game&&!paused&&!dialog.open&&!menuOpen()&&!document.hidden){
     advance(game,dt);
+    if(game.phase==='tower')updateReloadUI(game, false);
     if(game.phase==='field')fieldMap.tick(game,dt,(dx,dy)=>move(game,dx,dy),()=>{
       const site=nearbySite(game);
       if(site?.id==='tower'&&investigationComplete(game))act('debrief');
