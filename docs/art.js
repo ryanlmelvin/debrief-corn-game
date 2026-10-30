@@ -7,6 +7,7 @@ export const FIELD_ART = {
   pump: { file: 'field-pump', alt: 'A dim pump shed with rusting pipes, treatment drums and an old ledger.' },
   drain: { file: 'field-drain', alt: 'Pale roots spread across a muddy drainage ditch and dark water.' },
   tower: { file: 'station-kit', alt: 'A worn field radio, binoculars, pocket notebook and brass cartridges on the tower sill.' },
+  retrieval: { file: 'field-retrieval', alt: 'Three recovery workers in worn field clothing enter the corn, each carrying a light.' },
   sighting: { file: 'field-sighting', alt: 'A distant pale human figure disappears between corn rows, seen from the watchtower.' },
   stove: { file: 'pump-stove', alt: 'Corn steams on a camping stove beside a clean plate, butter and salt in the dirty pump shed.' },
   debrief: { file: 'debrief-desk', alt: 'A reel-to-reel recorder and blank report sheets on a worn desk under lamplight.' }
@@ -37,8 +38,9 @@ export function evidenceMount(id) {
 
 export function dialogArtwork(kind, shift = 0) {
   if (kind === 'debrief') return `<div class="interview-scene">${scenePlate('debrief')}<span class="recording-label"><i></i> REC / TAPE 0${shift + 1}</span></div>`;
-  if (['briefing', 'manual', 'guide-intro'].includes(kind)) return scenePlate('tower');
-  if (kind === 'sighting') return scenePlate('sighting');
+  if (kind === 'guide-intro') return scenePlate('retrieval');
+  if (['briefing', 'manual'].includes(kind)) return scenePlate('tower');
+  if (kind === 'sighting') return scenePlate(shift > 0 ? 'retrieval' : 'sighting');
   if (['ending', 'records'].includes(kind)) return scenePlate('debrief');
   if (kind === 'corn') return scenePlate('stove');
   return '';

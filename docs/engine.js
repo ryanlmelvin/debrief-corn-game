@@ -1,3 +1,4 @@
+import { SIGHTING_TIME, sightingPeople, watchNight, personRole, personExitTime, observedSighting } from './watch-story.js';
 import { startGuide, advanceGuide, guideDisposition } from './guide.js';
 import { fieldStepCost } from './field.js';
 import { freshFieldEvents, encounterAfterStep, resolveEncounter, dismissEncounter, migrateFieldEvents, validFieldEvents, encounterById } from './encounters.js';
@@ -28,7 +29,7 @@ export function createGame(mode = 'story', seed = Date.now()) {
   const s = { runId: String(seed), version: SAVE_VERSION, mode: mode === 'hard' ? 'hard' : 'story', rng: seed >>> 0 || 1, phase: 'briefing', shift: 0, time: 0,
     rounds: 6, reserve: 24, reload: 0, kills: 0, shots: 0, breaches: 0, exposure: 0,
     trust: 0, honesty: 0, evidence: [], reports: [], log: [], targets: [], nextSpawn: 3, nextId: 1,
-    incident: false, entered: false, departure: null, searched: [], question: 0, ending: null, lastShot: null,
+    incident: false, lightsOut: [], entered: false, departure: null, searched: [], question: 0, ending: null, lastShot: null,
     player: { x: 1, y: 7 }, visited: ['1,7'], fieldSteps: 0, inspected: [], focused: null, fieldEvents: freshFieldEvents() };
   return s;
 }
@@ -38,7 +39,7 @@ export function startShift(s) {
   if (s.phase !== 'briefing') return false;
   s.fieldEvents.pending=null;s.fieldEvents.journey=null;
   Object.assign(s, { phase: 'tower', time: 0, rounds: 6, reserve: 24, reload: 0, targets: [], nextSpawn: 3,
-    incident: false, incidentPrompted: false, entered: false, departure: null, question: 0, player: { x: 1, y: 7 }, visited: ['1,7'], fieldSteps: 0, inspected: [], focused: null, lastShot: null });
+    incident: false, incidentPrompted: false, lightsOut: [], entered: false, departure: null, question: 0, player: { x: 1, y: 7 }, visited: ['1,7'], fieldSteps: 0, inspected: [], focused: null, lastShot: null });
   addLog(s, `Station 04. Shift ${s.shift + 1}. Perimeter check complete.`);
   return true;
 }
@@ -68,16 +69,25 @@ export function advance(s, dt) {
     if (s.time >= s.nextSpawn && s.time < SHIFT_LENGTH - 13) {
       spawn(s); s.nextSpawn += (5.8 - s.shift * 0.65) * (s.mode === 'hard' ? .75 : 1);
     }
-    if (!s.incident && s.time >= 12) {
+    if (!s.incident && s.time >= SIGHTING_TIME) {
       s.incident = true;
-      // A person crosses the field. Players must distinguish them from mobile crops.
-      s.targets.push({ id: s.nextId++, x: 710, y: 331, direction: -1, speed: 9, kind: 'person', wobble: 0 });
-      addLog(s, ['A white dress. Northeast corner. Someone went in.', 'A team light near the northeast corner. No radio response.', 'Three lights in the northeast. One by one, they go out.'][s.shift], 'story');
+      // Each visible worker is a real civilian, never a decorative crop target.
+      s.targets.push(...sightingPeople(s.shift).map(person=>({...person,id:s.nextId++})));
+      addLog(s, watchNight(s.shift).log, 'story');
       addLog(s, 'You look toward the tower latch, then back to the gap in the rows.', 'story');
     }
     for (const target of s.targets) {
       target.x += target.direction * target.speed * step;
-      if (target.kind === 'person' && s.time > 24) target.gone = true;
+      if (target.kind === 'person') {
+        if(s.shift===2) {
+          const out=18+(target.member||0)*3;
+          if(s.time-step<out&&s.time>=out) {
+            s.lightsOut.push(target.member||0);
+            addLog(s,['The first team light goes out.','A second team light goes dark.','The last team light goes out. No radio response.'][target.member||0],'story');
+          }
+        }
+        if(s.time>personExitTime(s.shift,target))target.gone=true;
+      }
       if (target.kind === 'corn' && (target.x < 65 || target.x > 895)) {
         target.gone = true; s.breaches++;
         addLog(s, 'Perimeter breach. Something reached the road.', 'alert');
@@ -121,7 +131,7 @@ export function shoot(s, x, y, padding = 0) {
   if (target.kind === 'person') {
     s.trust -= 2; s.exposure = Math.min(100, s.exposure + 14);
     if (!s.searched.includes('figure-shot')) s.searched.push('figure-shot');
-    addLog(s, 'The white figure folds into the rows. Your radio stays silent.', 'story');
+    addLog(s, personRole(s.shift,target)==='retrieval'?'A recovery worker falls into the rows. A light drops. Your radio stays silent.':'The white figure folds into the rows. Your radio stays silent.', 'story');
     return 'person';
   }
   s.kills++; addLog(s, 'Mobile crop contained.'); return 'hit';
@@ -214,7 +224,7 @@ export function getQuestion(s) {
   const correctedObservation = testimony[1]?.redacted;
   const latest = ['dress', 'badge', 'teeth'][s.shift];
   const found = s.evidence.includes(latest);
-  const sighting = ['a figure in a white dress', 'a recovery team light', 'three lights going out'][s.shift];
+  const sighting = observedSighting(s);
   if (s.question === 0) return {
     prompt: s.departure === 'compelled' ? 'Your relief says you went down the ladder without answering him. Why did you enter the field?' : s.entered ? 'Your log shows you left the tower. What prompted you to investigate?' : 'Before we close the shift log, what did you observe in the northeast corner?',
     context: s.departure === 'compelled' ? 'Your hands still ache from the ladder. He waits for an explanation you do not have.' : 'He adjusts the microphone. Close enough to catch your breathing.',
@@ -314,6 +324,9 @@ export function restore(raw) {
     migrateFieldEvents(s);
     if(!validFieldEvents(s))return null;
     if (!s.targets.every(t => Number.isFinite(t.x) && Number.isFinite(t.y) && Number.isFinite(t.speed) && Number.isFinite(t.wobble) && [-1,1].includes(t.direction) && ['corn','person'].includes(t.kind))) return null;
+    if (!s.targets.every(t=>(t.role===undefined||['dress','retrieval'].includes(t.role))&&(t.member===undefined||(Number.isInteger(t.member)&&t.member>=0&&t.member<3)))) return null;
+    if (s.lightsOut===undefined)s.lightsOut=[];
+    if (!Array.isArray(s.lightsOut)||s.lightsOut.length>3||new Set(s.lightsOut).size!==s.lightsOut.length||!s.lightsOut.every(i=>Number.isInteger(i)&&i>=0&&i<3))return null;
     // Both former intensities continue as Story, with the former Standard balance.
     // Upgrade existing easy-mode crops once; preserve positions and earned progress.
     if (s.version === 1) {

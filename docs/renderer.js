@@ -1,7 +1,19 @@
+import { personRole, personLight, targetArtwork } from './watch-story.js';
 import { guideWall, GUIDE_SITES, projectGuide } from './guide.js';
 import { FIELD_SITES, SHIFT_LENGTH } from './engine.js';
 
 const W = 960, H = 600;
+// Source bounds keep transparent padding out of the gameplay size. The root
+// crown / shoes share the same ground anchor as the procedural fallback.
+const TARGET_SPRITES = {
+  corn: { file:'watch-corn.webp', source:[29,4,233,499], destination:[-28,-86,56,94] },
+  'corn-roots': { file:'watch-anatomy.webp', source:[35,3,290,592], destination:[-28,-86,56,94] },
+  'corn-teeth': { file:'watch-anatomy.webp', source:[352,3,288,593], destination:[-28,-86,56,94] },
+  dress: { file:'watch-figure.webp', source:[96,20,160,464], destination:[-12,-70,25.5,74] },
+  'retrieval-0': { file:'watch-retrieval.webp', source:[124,9,281,579], destination:[-18,-72,36,76] },
+  'retrieval-1': { file:'watch-retrieval.webp', source:[474,42,274,545], destination:[-18,-68,36,72] },
+  'retrieval-2': { file:'watch-retrieval.webp', source:[855,76,233,510], destination:[-16,-66,32,70] }
+};
 function rng(seed) { return () => { seed = (Math.imul(seed,1664525)+1013904223)>>>0; return seed/4294967296; }; }
 function line(c,x1,y1,x2,y2,color,width=1) { c.strokeStyle=color; c.lineWidth=width; c.beginPath(); c.moveTo(x1,y1); c.lineTo(x2,y2); c.stroke(); }
 function stalk(c,x,y,size,color,lean=0,mutant=false) {
@@ -53,6 +65,38 @@ export class Renderer {
     this.c.scale(dpr,dpr); this.pointer={x:480,y:330}; this.reduced=matchMedia('(prefers-reduced-motion: reduce)').matches;
     this.background=document.createElement('canvas'); this.background.width=W; this.background.height=H;
     this.paintLandscape(this.background.getContext('2d'));
+    this.sprites={};const byFile=new Map();
+    for(const [kind,art] of Object.entries(TARGET_SPRITES)) {
+      if(!byFile.has(art.file)) {const image=new Image();image.src=new URL(`./assets/${art.file}`,import.meta.url).href;byFile.set(art.file,image);}
+      this.sprites[kind]=byFile.get(art.file);
+    }
+    this.towerFrame=document.createElement('canvas');this.towerFrame.width=W;this.towerFrame.height=H;
+    this.paintTowerFrame(this.towerFrame.getContext('2d'));
+  }
+  paintTowerFrame(c) {
+    const random=rng(704),wood=c.createLinearGradient(0,553,0,H);
+    wood.addColorStop(0,'#384032');wood.addColorStop(.13,'#1d281e');wood.addColorStop(1,'#0e1712');
+    c.fillStyle='#0e1712';c.fillRect(0,0,18,H);c.fillRect(942,0,18,H);
+    c.fillStyle=wood;c.fillRect(0,553,W,47);
+    // Weathering is baked once, like the landscape grain; it never sparkles.
+    for(let i=0;i<150;i++) {
+      const x=random()*W,y=557+random()*43,length=10+random()*75;
+      c.strokeStyle=i%3?'#77816916':'#030b0760';c.lineWidth=.5+random()*.6;
+      c.beginPath();c.moveTo(x,y);c.bezierCurveTo(x+length*.3,y-1,x+length*.7,y+1,x+length,y);c.stroke();
+    }
+    for(const x of [175,575,850]) {
+      for(let ring=0;ring<3;ring++) {c.strokeStyle='#050d0a55';c.lineWidth=.7;c.beginPath();c.ellipse(x,577+ring,8+ring*6,1+ring,0,0,Math.PI*2);c.stroke();}
+    }
+    for(let x=0;x<W;x+=130)line(c,x,561,x-15,600,'#080f0b',2);
+    for(const x of [49,344,620,910]) {
+      c.fillStyle='#6e725344';c.beginPath();c.ellipse(x,565,2.4,1.5,0,0,Math.PI*2);c.fill();
+      line(c,x-1.5,565,x+1.5,565,'#0b140d',.8);
+    }
+    for(const edge of [0,942])for(let i=0;i<12;i++) {
+      const x=edge+2+random()*14,y=random()*H;
+      line(c,x,y,x+(random()-.5)*2,y+25+random()*140,'#6d76521b',.7);
+    }
+    line(c,0,553.5,W,553.5,'#71745166');
   }
   paintLandscape(c) {
     const random=rng(40130);
@@ -153,10 +197,7 @@ export class Renderer {
       for(const target of s.targets)if(target.kind==='corn')this.drawTargetMarker(target,s);
       if(s.shift>0) { c.fillStyle=`rgba(8,18,18,${s.shift*.08})`;c.fillRect(0,0,W,H); }
     }
-    // Watchtower frame and its worn sill.
-    c.fillStyle='#0e1712'; c.fillRect(0,0,18,H);c.fillRect(942,0,18,H);c.fillRect(0,556,W,44);
-    c.fillStyle='#30372a';c.fillRect(0,554,W,6);c.fillStyle='#414332';c.fillRect(0,553,W,1);
-    for(let x=0;x<W;x+=130)line(c,x,561,x-15,600,'#080f0b',2);
+    c.drawImage(this.towerFrame,0,0);
     c.strokeStyle='#68705250';c.lineWidth=1;c.strokeRect(31,30,898,501);
     c.fillStyle='#bdc19d';c.font='10px monospace';c.textAlign='left';c.fillText('STATION 04  /  NORTH FIELD',47,51);
     c.textAlign='right';c.fillText('38°00′17″ N   89°14′12″ W',913,51);
@@ -238,22 +279,56 @@ export class Renderer {
       line(c,tipX-dir*6,tipY-2,tipX-dir*7,tipY+3,'#8b805d',.7);
     }
   }
+  drawSprite(key,lean=0,brightness=1) {
+    const image=this.sprites[key],art=TARGET_SPRITES[key];
+    if(!image?.complete||!image.naturalWidth)return false;
+    const c=this.c;c.save();c.rotate(lean);
+    if(brightness!==1)c.filter=`brightness(${brightness})`;
+    c.drawImage(image,...art.source,...art.destination);c.restore();return true;
+  }
+  drawRetrievalMember(member,phase,light=1) {
+    const c=this.c,lean=this.reduced?0:Math.sin(phase*Math.PI*2)*.012;
+    if(!this.drawSprite(`retrieval-${member}`,lean,light?1.2:.48)) {
+      // Distinct civilian kit remains readable if an image has not downloaded.
+      c.save();c.globalAlpha=light?1:.45;
+      c.fillStyle=['#858b69','#aaa080','#67775a'][member];c.fillRect(-8,-52,16,35);
+      c.fillStyle='#b0ac8c';c.beginPath();c.arc(0,-61,5,0,Math.PI*2);c.fill();
+      if(member!==1){c.fillStyle=member===2?'#c0b692':'#617051';c.fillRect(-7,-65,14,5);}
+      c.fillStyle='#4d5842';c.fillRect(4,-45,9,19);
+      line(c,-4,-17,-7,4,'#69735b',4);line(c,4,-17,7,4,'#69735b',4);c.restore();
+    }
+    if(light<=0)return;
+    c.save();c.globalAlpha=light;
+    // Lamp points and small groundward beams belong to the workers, under leaves.
+    const glow=c.createRadialGradient(-17,-26,0,-17,-26,13);
+    glow.addColorStop(0,'#e4d5a343');glow.addColorStop(1,'#e4d5a300');c.fillStyle=glow;c.fillRect(-30,-39,26,26);
+    c.fillStyle='#d9c78e0c';c.beginPath();c.moveTo(-18,-26);c.lineTo(-69,-12);c.lineTo(-59,1);c.closePath();c.fill();
+    c.fillStyle='#eee2b5';c.beginPath();c.ellipse(-17,-26,2.2,1.5,-.3,0,Math.PI*2);c.fill();c.restore();
+  }
   drawTarget(target) {
-    const c=this.c,p=targetProjection(target,this.view);
+    const c=this.c,p=targetProjection(target,this.view),shift=this.scene?.shift||0;
     const phase=this.reduced?.35:((target.direction*p.x/(28*p.size)+target.wobble)%1+1)%1;
+    const form=targetArtwork(shift,target);
     c.save();c.translate(p.x,p.y);c.scale(p.size,p.size);
     c.fillStyle='#07120ba0';c.beginPath();c.ellipse(0,4,22,5,0,0,Math.PI*2);c.fill();
-    if(target.kind==='person') {
-      const step=this.reduced?0:Math.sin(phase*Math.PI*2)*3;
-      line(c,-4,-12,-5+step,3,'#9d9e8a',2);line(c,4,-12,5-step,3,'#9d9e8a',2);
-      c.fillStyle='#c6c6b4';c.beginPath();c.moveTo(-5,-58);c.lineTo(-13+step*.2,-8);c.lineTo(13+step*.2,-8);c.lineTo(5,-58);c.fill();
-      c.fillStyle='#bbb9a2';c.beginPath();c.arc(0,-65,5,0,Math.PI*2);c.fill();
-      c.fillStyle='#262f24';c.fillRect(-6,-70,12,6);
+    if(target.kind==='person'&&personRole(shift,target)==='retrieval') {
+      this.drawRetrievalMember(target.member||0,phase,personLight(shift,this.scene.time,target));
+    } else if(target.kind==='person') {
+      if(!this.drawSprite('dress',this.reduced?0:Math.sin(phase*Math.PI*2)*.012)) {
+        const step=this.reduced?0:Math.sin(phase*Math.PI*2)*3;
+        line(c,-4,-12,-5+step,3,'#9d9e8a',2);line(c,4,-12,5-step,3,'#9d9e8a',2);
+        c.fillStyle='#c6c6b4';c.beginPath();c.moveTo(-5,-58);c.lineTo(-13+step*.2,-8);c.lineTo(13+step*.2,-8);c.lineTo(5,-58);c.fill();
+        c.fillStyle='#bbb9a2';c.beginPath();c.arc(0,-65,5,0,Math.PI*2);c.fill();
+        c.fillStyle='#262f24';c.fillRect(-6,-70,12,6);
+      }
     } else {
       this.drawRoots(target,phase);
-      // The crown stays at soil level while the stalk strains toward its grip.
       const lean=target.direction*.045+(this.reduced?0:Math.sin(phase*Math.PI*2)*.025);
-      stalk(c,0,0,1.1,'#aaa66b',lean,true);
+      if(!this.drawSprite(form,lean,form==='corn'?1.45:1.2)) {
+        stalk(c,0,0,1.1,'#aaa66b',lean,true);
+        if(form==='corn-teeth') {c.fillStyle='#dcd2ae';for(let i=0;i<4;i++)c.fillRect(2,-50+i*5,4,3);}
+        if(form!=='corn')for(let i=-2;i<=2;i++)line(c,i*2,0,i*5,8,'#c5b58e',2.5);
+      }
       c.fillStyle='#766445';c.beginPath();c.ellipse(-target.direction*7,6,4,2,0,0,Math.PI*2);c.fill();
     }
     c.restore();
@@ -302,6 +377,11 @@ export class Renderer {
     c.save();
     const sky=c.createLinearGradient(0,0,0,300);sky.addColorStop(0,'#080f0e');sky.addColorStop(1,'#394338');c.fillStyle=sky;c.fillRect(0,0,W,300);
     const soil=c.createLinearGradient(0,300,0,H);soil.addColorStop(0,'#2d3324');soil.addColorStop(1,'#111b15');c.fillStyle=soil;c.fillRect(0,300,W,300);
+    const soilGrain=rng(914);
+    for(let i=0;i<220;i++) {
+      const y=302+soilGrain()*298,depth=(y-300)/300,x=soilGrain()*W;
+      c.fillStyle=i%2?'#7c795c12':'#050b092b';c.fillRect(x,y,1+depth*5,.5+depth);
+    }
     // Ray-cast corn rows give the walk depth without changing the tower landscape.
     for(let x=0;x<W;x+=4){
       const offset=Math.atan((x-480)/640),angle=g.angle+offset;
@@ -322,12 +402,18 @@ export class Renderer {
     }}
     for(const person of [...g.team].sort((a,b)=>Math.hypot(b.x-g.x,b.y-g.y)-Math.hypot(a.x-g.x,a.y-g.y))){
       const p=projectGuide(g,person);if(!p||person.status==='escaped')continue;
-      if(person.status==='shot'){c.fillStyle='#8b8461';c.fillRect(p.x-p.width*.6,p.y-4,p.width*1.2,5);continue;}
-      c.fillStyle='#aaa993';c.fillRect(p.x-p.width*.24,p.y-p.height*.75,p.width*.48,p.height*.48);
-      c.beginPath();c.arc(p.x,p.y-p.height*.86,p.width*.23,0,Math.PI*2);c.fill();
-      line(c,p.x-p.width*.12,p.y-p.height*.28,p.x-p.width*.24,p.y,'#777d69',Math.max(2,p.width*.13));
-      line(c,p.x+p.width*.12,p.y-p.height*.28,p.x+p.width*.24,p.y,'#777d69',Math.max(2,p.width*.13));
-      c.fillStyle='#e2cea0';c.fillRect(p.x+p.width*.42,p.y-p.height*.5,Math.max(3,p.width*.13),Math.max(4,p.height*.09));
+      const size=p.height/76;
+      c.save();c.translate(p.x,p.y+1);c.scale(1,.18);
+      const shadow=c.createRadialGradient(0,0,0,0,0,p.width*.65);shadow.addColorStop(0,'#050c08a0');shadow.addColorStop(1,'#050c0800');
+      c.fillStyle=shadow;c.fillRect(-p.width,-p.width,p.width*2,p.width*2);c.restore();
+      if(person.status==='shot') {
+        c.save();c.translate(p.x-p.height*.27,p.y);c.scale(size*.72,size*.22);c.rotate(Math.PI/2);
+        if(!this.drawSprite(`retrieval-${person.id-1}`,0,.55)){c.fillStyle='#74765c';c.fillRect(-10,-60,20,58);}
+        c.restore();continue;
+      }
+      c.save();c.translate(p.x,p.y-4*size);c.scale(size,size);
+      this.drawRetrievalMember(person.id-1,this.reduced?.35:g.time*.6+person.id,1);
+      c.restore();
     }
     const vignette=c.createRadialGradient(480,320,40,480,320,480);vignette.addColorStop(0,'#02080500');vignette.addColorStop(.65,'#02080560');vignette.addColorStop(1,'#020805f2');c.fillStyle=vignette;c.fillRect(0,0,W,H);
     c.fillStyle='#afba98';c.font='11px monospace';c.textAlign='left';
