@@ -25,7 +25,7 @@ test('holding the post ends in a saved compulsion scene before the field',()=>{
     const s=watch();s.shift=shift;safeWatch(s,false);
     assert.equal(s.phase,'decision');assert.equal(s.departure,'compelled');
     assert.equal(s.entered,false);assert.equal(s.breaches,0);
-    assert.match(s.log[0].message,/thought won/);
+    assert.match(s.log[0].message,/hand lifts the latch/);
     assert.equal(move(s,1,0),false);assert.equal(shoot(s,0,0),'blocked');assert.equal(beginDebrief(s),false);
     const resumed=restore(serialize(s));assert.deepEqual(resumed,s);
     advance(resumed,20);assert.deepEqual(resumed,s);
@@ -226,7 +226,7 @@ test('voluntary departure and compulsion remain distinct through testimony, save
     enterField(s);investigateAll(s);beginDebrief(s);
     assert.equal(s.departure,compelled?'compelled':'chosen');
     const resumed=restore(serialize(s));const q=getQuestion(resumed);
-    if(compelled)assert.match(q.options[0].label,/could not stop myself/);
+    if(compelled)assert.match(q.options[0].label,/deciding to stay. Then I was on the ladder/);
     else assert.match(q.options[0].label,/went into the field to investigate/);
     answer(resumed,'truth');assert.equal(resumed.reports[0].answer,q.options[0].label);
     if(compelled)assert.match(getQuestion(resumed).prompt,/I will record/);

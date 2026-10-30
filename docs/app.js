@@ -3,6 +3,7 @@ import { createGame, startShift, advance, reload, shoot, focusNext, enterField, 
 import { Renderer } from './renderer.js';
 import { FieldMap } from './field-ui.js';
 import { dialogArtwork, evidenceMount, notebookMarkup } from './art.js';
+import { GameAudio } from './audio.js';
 
 const $ = id => document.getElementById(id);
 const canvas=$('field'), renderer=new Renderer(canvas), dialog=$('paper-dialog');
@@ -14,7 +15,7 @@ menu.addEventListener('click',event=>{if(event.target.closest('button')&&!event.
 const HISTORY_KEY=`debrief-history-v1:${new URL('.',location.href).pathname}`;
 const SAVE_KEY=`debrief-save-v1:${new URL('.',location.href).pathname}`;
 let game=null, paused=false, modalKind='', lastModalKey='', lastControlsKey='', lastLog='', lastFrame=0, lastSave=0, lastUI=0, toastTimer, installPrompt=null;
-let audioContext=null, master=null, ambient=null, soundEnabled=false, storageWarned=false;
+let audioContext=null, soundscape=null, soundEnabled=false, storageWarned=false;
 const esc = value => String(value).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 function readSave() { try { return restore(localStorage.getItem(SAVE_KEY)); } catch { return null; } }
 let history={ collected: [], runs: [] };
@@ -79,10 +80,10 @@ function sceneDialog() {
     showModal('briefing',paper(b.title,`<p class="eyebrow">SHIFT ${game.shift+1} / ${DATES[game.shift]}, <span class="redacted-text">19XX</span></p><p>${esc(b.text).replaceAll('██████', REDACTED_TOWN)}</p><ol class="orders">${b.orders.map((o,i)=>`<li><span>0${i+1}</span>${o}</li>`).join('')}</ol>${b.note?`<p class="note">${b.note}</p>`:''}${game.shift===0?'<p class="small">Click or tap to fire. <b>X</b> aims, <b>Space</b> fires, <b>R</b> reloads.</p>':''}<button class="primary" data-action="start">Take your post <span>↗</span></button>`, 'SHIFT ORDERS'));
   } else if(game.phase==='tower' && game.incident && !game.incidentPrompted) {
     game.incidentPrompted=true;
-    showModal('sighting',paper('Movement in the field.', '<p>Someone went into the rows. A thought follows, too quickly to feel like your own: <em>investigate.</em></p><p class="note">For a moment, you can feel the roots under the tower. Like fingers you have forgotten how to move.</p><p class="small">Leaving now means any loose crops can cross the perimeter.</p><div class="paper-actions"><button class="primary" data-action="confirm-enter">Follow the thought ↗</button><button class="secondary" data-action="close">Stay at my post</button></div>', 'FIELD OBSERVATION'));
+    showModal('sighting',paper('Movement in the field.', '<p>Someone went into the rows. You keep watching the gap after it closes.</p><p class="note">Your thumb is resting on the tower latch.</p><p class="small">Leaving now means any loose crops can cross the perimeter.</p><div class="paper-actions"><button class="primary" data-action="confirm-enter">Investigate now ↗</button><button class="secondary" data-action="close">Stay at my post</button></div>', 'FIELD OBSERVATION'));
     save();
   } else if(game.phase==='decision') {
-    showModal('compulsion',`<article class="compulsion-scene"><button id="dialog-update" class="secondary" data-update hidden>Update ready. Download?</button><p class="compulsion-time">RELIEF HAS ARRIVED / YOUR WATCH IS OVER</p><div class="compulsion-word" aria-hidden="true">investigate</div><h2 id="dialog-title" tabindex="-1">You did not decide to move.</h2><p>You held your post. You waited for relief.<br>The thought waited with you.</p><p>Now someone is calling up from below. You try to answer. Your mouth shapes a different word. Your hands lift the latch.</p><p class="compulsion-refusal">You tell yourself: <em>stay in the tower.</em><br>Your body starts down the ladder.</p><p>Below the soil, something vast loosens its grip. It no longer needs to pull. The thought has become the part of you that moves.</p><p class="compulsion-verdict">You kept the corn inside.<br>You could not keep it out of your head.</p><button class="primary" data-action="accept-compulsion">Your feet reach the soil <span>→</span></button></article>`);
+    showModal('compulsion',`<article class="compulsion-scene"><button id="dialog-update" class="secondary" data-update hidden>Update ready. Download?</button><p class="compulsion-time">RELIEF HAS ARRIVED / YOUR WATCH IS OVER</p><div class="compulsion-word" aria-hidden="true">investigate</div><h2 id="dialog-title" tabindex="-1">You meant to stay.</h2><p>Relief calls from below. You try to answer.</p><p>Your hand lifts the latch.</p><p class="compulsion-refusal"><em>Stay in the tower.</em><br>One boot finds the top rung.</p><p>Then the next. And the next.<br>You cannot make your fingers let go of the rail.</p><p class="compulsion-verdict">Behind you, your relief asks where you are going.</p><button class="primary" data-action="accept-compulsion">Your feet reach the soil <span>→</span></button></article>`);
     save();
   } else if(game.phase==='debrief') {
     const q=getQuestion(game);
@@ -151,6 +152,7 @@ function updateUI(force=false) {
   canvas.hidden=field;
   if (phase === 'guide') updateGuideUI();
   sceneDialog();
+  syncAudio();
 }
 function updateGuideUI() {
   const g=game.guide, escaping=g.stage==='escape';
@@ -263,7 +265,7 @@ document.addEventListener('keydown',event=>{
     if(k==='e'){event.preventDefault();fieldMap.stop();act(nearbySite(game)?.id==='tower'?'debrief':'inspect');}
   }
 });
-document.addEventListener('visibilitychange',()=>{if(document.hidden){save();if(game&&!dialog.open)togglePause(true);audioContext?.suspend();}else syncAudio();});
+document.addEventListener('visibilitychange',()=>{if(document.hidden){save();if(game&&!dialog.open)togglePause(true);}syncAudio();});
 window.addEventListener('pagehide',save);
 function exportRecord() {
   const e=getEnding(game);
@@ -273,23 +275,17 @@ function exportRecord() {
 async function initAudio() {
   const Audio=window.AudioContext||window.webkitAudioContext;if(!Audio){toast('Sound is not available in this browser.');return false;}
   if(!audioContext){
-    audioContext=new Audio();master=audioContext.createGain();master.gain.value=.08;master.connect(audioContext.destination);
-    const buffer=audioContext.createBuffer(1,audioContext.sampleRate*3,audioContext.sampleRate),data=buffer.getChannelData(0);let previous=0;
-    for(let i=0;i<data.length;i++){previous=(previous+Math.random()*.04-.02)/1.02;data[i]=previous;}
-    ambient=audioContext.createBufferSource();ambient.buffer=buffer;ambient.loop=true;const gain=audioContext.createGain();gain.gain.value=.5;ambient.connect(gain);gain.connect(master);ambient.start();
+    audioContext=new Audio();soundscape=new GameAudio(audioContext);
   }
   await audioContext.resume();return true;
 }
-function syncAudio(){if(!audioContext)return;if(!soundEnabled||paused||dialog.open||menuOpen()||document.hidden)audioContext.suspend();else audioContext.resume().catch(()=>{});}
+function syncAudio(){soundscape?.sync({enabled:soundEnabled,held:paused||dialog.open||menuOpen()||document.hidden,pressure:game?investigationPressure(game)?.strength||0:0,takeover:game?.phase==='decision'});}
 $('sound').addEventListener('click',async()=>{
   if(!soundEnabled){try{if(!await initAudio())return;}catch{toast('Sound could not start. You can keep playing silently.');return;}}
   soundEnabled=!soundEnabled;$('sound').textContent=soundEnabled?'Sound on':'Sound off';$('sound').setAttribute('aria-pressed',String(soundEnabled));syncAudio();
 });
 function shotSound(hit) {
-  if(!soundEnabled||!audioContext)return;
-  const oscillator=audioContext.createOscillator(),gain=audioContext.createGain(),now=audioContext.currentTime;
-  oscillator.type='triangle';oscillator.frequency.setValueAtTime(hit?170:130,now);oscillator.frequency.exponentialRampToValueAtTime(45,now+.14);
-  gain.gain.setValueAtTime(.9,now);gain.gain.exponentialRampToValueAtTime(.001,now+.18);oscillator.connect(gain);gain.connect(master);oscillator.start(now);oscillator.stop(now+.2);
+  if(soundEnabled)soundscape?.shot(hit);
 }
 const isInstalled = () => window.matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
 function refreshInstallGuide() {

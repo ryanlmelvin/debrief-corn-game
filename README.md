@@ -43,6 +43,8 @@ Repository: https://github.com/ryanlmelvin/debrief-corn-game
 
 Play online: https://ryanlmelvin.github.io/debrief-corn-game/
 
+With sound enabled, the investigate pressure starts as a distant low drone. The pulse and close, beating tones build as the outdoor ambience recedes. The entire mix cuts to silence when the compulsion wins, and ordinary ambience returns in the field. Pause, menus, and background tabs mute the sound; turning it back on resumes the current pressure level.
+
 ## Offline play and saves
 
 The manifest and service worker make the game installable in compatible browsers and cache every game asset after an initial online load. The browser may offer **Install**, or **Add to Home Screen** through its own menu. On iOS, use Safari’s Share menu. Browser support determines the exact installation UI.

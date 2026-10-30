@@ -71,7 +71,7 @@ export function advance(s, dt) {
       // A person crosses the field. Players must distinguish them from mobile crops.
       s.targets.push({ id: s.nextId++, x: 710, y: 331, direction: -1, speed: 9, kind: 'person', wobble: 0 });
       addLog(s, ['A white dress. Northeast corner. Someone went in.', 'A team light near the northeast corner. No radio response.', 'Three lights in the northeast. One by one, they go out.'][s.shift], 'story');
-      addLog(s, 'Investigate. The thought arrives in your own voice. You can still remain at your post.', 'story');
+      addLog(s, 'You look toward the tower latch, then back to the gap in the rows.', 'story');
     }
     for (const target of s.targets) {
       target.x += target.direction * target.speed * step;
@@ -86,7 +86,7 @@ export function advance(s, dt) {
     else if (s.time >= SHIFT_LENGTH) {
       // Relief ends containment duty, but the compulsion gets its own saved scene.
       s.phase = 'decision'; s.departure = 'compelled'; s.targets = [];
-      addLog(s, 'You held your post until relief. The thought won anyway. Your body is going down the ladder.', 'story');
+      addLog(s, 'Relief calls. You mean to answer. Your hand lifts the latch.', 'story');
     }
   }
 }
@@ -99,8 +99,8 @@ export function investigationPressure(s) {
   if (!strength) return null;
   const stage = strength < .45 ? 0 : strength < .68 ? 1 : strength < .88 ? 2 : 3;
   return { strength, stage,
-    thought: ['I should go down there.', 'I should go down there. I just thought that.', 'Something under the rows is thinking in my voice.', 'I am still saying no. My hands are letting go.'][stage],
-    echo: ['just a look', 'below the roots', 'it knows your name', 'you have been heard'][stage] };
+    thought: ['Just a look.', 'Your thumb rests on the latch.', 'You put your hand back. Again.', 'Stay at your post. Stay.'][stage],
+    echo: ['just a look', 'again', 'a little closer', 'down'][stage] };
 }
 export function reload(s) {
   if (s.phase !== 'tower' || s.reload > 0 || s.rounds === 6 || s.reserve <= 0) return false;
@@ -206,9 +206,9 @@ export function getQuestion(s) {
   const sighting = ['a figure in a white dress', 'a recovery team light', 'three lights going out'][s.shift];
   if (s.question === 0) return {
     prompt: s.departure === 'compelled' ? 'Your relief says you went down the ladder without answering him. Why did you enter the field?' : s.entered ? 'Your log shows you left the tower. What prompted you to investigate?' : 'Before we close the shift log, what did you observe in the northeast corner?',
-    context: `This interview concerns the watch you just completed. You saw ${sighting} near the northeast corner.${s.departure === 'compelled' ? ' You waited for relief. The thought kept repeating until your body obeyed it.' : ''}`,
+    context: `This interview concerns the watch you just completed. You saw ${sighting} near the northeast corner.${s.departure === 'compelled' ? ' You waited for relief. You remember the latch opening, then the ladder under your hands.' : ''}`,
     options: [
-      { id: 'truth', label: s.departure === 'compelled' ? `I saw ${sighting}. I tried to stay. I could not stop myself from going down.` : s.entered ? `I saw ${sighting}. I went into the field to investigate.` : `I saw ${sighting}. I stayed at my post.`, detail: 'Put the sighting and your response on record.', honesty: 1, trust: -1 },
+      { id: 'truth', label: s.departure === 'compelled' ? `I saw ${sighting}. I remember deciding to stay. Then I was on the ladder.` : s.entered ? `I saw ${sighting}. I went into the field to investigate.` : `I saw ${sighting}. I stayed at my post.`, detail: 'Put the sighting and your response on record.', honesty: 1, trust: -1 },
       { id: 'comply', label: s.entered ? 'I was checking the perimeter, sir.' : 'Routine crop movement. Nothing further.', detail: 'Leave the sighting out of the official account.', honesty: -1, trust: 1 }
     ]
   };
