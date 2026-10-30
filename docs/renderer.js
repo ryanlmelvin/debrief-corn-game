@@ -164,15 +164,22 @@ export class Renderer {
       : ['debrief','ending'].includes(s.phase) ? 1 : Math.max(0,Math.min(1,s.time/SHIFT_LENGTH));
     const c=this.c,view=this.view||{left:0,top:0,width:W,height:H};
     const x=view.left+view.width*.79,y=Math.max(99,view.top+view.height*.17);
-    // Cut the shadow out of one lit disk, leaving the sky visible through it.
-    // Painting an opaque shadow disk made it look like an additional gray moon.
+    // Trace only the exposed crescent. Clipping two complete circles can leave
+    // an antialiased bright rim around the shadow on mobile canvas renderers.
+    const radius=23,shadowRadius=22+14*progress,distance=Math.hypot(9,7);
+    if(shadowRadius>=distance+radius)return;
+    const direction=Math.atan2(-7,-9);
+    const angle=Math.acos((radius*radius+distance*distance-shadowRadius*shadowRadius)/(2*radius*distance));
+    const start=direction+angle,end=direction-angle;
+    const shadowStart=Math.atan2(radius*Math.sin(end)+7,radius*Math.cos(end)+9);
+    const shadowEnd=Math.atan2(radius*Math.sin(start)+7,radius*Math.cos(start)+9);
     c.save();
-    c.beginPath();c.arc(x,y,23,0,Math.PI*2);c.clip();
     c.fillStyle='#d9d6ae';
-    c.beginPath();c.arc(x,y,23,0,Math.PI*2);
-    c.moveTo(x-9+22+14*progress,y-7);
-    c.arc(x-9,y-7,22+14*progress,0,Math.PI*2);
-    c.fill('evenodd');
+    c.beginPath();
+    c.arc(x,y,radius,start,end);
+    c.arc(x-9,y-7,shadowRadius,shadowStart,shadowEnd,true);
+    c.closePath();
+    c.fill();
     c.restore();
   }
   draw(s,now,title=false) {

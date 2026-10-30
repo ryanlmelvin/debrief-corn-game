@@ -23,16 +23,19 @@ for (const [width,height] of [[390,844],[844,390],[1440,900]]) {
   });
 }
 
-test('eclipse cuts one shadow from a lit moon without painting gray shadow disks', () => {
+test('eclipse traces an exposed crescent without a clipped full-circle rim', () => {
   const calls=[];
   const context=new Proxy({}, {get:(_,name)=>(...args)=>calls.push([name,...args]),set:(_,name,value)=>{calls.push([name,value]);return true;}});
-  for(const time of [0,30,60]) {
+  for(const time of [0,20,40]) {
     calls.length=0;
     Renderer.prototype.drawEclipse.call({c:context,view:cameraFor(390,844)},{phase:'tower',time},false);
-    assert.deepEqual(calls.filter(c=>c[0]==='fill'),[['fill','evenodd']]);
+    assert.deepEqual(calls.filter(c=>c[0]==='fill'),[['fill']]);
     assert.deepEqual(calls.filter(c=>c[0]==='fillStyle'),[['fillStyle','#d9d6ae']]);
-    assert.equal(calls.filter(c=>c[0]==='clip').length,1);
+    assert.equal(calls.filter(c=>c[0]==='clip').length,0);
   }
+  calls.length=0;
+  Renderer.prototype.drawEclipse.call({c:context},{phase:'ending'},false);
+  assert.equal(calls.filter(c=>c[0]==='fill').length,0,'Full eclipse leaves no bright ring.');
 });
 
 for (const [width,height] of [[390,844],[844,390],[1440,900]]) {
