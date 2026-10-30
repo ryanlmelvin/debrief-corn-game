@@ -1,13 +1,23 @@
 // Bump this version whenever a shipped asset changes. An active game keeps its
 // current worker; the new version activates after all old game tabs close.
-const VERSION = 'debrief-v18';
+const VERSION = 'debrief-v19';
 const DEVELOPMENT = ['localhost', '127.0.0.1', '[::1]'].includes(self.location.hostname);
 const SCOPE = new URL('./', self.location.href).pathname;
 const CACHE_PREFIX = `debrief:${SCOPE}:`;
 const CACHE = CACHE_PREFIX + VERSION;
 const FILES = ['./','./index.html','./style.css','./app.js','./engine.js','./guide.js','./renderer.js','./manifest.webmanifest','./icons/icon.svg','./icons/icon-192.png','./icons/icon-512.png'];
 self.addEventListener('install',event=>event.waitUntil((async()=>{
-  const cache=await caches.open(CACHE);await cache.addAll(FILES);
+  const cache=await caches.open(CACHE);
+  // A new worker must not populate its new cache with an older HTTP-cached build.
+  // Store under canonical URLs so module imports and offline navigation agree.
+  await Promise.all(FILES.map(async file=>{
+    const canonical=new URL(file,self.location.href);
+    const download=new URL(canonical);
+    download.searchParams.set('release',VERSION);
+    const response=await fetch(download.href,{cache:'reload'});
+    if(!response.ok)throw new Error(`Could not download ${file}: ${response.status}`);
+    await cache.put(canonical.href,response);
+  }));
   if(DEVELOPMENT)await self.skipWaiting();
 })()));
 self.addEventListener('message', event => {

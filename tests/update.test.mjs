@@ -54,3 +54,25 @@ test('service worker activates on the explicit update message', async () => {
   events.message({ data: { type: 'SKIP_WAITING' }, waitUntil: promise => promise });
   assert.deepEqual(calls, ['activate']);
 });
+
+test('new offline cache downloads release-specific assets without reusing HTTP cache', async () => {
+  const events={}, requests=[], saved=[];
+  vm.runInNewContext(readFileSync(new URL('../docs/sw.js', import.meta.url), 'utf8'), {
+    URL,
+    self:{location:{hostname:'example.com',href:'https://example.com/game/sw.js'},addEventListener:(name,fn)=>{events[name]=fn;}},
+    caches:{open:async()=>({put:async(url,response)=>saved.push({url,response})})},
+    fetch:async(url,options)=>{requests.push({url,options});return {ok:true};}
+  });
+  let installation;
+  events.install({waitUntil:promise=>{installation=promise;}});
+  await installation;
+  assert.ok(requests.length > 0);
+  for(const request of requests){
+    assert.ok(new URL(request.url).searchParams.get('release'));
+    assert.equal(request.options.cache,'reload');
+  }
+  assert.equal(saved.length,requests.length);
+  assert.ok(saved.some(item=>item.url==='https://example.com/game/style.css'));
+  assert.ok(saved.some(item=>item.url==='https://example.com/game/'));
+  assert.ok(saved.every(item=>!new URL(item.url).search));
+});
