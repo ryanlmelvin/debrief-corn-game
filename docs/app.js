@@ -7,6 +7,7 @@ import { dialogArtwork, evidenceMount, notebookMarkup, encounterMarkup, intervie
 import { GameAudio } from './audio.js';
 import { pressureWordMarkup } from './pressure-word.js';
 import { DialogPager } from './pager.js';
+import { endingShareData, shareEnding } from './sharing.js';
 
 const $ = id => document.getElementById(id);
 const canvas=$('field'), renderer=new Renderer(canvas), dialog=$('paper-dialog');
@@ -128,7 +129,7 @@ function sceneDialog() {
       if(!$('guide-aftermath').matches(':popover-open'))$('guide-aftermath').showPopover();
       return;
     }
-    showModal('ending',paper(e.title,`<p class="eyebrow">ENDING ${e.code} / ${String(Object.keys(ENDINGS).length).padStart(2,'0')}</p><p>${e.text}</p><p class="note">${e.last}</p><div class="stamp">${e.stamp}</div><div class="receipt-stats"><span>CROPS CONTAINED<strong>${game.kills}</strong></span><span>EXHIBITS RETAINED<strong>${game.evidence.length}</strong></span><span>PERIMETER BREACHES<strong>${game.breaches}</strong></span></div><div class="paper-actions"><button class="primary" data-action="restart">Another assignment ↗</button><button class="secondary" data-action="export">Keep the transcript ↓</button><button class="secondary" data-action="records">Records</button></div>`, 'FINAL DISPOSITION'));
+    showModal('ending',paper(e.title,`<p class="eyebrow">ENDING ${e.code} / ${String(Object.keys(ENDINGS).length).padStart(2,'0')}</p><p>${e.text}</p><p class="note">${e.last}</p><div class="stamp">${e.stamp}</div><div class="receipt-stats"><span>CROPS CONTAINED<strong>${game.kills}</strong></span><span>EXHIBITS RETAINED<strong>${game.evidence.length}</strong></span><span>PERIMETER BREACHES<strong>${game.breaches}</strong></span></div><div class="paper-actions"><button class="primary" data-action="restart">Another assignment ↗</button><button class="secondary" data-action="share-ending">Share ending ↗</button><button class="secondary" data-action="export">Keep the transcript ↓</button><button class="secondary" data-action="records">Records</button></div>`, 'FINAL DISPOSITION'));
   }
 }
 function stat(label,value,sub='',percent=null,warning=false) {return `<div class="stat ${warning?'warning':''}"><label>${label}</label><strong>${value}</strong><small> ${sub}</small>${percent!==null?`<div class="meter"><span style="width:${Math.min(100,Math.max(0,percent))}%"></span></div>`:''}</div>`;}
@@ -167,7 +168,7 @@ function updateUI(force=false) {
   if(phase!=='guide'&&(force||controlKey!==lastControlsKey)) {
     lastControlsKey=controlKey;
     const focusedAction=$('controls').contains(document.activeElement)?document.activeElement.dataset.action:null;
-    let html=aftermath?'<button class="primary" data-action="restart">Another assignment ↗</button><button class="secondary" data-action="records">View records</button><button class="secondary" data-action="export">Keep the transcript ↓</button>':'';
+    let html=aftermath?'<button class="primary" data-action="restart">Another assignment ↗</button><button class="secondary" data-action="records">View records</button><button class="secondary" data-action="share-ending">Share ending ↗</button><button class="secondary" data-action="export">Keep the transcript ↓</button>':'';
     if(field){
       html='<div class="dpad" aria-label="Walk through the field"><button class="up" data-action="move" data-value="0,-1" aria-label="Move north">↑</button><button class="left" data-action="move" data-value="-1,0" aria-label="Move west">←</button><button class="down" data-action="move" data-value="0,1" aria-label="Move south">↓</button><button class="right" data-action="move" data-value="1,0" aria-label="Move east">→</button></div>';
       if(site?.id==='tower'){if(investigationComplete(game))html+='<button class="primary" data-action="debrief">Return / submit report ↗</button>';}
@@ -222,6 +223,9 @@ function updateGuideUI() {
   if(focusedAction)[...$('controls').querySelectorAll('button')].find(b=>b.dataset.action===focusedAction&&b.dataset.value===focusedValue)?.focus({preventScroll:true});
 }
 function act(action,value) {
+  if(action==='select-share-link'){const input=dialog.querySelector('.share-link');input?.focus();input?.select();return;}
+  if(action==='share-ending'){if(game?.phase==='ending')shareDisposition(game.ending);return;}
+  if(action==='share-record'){const run=history.runs[Number(value)];if(run)shareDisposition(run.ending);return;}
   if(action.startsWith('guide-')&&(!game||game.phase!=='guide'||paused||dialog.open||menuOpen()))return;
   if(action==='encounter-choice') {
     if(!chooseFieldEncounter(game,value))return;
@@ -259,7 +263,7 @@ function act(action,value) {
   }
   if(action==='record-run') {
     const r=history.runs[Number(value)];if(!r)return;
-    showModal('record',paper(esc(r.title),`<p>${esc(r.text)}</p><p class="note">${esc(r.last)}</p><div class="transcript">${r.reports.map(t=>`<section><p class="eyebrow">SHIFT ${Number(t.shift)+1}</p><p>${esc(t.question)}</p><p><b>YOU</b> ${esc(t.answer)}</p>${t.supervisorReply?`<p class="note">SUPERVISOR: ${esc(t.supervisorReply)}</p>`:''}</section>`).join('')}</div><div class="paper-actions"><button class="primary" data-action="records">Back to records</button><button class="secondary" data-action="close">Close</button></div>`,'PAST ASSIGNMENT'));return;
+    showModal('record',paper(esc(r.title),`<p>${esc(r.text)}</p><p class="note">${esc(r.last)}</p><div class="transcript">${r.reports.map(t=>`<section><p class="eyebrow">SHIFT ${Number(t.shift)+1}</p><p>${esc(t.question)}</p><p><b>YOU</b> ${esc(t.answer)}</p>${t.supervisorReply?`<p class="note">SUPERVISOR: ${esc(t.supervisorReply)}</p>`:''}</section>`).join('')}</div><div class="paper-actions"><button class="secondary" data-action="share-record" data-value="${Number(value)}">Share ending ↗</button><button class="primary" data-action="records">Back to records</button><button class="secondary" data-action="close">Close</button></div>`,'PAST ASSIGNMENT'));return;
   }
   if(action==='records'){$('records').click();return;}
   if(action==='guide-step'){stepGuide(game,Number(value));game.guide.focused=null;}
@@ -359,6 +363,20 @@ document.addEventListener('keydown',event=>{
 });
 document.addEventListener('visibilitychange',()=>{if(document.hidden){save();if(game&&!dialog.open)togglePause(true);}syncAudio();});
 window.addEventListener('pagehide',save);
+let sharingEnding=false;
+async function shareDisposition(ending) {
+  if(sharingEnding)return;
+  sharingEnding=true;
+  save();
+  try {
+    const result=await shareEnding(ending);
+    if(result==='copied')toast('Ending and link copied. Paste them into a message.');
+    if(result==='manual'){
+      const data=endingShareData(ending);
+      showModal('share',paper('Pass it on.',`<p>${esc(data.text)}</p><p class="small">Copy this link into a message to share your ending.</p><input class="share-link" aria-label="Ending link" readonly value="${esc(data.url)}"><div class="paper-actions"><button class="secondary" data-action="select-share-link">Select link</button><button class="primary" data-action="close">Back to assignment ↗</button></div>`,'SHARE YOUR ENDING'));
+    }
+  } finally { sharingEnding=false; }
+}
 function exportRecord() {
   const e=getEnding(game);
   const body=`DEBRIEF — PRIVATE TRANSCRIPT\nBased on the story by Ryan L. Melvin\n\n${e.title}\n${e.stamp}\n\n${e.text}\n${e.last}\n\nTESTIMONY\n\n${game.reports.map(r=>`SHIFT ${r.shift+1}\nQ: ${r.question}\nA: ${r.answer}${r.redacted?' [official wording]':''}${r.supervisorReply ? `\nSUPERVISOR: ${r.supervisorReply}` : ''}`).join('\n\n')}\n\nEXHIBITS\n\n${game.evidence.map(id=>`${EVIDENCE[id].title}\n${EVIDENCE[id].text}`).join('\n\n')}`;

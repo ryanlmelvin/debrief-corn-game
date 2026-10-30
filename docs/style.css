@@ -162,3 +162,5 @@ body[data-phase="field"] .viewport{background:#16221c}
 .tower-hud button.needs-reload{animation:reload-pulse 1.4s ease-in-out infinite}
 @keyframes reload-pulse{0%,100%{box-shadow:0 0 0 0 #d6af6900;border-color:#687052}50%{box-shadow:0 0 0 5px #d6af6933;border-color:#d6af69}}
 @media(prefers-reduced-motion:reduce){.tower-hud button.needs-reload{animation:none;border-color:#d6af69;box-shadow:0 0 0 2px #d6af6933}}
+
+.share-link{width:100%;min-width:0;padding:12px;border:1px solid #737a63;background:#eee9cf;color:#232b21;font:12px ui-monospace,monospace}.share-link:focus-visible{outline:2px solid #344330;outline-offset:2px}
