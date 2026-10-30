@@ -1,5 +1,5 @@
 import { guideWall, GUIDE_SITES, projectGuide } from './guide.js';
-import { FIELD_SITES } from './engine.js';
+import { FIELD_SITES, SHIFT_LENGTH } from './engine.js';
 
 const W = 960, H = 600;
 function rng(seed) { return () => { seed = (Math.imul(seed,1664525)+1013904223)>>>0; return seed/4294967296; }; }
@@ -71,11 +71,24 @@ export class Renderer {
     for(let i=0;i<20000;i++) { c.fillStyle=random()>.5?'#efe7b507':'#0000000b';c.fillRect(random()*W,random()*H,1,1); }
     const vignette=c.createRadialGradient(480,310,170,480,310,620);vignette.addColorStop(0,'#08110d00');vignette.addColorStop(1,'#08110dc9');c.fillStyle=vignette;c.fillRect(0,0,W,H);
   }
+  drawEclipse(s,title) {
+    // Keep the original, oddly offset shadow; let it grow across the disk.
+    const progress=!s || title || s.phase==='briefing' ? 0
+      : ['debrief','ending'].includes(s.phase) ? 1 : Math.max(0,Math.min(1,s.time/SHIFT_LENGTH));
+    if(progress===0)return;
+    const c=this.c;
+    c.save();
+    c.beginPath();c.arc(760,99,23,0,Math.PI*2);c.clip();
+    c.fillStyle=`rgb(${Math.round(52+progress*40)},${Math.round(72+progress*20)},${Math.round(63+progress*29)})`;
+    c.beginPath();c.arc(751,92,22+14*progress,0,Math.PI*2);c.fill();
+    c.restore();
+  }
   draw(s,now,title=false) {
     const c=this.c; c.clearRect(0,0,W,H);
     if(s?.phase==='guide') { this.drawGuide(s); return; }
     if(s?.phase==='field') { this.drawMap(s); return; }
     c.drawImage(this.background,0,0);
+    this.drawEclipse(s,title);
     const t=this.reduced?0:now/1000;
     c.save();
     // Thin drifting mist rather than flashes or screen shake.
