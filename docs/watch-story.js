@@ -1,5 +1,10 @@
 // Watchtower visuals follow the same nightly events as the radio and interviews.
 export const SIGHTING_TIME = 12;
+// Let the player watch the people in the rows before offering to leave the tower.
+export const SIGHTING_OBSERVATION_SECONDS = 5;
+export function sightingPromptReady(s) {
+  return s.phase === 'tower' && s.incident && s.time >= SIGHTING_TIME + SIGHTING_OBSERVATION_SECONDS;
+}
 export const WATCH_NIGHTS = [
   { role:'dress', count:1, crop:'corn', log:'A white dress. Northeast corner. Someone went in.', notice:'Someone in a white dress went into the rows.' },
   { role:'retrieval', count:3, crop:'corn-roots', log:'A recovery team enters the northeast corner. Their lights move between the rows. No radio response.', notice:'Three recovery workers enter the northeast corner. Their lights move between the rows. No one answers the radio.' },

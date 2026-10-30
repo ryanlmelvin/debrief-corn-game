@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {createGame,startShift,advance,shoot,focusNext,enterField,restore,serialize} from '../docs/engine.js';
-import {sightingPeople,personLight,personExitTime,targetArtwork,watchNight,observedSighting} from '../docs/watch-story.js';
+import {sightingPromptReady,sightingPeople,personLight,personExitTime,targetArtwork,watchNight,observedSighting} from '../docs/watch-story.js';
 import {dialogArtwork} from '../docs/art.js';
 
 const watch=shift=>{const s=createGame('story',42);s.shift=shift;startShift(s);return s;};
@@ -66,4 +66,21 @@ test('testimony remembers only the lamp losses actually witnessed, including aft
   assert.deepEqual(later.lightsOut,[0,1]);
   assert.equal(observedSighting(restore(serialize(later))),'two recovery lights going out');
   for(const lightsOut of [[0,0],[3],'three'])assert.equal(restore(JSON.stringify({...later,lightsOut})),null);
+});
+
+test('each sighting gets five seconds of active observation before its prompt, including after resume',()=>{
+  for(const shift of [0,1,2]) {
+    const s=watch(shift);
+    advance(s,12.1);
+    assert.equal(s.incident,true);
+    assert.equal(sightingPromptReady(s),false);
+    advance(s,4.8);
+    assert.equal(sightingPromptReady(s),false);
+    const resumed=restore(serialize(s));
+    assert.equal(sightingPromptReady(resumed),false);
+    advance(resumed,.2);
+    assert.equal(sightingPromptReady(resumed),true);
+    resumed.phase='field';
+    assert.equal(sightingPromptReady(resumed),false);
+  }
 });

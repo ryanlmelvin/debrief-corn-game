@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import vm from 'node:vm';
+import { sightingPromptReady } from '../docs/watch-story.js';
 import { readFileSync } from 'node:fs';
 import { createGame, answer, advance, restore, serialize, getEnding, BRIEFINGS, enterField, inspect } from '../docs/engine.js';
 import { stepGuide, turnGuide, inspectGuide, focusGuide, fireGuide, spareGuide, guideWall, isGuideAftermath } from '../docs/guide.js';
@@ -47,7 +48,7 @@ test('shooting aftermath stays in the field with only the final order, including
     if(shots<3)spareGuide(s);
     const game=restore(serialize(s));assert.equal(isGuideAftermath(game),true);
     let archived=0,shown=0;const message={textContent:''};
-    const context=vm.createContext({game,lastModalKey:'',isGuideAftermath,getEnding,
+    const context=vm.createContext({game,sightingPromptReady,lastModalKey:'',isGuideAftermath,getEnding,
       archiveRun(){archived++;},$:id=>id==='aftermath-message'?message:{matches:()=>shown>0,showPopover(){shown++;}},
       showModal(){assert.fail('The field should remain visible.');}});
     vm.runInContext(scene+';sceneDialog();sceneDialog();',context);
