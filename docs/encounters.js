@@ -31,7 +31,7 @@ export const ENCOUNTERS=[
       choice('turn','Turn the light behind you.',4,'Only a bent stalk. It straightens very slowly, as though someone has just let go of it.','looked-back')
     ]},
   {id:'second-call',night:1,step:3,art:'radio',title:'It remembers the conversation.',
-    text:s=>has(s,'answered-radio')?'The radio is in the same furrow. It repeats the question you asked last time, in your voice. This time another voice answers from inside the corn.':'The radio is waiting in a dry furrow. It plays the sound of your boots leaving it behind. Then you hear those boots coming back.',
+    text:s=>has(s,'answered-radio')?'The radio is in the same furrow. It repeats the question you asked last time, in your voice: “Where am I?” This time another voice answers from inside the corn.':'The radio is waiting in a dry furrow. It plays the sound of your boots leaving it behind. Then you hear those boots coming back.',
     report:'The field radio played sounds from my previous investigation.',choices:[
       choice('disconnect','Disconnect the loose microphone.',0,'You unplug the microphone. The walking continues through the empty connector.'),
       choice('mislead','Give it a false direction.',3,'You tell it you are heading west. A whole row bends westward. You go the other way.','false-direction'),
