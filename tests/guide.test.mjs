@@ -32,6 +32,6 @@ test('guide saves reject corrupt state and retain exploration progress',()=>{
   for(const patch of [{x:99},{clues:['corner']},{team:[{}]},{stage:'unknown'},{fired:7}])assert.equal(restore(serialize({...s,guide:{...s.guide,...patch}})),null);
 });
 test('orders stay restrained, and every landmark has a new exhibit each night',()=>{
-  for(const b of BRIEFINGS)assert.deepEqual(b.orders,['Watch the corn. Shoot any that try to escape.','Remain in the watchtower.','Remember any irregularities for your debrief at the end of the night.']);
+  for(const b of BRIEFINGS)assert.deepEqual(b.orders,['Watch the corn. Shoot any that try to escape.','Remain in the watchtower.','Do not consume the crop.','Remember any irregularities for your debrief at the end of the night.']);
   for(const [x,y] of [[9,1],[3,3],[7,5]]){const exhibits=[];for(let shift=0;shift<3;shift++){const s=createGame();Object.assign(s,{phase:'decision',shift,incident:true});enterField(s);s.player={x,y};exhibits.push(inspect(s));}assert.equal(new Set(exhibits).size,3);}
 });

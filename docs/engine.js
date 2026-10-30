@@ -15,7 +15,7 @@ export const EVIDENCE = {
   glove: { title: 'Work glove', code: 'EXHIBIT 09', text: 'A glove lies beneath the pump tap. The fingers are packed with damp soil. The inside is still warm.', where: 'The pump house' },
   map: { title: 'Drainage survey', code: 'EXHIBIT 07', text: 'Old field boundaries, a creek, the next farm. Someone has drawn a ring around this station. The water does not respect it.', where: 'The drainage channel' }
 };
-const WATCH_ORDERS = ['Watch the corn. Shoot any that try to escape.', 'Remain in the watchtower.', 'Remember any irregularities for your debrief at the end of the night.'];
+const WATCH_ORDERS = ['Watch the corn. Shoot any that try to escape.', 'Remain in the watchtower.', 'Do not consume the crop.', 'Remember any irregularities for your debrief at the end of the night.'];
 export const BRIEFINGS = [
   { title: 'Watch the corn.', text: 'Your post overlooks an experimental crop outside ██████, Illinois. The night shift is quiet. Usually.', orders: WATCH_ORDERS, note: 'Your relief comes at the end of the night.' },
   { title: 'Watch the corn.', text: 'You have been reassigned to the same post. The previous report has been filed.', orders: WATCH_ORDERS, note: '' },
@@ -162,6 +162,15 @@ export function inspect(s) {
   addLog(s, 'Private observation saved. Open your notebook to read it.', 'story');
   return id;
 }
+export function canEatCrop(s) {
+  return s.phase === 'field' && nearbySite(s)?.id === 'pump' && s.inspected.includes('pump');
+}
+export function eatCrop(s) {
+  if (!canEatCrop(s)) return false;
+  addLog(s, 'You eat an ear from the pot in the pump house.', 'story');
+  finish(s, 'consumption');
+  return true;
+}
 export function investigationComplete(s) {
   return ['corner', 'pump', 'drain'].every(id => s.inspected.includes(id));
 }
@@ -251,6 +260,7 @@ function nextShift(s) {
   s.shift++; s.phase = 'briefing'; s.exposure = Math.max(0, s.exposure - 12);
 }
 export const ENDINGS = {
+  consumption: { code: '07', title: 'Nothing wasted.', stamp: 'SPECIMEN INGESTED', text: 'The first bite is sweet. You finish the ear before you notice the boiling has stopped. Something fine catches between your teeth. When you pull it free, the pain comes from beneath your tongue. Your radio calls you back to the tower. You try to answer, but your mouth is full of warm soil. Outside, the rows lean toward the pump house.', last: 'For the first time tonight, you are no longer hungry.' },
   witness: { code: '01', title: 'An unofficial record.', stamp: 'DISTRIBUTION UNAUTHORIZED', text: 'The photographs and application records reach someone outside the department. The field is closed pending an inquiry. For a week, no one calls you. Then a farmer three counties away sends a photograph of his drainage ditch.', last: 'You keep the original report.' },
   guide: { code: '02', title: 'You remember where.', stamp: 'RECOVERY PENDING', text: 'They follow you between the rows. You know each turn before you take it. Behind you, someone asks why the path is so warm. At the northeast corner, the corn makes room.', last: 'This makes three, sir.' },
   compliance: { code: '03', title: 'Within acceptable limits.', stamp: 'REPORT APPROVED', text: 'The corrections are filed. The next treatment is authorized. From the tower, the road looks narrower than it did yesterday. Your replacement asks if the corn has always grown on both sides.', last: 'You watch the corn grow.' },
