@@ -106,7 +106,7 @@ export class Renderer {
       }
       if(s.shift>0 && s.time>35 && s.time<44){c.save();c.globalAlpha=this.reduced ? .6 :Math.sin((s.time-35)/9*Math.PI)*.6;c.fillStyle=s.shift===2?'#b56554':'#bcc09a';c.font='17px Georgia';c.textAlign='center';c.fillText('Watch the corn. Shoot any that try to escape.',480,110);c.restore();}
       c.fillStyle='#ddd5ad';c.font='11px monospace';c.fillText(s.reload?'RELOADING':`${String(s.rounds).padStart(2,'0')} / ${String(s.reserve).padStart(2,'0')}   .22 RIFLE`,47,582);
-      c.textAlign='right';c.fillText('PERIMETER  /  KEEP CLEAR',913,582);
+
     }
     c.restore();
   }

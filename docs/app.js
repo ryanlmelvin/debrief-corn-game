@@ -62,7 +62,7 @@ function sceneDialog() {
   lastModalKey=key;
   if(game.phase==='briefing') {
     const b=BRIEFINGS[game.shift];
-    showModal('briefing',paper(b.title,`<p class="eyebrow">SHIFT ${game.shift+1} / ${DATES[game.shift]}, <span class="redacted-text">19XX</span></p><p>${esc(b.text).replaceAll('██████', REDACTED_TOWN)}</p><ol class="orders">${b.orders.map((o,i)=>`<li><span>0${i+1}</span>${o}</li>`).join('')}</ol><p class="note">${b.note}</p>${game.shift===0?'<p class="small">Click or tap to fire. <b>X</b> aims, <b>Space</b> fires, <b>R</b> reloads.</p>':''}<button class="primary" data-action="start">Take your post <span>↗</span></button>`, 'SHIFT ORDERS'));
+    showModal('briefing',paper(b.title,`<p class="eyebrow">SHIFT ${game.shift+1} / ${DATES[game.shift]}, <span class="redacted-text">19XX</span></p><p>${esc(b.text).replaceAll('██████', REDACTED_TOWN)}</p><ol class="orders">${b.orders.map((o,i)=>`<li><span>0${i+1}</span>${o}</li>`).join('')}</ol>${b.note?`<p class="note">${b.note}</p>`:''}${game.shift===0?'<p class="small">Click or tap to fire. <b>X</b> aims, <b>Space</b> fires, <b>R</b> reloads.</p>':''}<button class="primary" data-action="start">Take your post <span>↗</span></button>`, 'SHIFT ORDERS'));
   } else if(game.phase==='tower' && game.incident && !game.incidentPrompted) {
     game.incidentPrompted=true;
     showModal('sighting',paper('Movement in the field.', '<p>A human entered the field. Investigate now or after relief comes.</p><p class="small">Leaving now means any loose crops can cross the perimeter.</p><div class="paper-actions"><button class="primary" data-action="confirm-enter">Investigate now ↗</button><button class="secondary" data-action="close">Wait for relief</button></div>', 'FIELD OBSERVATION'));
@@ -86,9 +86,14 @@ function updateUI(force=false) {
   $('station-status').textContent=field?'RADIO SIGNAL WEAK':phase==='ending'?'FILE CLOSED':'PERIMETER ACTIVE';
   $('phase-label').textContent=field?'FIELD INVESTIGATION':phase==='debrief'?'RECORDED INTERVIEW':'WATCHTOWER';
   $('shift-number').textContent=`0${game.shift+1} / 03`;
-  $('objective').textContent=field?(site?.label||'Find your way through.'):phase==='decision'?'Your relief has arrived.':'Watch the corn.';
-  $('objective-detail').textContent=field?'Return to the watchtower when you are ready.':phase==='decision'?'Investigate the northeast corner, or submit your report.':'Shoot any that try to escape.';
+  $('objective').textContent=field?(site?.label||'Find your way through.'):'Watch the corn.';
+  $('objective-detail').textContent=field?'Return to the watchtower when you are ready.':'Shoot any that try to escape.';
   $('stats').innerHTML=field?stat('EXPOSURE',Math.floor(game.exposure),' / 100',game.exposure,game.exposure>=70)+stat('EXHIBITS',String(game.evidence.length).padStart(2,'0'),'retained'):stat('RELIEF IN',Math.max(0,Math.ceil(SHIFT_LENGTH-game.time)),'sec',(SHIFT_LENGTH-game.time)/SHIFT_LENGTH*100)+stat('BREACHES',game.breaches,'/ 6',game.breaches/6*100,game.breaches>=3);
+  $('tower-hud').hidden=!active;
+  $('hud-reload').disabled=paused||game.reload>0||game.rounds===6||game.reserve===0;
+  $('hud-reload').textContent=game.reload>0?'↻ Reloading…':'↻ Reload';
+  $('hud-reload').setAttribute('aria-label',`Reload rifle. ${game.rounds} rounds loaded, ${game.reserve} in reserve.`);
+  $('controls').hidden=active;
   $('evidence-count').textContent=String(game.evidence.length).padStart(2,'0');
   $('control-hint').textContent=field?'ARROWS / WASD TO MOVE · E TO INSPECT':active?'CLICK / TAP FIRE · R RELOAD':'STATION 04';
   canvas.setAttribute('aria-label',field?`Field survey. Your position is column ${game.player.x+1}, row ${game.player.y+1}. ${site?site.label+'. ':''}Gold page markers show tonight’s unread discoveries. Check marks show searched locations. Use arrow keys or WASD to move. E to inspect. Watchtower is column 2 row 8; pump house column 4 row 4; drainage channel column 8 row 6; northeast corner column 10 row 2.`:'Watchtower shooting gallery. Click moving corn to fire. X selects a crop. Space fires. R reloads.');
@@ -97,14 +102,9 @@ function updateUI(force=false) {
     lastControlsKey=controlKey;
     const focusedAction=$('controls').contains(document.activeElement)?document.activeElement.dataset.action:null;
     let html='';
-    if(active){
-      html=`<button class="half" data-action="reload" ${game.reload>0||game.rounds===6||game.reserve===0?'disabled':''}>${game.reload>0?'Reloading…':`Reload · ${game.rounds}/6`}</button><button class="half" data-action="focus">Find movement</button>`;
-      if(game.incident)html+='<button data-action="enter">Investigate now ↗</button>';
-
-    } else if(phase==='decision')html='<button class="primary" data-action="enter">Investigate the field ↗</button><button data-action="debrief">Remain / submit report</button>';
-    else if(field){
+    if(field){
       html='<div class="dpad" aria-label="Walk through the field"><button class="up" data-action="move" data-value="0,-1" aria-label="Move north">↑</button><button class="left" data-action="move" data-value="-1,0" aria-label="Move west">←</button><button class="down" data-action="move" data-value="0,1" aria-label="Move south">↓</button><button class="right" data-action="move" data-value="1,0" aria-label="Move east">→</button></div>';
-      if(site?.id==='tower')html+='<button class="primary" data-action="debrief">Return / submit report ↗</button>';
+      if(site?.id==='tower'){if(game.inspected.some(id=>['corner','pump','drain'].includes(id)))html+='<button class="primary" data-action="debrief">Return / submit report ↗</button>';}
       else if(site)html+=`<button class="primary" data-action="inspect" ${game.inspected.includes(site.id)?'disabled':''}>${game.inspected.includes(site.id)?'Location searched':'Inspect '+site.label.toLowerCase()}</button>`;
       else html+='<small>Walk to a marked location to inspect it. Each move costs exposure.</small>';
     }
@@ -149,7 +149,6 @@ function act(action,value) {
   if(action==='answer'){closeModal();answer(game,value);}
   if(action==='reload')reload(game);
   if(action==='focus'){const p=focusNext(game);if(p)renderer.pointer=p;else toast('No moving crops in view.');canvas.focus({preventScroll:true});}
-  if(action==='enter')enterField(game);
   if(action==='confirm-enter'){closeModal();enterField(game);canvas.focus({preventScroll:true});}
   if(action==='move'){const [dx,dy]=value.split(',').map(Number);move(game,dx,dy);}
   if(action==='inspect'){

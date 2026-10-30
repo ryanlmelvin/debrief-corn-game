@@ -18,7 +18,7 @@ export const EVIDENCE = {
 const WATCH_ORDERS = ['Watch the corn. Shoot any that try to escape.', 'Remain in the watchtower.', 'Remember any irregularities for your debrief at the end of the night.'];
 export const BRIEFINGS = [
   { title: 'Watch the corn.', text: 'Your post overlooks an experimental crop outside ██████, Illinois. The night shift is quiet. Usually.', orders: WATCH_ORDERS, note: 'Your relief comes at the end of the night.' },
-  { title: 'Watch the corn.', text: 'You have been reassigned to the same post. The previous report has been filed.', orders: WATCH_ORDERS, note: 'The tower key is where you left it.' },
+  { title: 'Watch the corn.', text: 'You have been reassigned to the same post. The previous report has been filed.', orders: WATCH_ORDERS, note: '' },
   { title: 'Watch the corn.', text: 'The wind has dropped. You are due at the tower before dark.', orders: WATCH_ORDERS, note: 'The lights on the neighboring farm went out at 18:40.' }
 ];
 
@@ -82,7 +82,7 @@ export function advance(s, dt) {
     }
     s.targets = s.targets.filter(t => !t.gone);
     if (s.breaches >= 6) finish(s, 'breach');
-    else if (s.time >= SHIFT_LENGTH) { s.phase = 'decision'; addLog(s, 'Relief has arrived. The northeast corner is quiet.', 'story'); }
+    else if (s.time >= SHIFT_LENGTH) { s.phase = 'decision'; addLog(s, 'Relief has arrived. You head into the field.', 'story'); enterField(s); }
   }
 }
 export function reload(s) {
@@ -159,8 +159,7 @@ export function inspect(s) {
   return id;
 }
 export function beginDebrief(s) {
-  if (s.phase === 'field' && nearbySite(s)?.id !== 'tower') return false;
-  if (!['field', 'decision'].includes(s.phase)) return false;
+  if (s.phase !== 'field' || nearbySite(s)?.id !== 'tower' || !s.inspected.some(id => ['corner', 'pump', 'drain'].includes(id))) return false;
   s.phase = 'debrief'; s.question = 0; return true;
 }
 export function getQuestion(s) {
@@ -280,6 +279,7 @@ export function restore(raw) {
       if (!Array.isArray(g.team) || g.team.length>3 || !g.team.every(t=>Number.isInteger(t.id)&&Number.isFinite(t.x)&&Number.isFinite(t.y)&&Number.isFinite(t.distance)&&['running','shot','escaped'].includes(t.status))) return null;
       if (g.stage==='escape' && (g.team.length!==3 || g.clues.length!==3)) return null;
     }
+    if (s.phase === 'decision') enterField(s);
     if (typeof s.runId !== 'string') s.runId = `legacy-${s.rng}`;
     // Older saves used discovery titles as log receipts, revealing them outside the exhibit.
     const oldReceipts = new Set(Object.values(EVIDENCE).map(e => `${e.title} entered in your private notebook.`));

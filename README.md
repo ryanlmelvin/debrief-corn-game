@@ -2,7 +2,7 @@
 
 A playable rural horror game based on **Debrief**, the short story by **Ryan L. Melvin**.
 
-Work three watchtower shifts. Shoot corn that tries to escape, distinguish human figures from moving crops, decide whether to leave your post, and choose what goes into the official debrief. Optional field investigations reveal evidence that changes your answers and available endings.
+Work three watchtower shifts. Shoot corn that tries to escape, distinguish human figures from moving crops, choose whether to investigate immediately or wait for relief, and choose what goes into the official debrief. Every completed watch leads into field investigation. Inspect at least one location and return to the tower for debrief; your evidence changes your answers and available endings.
 
 This is a first playable adaptation, with original additional scenes and six alternate outcomes. The source manuscript has not been copied into the project. The application records and environmental anomalies are fictional story elements.
 

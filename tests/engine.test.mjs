@@ -5,7 +5,7 @@ import { createGame,startShift,advance,shoot,reload,enterField,move,inspect,begi
 const watch=mode=>{const s=createGame(mode,42);startShift(s);return s;};
 function safeWatch(s){while(s.phase==='tower'){advance(s,.25);for(const t of [...s.targets]){if(t.kind!=='corn')continue;if(!s.rounds){reload(s);break;}shoot(s,t.x,t.y-34);}if(s.rounds<2)reload(s);}}
 function walkTo(s,x,y){while(s.phase==='field'&&s.player.x!==x)move(s,Math.sign(x-s.player.x),0);while(s.phase==='field'&&s.player.y!==y)move(s,0,Math.sign(y-s.player.y));}
-function report(s,choice='comply'){beginDebrief(s);answer(s,choice);answer(s,'evidence');answer(s,s.shift===2?'sign':'question');if(s.phase==='debrief'&&s.question===3)answer(s,'return');}
+function report(s,choice='comply'){if(s.phase==='field'&&!s.inspected.length){walkTo(s,3,3);inspect(s);walkTo(s,1,7);}beginDebrief(s);answer(s,choice);answer(s,'evidence');answer(s,s.shift===2?'sign':'question');if(s.phase==='debrief'&&s.question===3)answer(s,'return');}
 
 test('game starts with briefing, and a shift resets its supplies',()=>{const s=createGame();assert.equal(s.phase,'briefing');startShift(s);assert.equal(s.rounds,6);assert.equal(s.phase,'tower');assert.equal(startShift(s),false);});
 test('targets spawn deterministically from a seed',()=>{const a=watch(),b=watch();advance(a,8);advance(b,8);assert.deepEqual(a.targets,b.targets);assert.ok(a.targets.length);});
@@ -19,13 +19,13 @@ test('keyboard target selection excludes humans',()=>{const s=watch();advance(s,
 test('investigation is unavailable before the sighting',()=>{const s=watch();assert.equal(enterField(s),false);});
 test('abandoning the post counts remaining mobile crops as breaches',()=>{const s=watch();advance(s,13);const n=s.targets.filter(t=>t.kind==='corn').length;enterField(s);assert.equal(s.phase,'field');assert.equal(s.breaches,n);});
 test('six total breaches end the assignment',()=>{const s=watch();s.breaches=5;s.targets=[{id:1,kind:'corn',x:895,y:400,direction:1,speed:20,wobble:0}];advance(s,.1);assert.equal(s.phase,'ending');assert.equal(s.ending,'breach');});
-test('a defended watch reaches relief, which permits a safe departure',()=>{const s=watch();safeWatch(s);assert.equal(s.phase,'decision');assert.equal(s.breaches,0);enterField(s);assert.equal(s.breaches,0);assert.equal(s.phase,'field');});
-test('all three standard shifts are defendable with supplied ammunition',()=>{const s=watch();for(let i=0;i<3;i++){safeWatch(s);assert.equal(s.phase,'decision');assert.equal(s.breaches,0);report(s);if(s.phase==='briefing')startShift(s);}assert.equal(s.phase,'ending');});
+test('a defended watch automatically enters investigation at relief',()=>{const s=watch();safeWatch(s);assert.equal(s.phase,'field');assert.equal(s.breaches,0);enterField(s);assert.equal(s.breaches,0);assert.equal(s.phase,'field');});
+test('all three standard shifts are defendable with supplied ammunition',()=>{const s=watch();for(let i=0;i<3;i++){safeWatch(s);assert.equal(s.phase,'field');assert.equal(s.breaches,0);report(s);if(s.phase==='briefing')startShift(s);}assert.equal(s.phase,'ending');});
 test('movement is bounded, cardinal, and costs exposure',()=>{const s=watch();advance(s,13);enterField(s);assert.equal(move(s,-1,0),true);assert.equal(move(s,-1,0),false);assert.equal(move(s,1,1),false);assert.ok(s.exposure>0);});
 test('exhibits require reaching their location, and cannot be duplicated',()=>{const s=watch('story');safeWatch(s);enterField(s);assert.equal(inspect(s),null);walkTo(s,3,3);assert.equal(inspect(s),'ledger');assert.equal(inspect(s),null);assert.deepEqual(s.evidence,['ledger']);assert.equal(beginDebrief(s),false);walkTo(s,1,7);assert.equal(beginDebrief(s),true);});
 test('exposure ends the investigation at 100',()=>{const s=watch();advance(s,13);enterField(s);s.exposure=99.5;move(s,1,0);assert.equal(s.ending,'assimilation');});
 test('story mode lowers crop speed and exploration costs',()=>{const a=watch('standard'),b=watch('story');advance(a,4);advance(b,4);assert.ok(b.targets[0].speed<a.targets[0].speed);advance(a,9);advance(b,9);enterField(a);enterField(b);move(a,1,0);move(b,1,0);assert.ok(b.exposure<a.exposure);});
-test('debrief reports reflect actual findings',()=>{const s=watch();safeWatch(s);beginDebrief(s);answer(s,'truth');assert.match(getQuestion(s).options[0].label,/did not reach/);s.evidence.push('dress');assert.match(getQuestion(s).options[0].label,/white fabric/i);});
+test('debrief reports reflect actual findings',()=>{const s=watch();safeWatch(s);walkTo(s,3,3);inspect(s);walkTo(s,1,7);beginDebrief(s);answer(s,'truth');assert.match(getQuestion(s).options[0].label,/did not recover/);s.evidence.push('dress');assert.match(getQuestion(s).options[0].label,/white fabric/i);});
 test('invalid or locked responses cannot advance a debrief',()=>{const s=createGame();s.phase='debrief';s.shift=2;s.question=2;assert.equal(answer(s,'bogus'),false);assert.equal(answer(s,'expose'),false);assert.equal(s.question,2);});
 test('evidence ending requires both quantity and treatment evidence',()=>{const s=createGame();s.phase='debrief';s.shift=2;s.question=2;s.evidence=['dress','badge','teeth'];assert.equal(answer(s,'expose'),false);s.evidence.push('ledger');assert.equal(answer(s,'expose'),true);assert.equal(s.ending,'witness');});
 test('a full investigation route can retain treatment evidence and reach the witness ending',()=>{const s=watch();for(let i=0;i<3;i++){safeWatch(s);enterField(s);if(i===0){walkTo(s,3,3);inspect(s);}walkTo(s,9,1);inspect(s);walkTo(s,1,7);beginDebrief(s);answer(s,'truth');answer(s,'evidence');answer(s,i===2?'expose':'question');if(s.phase==='debrief'&&s.question===3)answer(s,'return');if(s.phase==='briefing')startShift(s);}assert.equal(s.ending,'witness');assert.ok(s.exposure<100);});
@@ -136,4 +136,20 @@ test('older saves replace exhibit-title receipts without losing evidence or othe
   assert.equal(resumed.log[0].message, 'Private observation saved. Open your notebook to read it.');
   assert.equal(resumed.log[0].at, 12);
   assert.deepEqual(resumed.log[1], s.log[1]);
+});
+
+
+test('every completed watch requires an inspection before debrief',()=>{
+  const s=watch();
+  assert.equal(beginDebrief(s),false);
+  safeWatch(s);
+  assert.equal(s.phase,'field');assert.equal(s.entered,true);
+  assert.equal(beginDebrief(s),false);
+  move(s,1,0);move(s,-1,0);assert.equal(beginDebrief(s),false);
+  walkTo(s,3,3);inspect(s);assert.equal(beginDebrief(s),false);
+  walkTo(s,1,7);assert.equal(beginDebrief(s),true);
+});
+test('old end-of-watch saves resume in the field without bypassing investigation',()=>{
+  const s=createGame();Object.assign(s,{phase:'decision',incident:true,time:SHIFT_LENGTH});
+  const resumed=restore(serialize(s));assert.equal(resumed.phase,'field');assert.equal(resumed.entered,true);assert.equal(beginDebrief(resumed),false);
 });
