@@ -3,7 +3,7 @@ import { stepGuide, turnGuide, inspectGuide, spareGuide, fireGuide, focusGuide, 
 import { createGame, startShift, advance, reload, shoot, focusNext, enterField, move, inspect, canEatCrop, eatCrop, nearbySite, investigationPressure, investigationComplete, beginDebrief, chooseFieldEncounter, continueFieldEncounter, getQuestion, getEnding, answer, serialize, restore, BRIEFINGS, EVIDENCE, ENDINGS, DATES, REPORT_DATES, SHIFT_LENGTH } from './engine.js';
 import { Renderer } from './renderer.js';
 import { FieldMap } from './field-ui.js';
-import { dialogArtwork, evidenceMount, notebookMarkup, encounterMarkup } from './art.js';
+import { dialogArtwork, evidenceMount, notebookMarkup, encounterMarkup, interviewRecord } from './art.js';
 import { GameAudio } from './audio.js';
 
 const $ = id => document.getElementById(id);
@@ -56,6 +56,7 @@ function showModal(kind,html) {
   dialog.dataset.kind=kind;
   const artwork=dialogArtwork(kind,game?.shift);
   if(artwork)$('dialog-content').querySelector('.paper')?.insertAdjacentHTML('afterbegin',artwork);
+  if(kind==='debrief')$('dialog-content').querySelector('.interview-scene')?.insertAdjacentHTML('beforeend',interviewRecord(game));
   if(!dialog.open)dialog.showModal();
   dialog.scrollTop=0;
   $('dialog-title')?.focus({preventScroll:true});
@@ -90,7 +91,7 @@ function sceneDialog() {
     save();
   } else if(game.phase==='debrief') {
     const q=getQuestion(game);
-    showModal('debrief',paper('For the record.',`<p class="eyebrow">${REPORT_DATES[game.shift]}, <span class="redacted-text">19XX</span></p>${game.question<3?`<span class="question-num" aria-label="Question ${game.question+1} of 3">${game.question+1} / 3</span>`:''}<p><strong>[SUPERVISOR]</strong><br>${esc(q.prompt)}</p><p class="note">${esc(q.context)}</p><div class="choices">${q.options.map(o=>`<button class="choice" data-action="answer" data-value="${o.id}" ${o.disabled?'disabled':''}>${esc(o.label)}${o.detail?`<small>${esc(o.detail)}</small>`:''}</button>`).join('')}</div>`, 'DEBRIEF TRANSCRIPT'));
+    showModal('debrief',paper('For the record.',`<p class="eyebrow">${REPORT_DATES[game.shift]}, <span class="redacted-text">19XX</span></p>${game.question<3?`<span class="question-num" aria-label="Question ${game.question+1} of 3">${game.question+1} / 3</span>`:''}<div class="interview-question"><span class="speaker-label">SUPERVISOR</span><p>${esc(q.prompt)}</p></div><p class="note">${esc(q.context)}</p><div class="choices" role="group" aria-label="Your response"><span class="speaker-label">YOUR RESPONSE</span>${q.options.map((o,i)=>`<button class="choice" data-action="answer" data-value="${o.id}" ${o.disabled?'disabled':''}><span class="response-key" aria-hidden="true">${String.fromCharCode(65+i)}</span><span>${esc(o.label)}${o.detail?`<small>${esc(o.detail)}</small>`:''}</span></button>`).join('')}</div>`, 'DEBRIEF TRANSCRIPT'));
   } else if(game.phase==='guide' && game.guide.steps === 0) {
     showModal('guide-intro',paper('Between the rows.', '<p>Three recovery personnel wait beneath the tower. You take the rifle. They take lamps.</p><p class="note">“You know the way,” one of them says.</p><p class="small"><b>W/S</b> or <b>↑/↓</b> walk · <b>A/D</b> or <b>←/→</b> turn · <b>E</b> examine.</p><button class="primary" data-action="close">Lead them in ↗</button>', 'RECOVERY DETAIL'));
   } else if(game.phase==='ending') {

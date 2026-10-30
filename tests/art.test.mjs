@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync, readdirSync } from 'node:fs';
 import { createGame, EVIDENCE } from '../docs/engine.js';
-import { notebookMarkup, SPECIMENS } from '../docs/art.js';
+import { notebookMarkup, interviewRecord, SPECIMENS } from '../docs/art.js';
 
 test('notebook exposes only discovered exhibits and clamps page navigation', () => {
   const game=createGame();
@@ -32,4 +32,18 @@ test('every exhibit has a distinct illustration and all art ships in the offline
   const worker=readFileSync(new URL('../docs/sw.js',import.meta.url),'utf8');
   for(const name of readdirSync(new URL('../docs/assets/',import.meta.url)).filter(n=>n.endsWith('.webp')))assert.ok(worker.includes(`'./assets/${name}'`),`${name} must work offline`);
   for(const name of ['art.js','art.css'])assert.ok(worker.includes(`'./${name}'`));
+});
+
+test('the interview tape shows only the latest completed answer from this shift', () => {
+  const game=createGame();
+  game.shift=1;
+  game.evidence=['dress','ledger'];
+  game.reports=[{shift:0,answer:'Previous night'}];
+  assert.match(interviewRecord(game),/No statement on record/);
+  assert.doesNotMatch(interviewRecord(game),/Previous night|White fabric|Application record/);
+  game.reports.push({shift:1,answer:'First answer'},{shift:1,answer:'<b>My statement & nothing else</b>'});
+  const html=interviewRecord(game);
+  assert.match(html,/02 \/ 03 RECORDED/);
+  assert.match(html,/&lt;b&gt;My statement &amp; nothing else&lt;\/b&gt;/);
+  assert.doesNotMatch(html,/First answer|Previous night|<b>/);
 });
