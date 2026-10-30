@@ -318,7 +318,7 @@ export class Renderer {
     if(brightness!==1)c.filter=`brightness(${brightness})`;
     c.drawImage(image,...art.source,...art.destination);c.restore();return true;
   }
-  drawRetrievalMember(member,phase,light=1,artwork=`retrieval-${member}`) {
+  drawRetrievalMember(member,phase,light=1,artwork=`retrieval-${member}`,walking=false) {
     const c=this.c,lean=this.reduced?0:Math.sin(phase*Math.PI*2)*.012;
     if(!this.drawSprite(artwork,lean,light?1.2:.48)) {
       const hazmat=artwork.startsWith('hazmat-');
@@ -336,6 +336,7 @@ export class Renderer {
     }
     if(light<=0)return;
     c.save();c.globalAlpha=light;
+    if(walking&&!this.reduced)c.translate(Math.sin(phase*Math.PI*2)*1.2,Math.cos(phase*Math.PI*2)*.6);
     // Lamp points and small groundward beams belong to the workers, under leaves.
     const glow=c.createRadialGradient(-17,-26,0,-17,-26,13);
     glow.addColorStop(0,'#e4d5a343');glow.addColorStop(1,'#e4d5a300');c.fillStyle=glow;c.fillRect(-30,-39,26,26);
@@ -432,21 +433,10 @@ export class Renderer {
     c.globalAlpha=this.guidePlateFrom?blend:1;
     this.drawGuidePlate(plate,zoom);c.globalAlpha=1;
     if(blend===1)this.guidePlateFrom=null;
-    for(const person of [...g.team].sort((a,b)=>Math.hypot(b.x-g.x,b.y-g.y)-Math.hypot(a.x-g.x,a.y-g.y))){
-      const p=projectGuide(g,person);if(!p||person.status==='escaped')continue;
-      const size=p.height/76;
-      c.save();c.translate(p.x,p.y+1);c.scale(1,.18);
-      const shadow=c.createRadialGradient(0,0,0,0,0,p.width*.65);shadow.addColorStop(0,'#050c08a0');shadow.addColorStop(1,'#050c0800');
-      c.fillStyle=shadow;c.fillRect(-p.width,-p.width,p.width*2,p.width*2);c.restore();
-      if(person.status==='shot') {
-        c.save();c.translate(p.x-p.height*.27,p.y);c.scale(size*.72,size*.22);c.rotate(Math.PI/2);
-        if(!this.drawSprite(`retrieval-${person.id-1}`,0,.55)){c.fillStyle='#74765c';c.fillRect(-10,-60,20,58);}
-        c.restore();continue;
-      }
-      c.save();c.translate(p.x,p.y-4*size);c.scale(size,size);
-      this.drawRetrievalMember(person.id-1,this.reduced?.35:g.time*.6+person.id,1);
-      c.restore();
-    }
+    const figures=g.team.filter(person=>person.status!=='escaped')
+      .map(person=>({person,p:projectGuide(g,person)})).filter(figure=>figure.p)
+      .sort((a,b)=>a.p.y-b.p.y);
+    for(const {person,p} of figures)this.drawGuideMember(person,p,g);
     if(g.stage==='escape'){
       if(!aftermath){
       const p=this.pointer;c.strokeStyle='#d6cfad';c.lineWidth=1;c.beginPath();c.arc(p.x,p.y,10,0,Math.PI*2);c.stroke();
@@ -454,6 +444,35 @@ export class Renderer {
       c.globalAlpha=this.reduced ? .8 :Math.max(0,Math.sin(g.time*.55-.8))*.85;
       c.fillStyle='#c65b4f';c.font='22px Georgia';c.textAlign='center';c.fillText('shoot any that try to escape.',480,112);c.globalAlpha=1;
       }
+    }
+    c.restore();
+  }
+  drawGuideMember(person,p,g) {
+    const c=this.c,size=p.height/76,center=p.spriteX??p.x;
+    c.save();
+    // Bodies keep their scale as the people cross the track. An irregular edge
+    // of the illustrated row conceals each person during the final steps.
+    if(p.concealment>0) {
+      const half=p.height*(person.id===3?32:36)/76/2;
+      const left=center-half,right=center+half;
+      const edge=p.exitSide<0?left+half*2*p.concealment:right-half*2*p.concealment;
+      const outer=p.exitSide<0?right+18:left-18;
+      const top=p.y-p.height-12,bottom=p.y+12;
+      c.beginPath();c.moveTo(outer,top);c.lineTo(edge,top);
+      for(let y=top;y<bottom;y+=9)c.lineTo(edge+Math.sin(y*.43+person.id)*3,y);
+      c.lineTo(edge,bottom);c.lineTo(outer,bottom);c.closePath();c.clip();
+    }
+    c.save();c.translate(center,p.y+1);c.scale(1,.18);
+    const shadow=c.createRadialGradient(0,0,0,0,0,(p.fullWidth||p.width)*.65);
+    shadow.addColorStop(0,'#050c08a0');shadow.addColorStop(1,'#050c0800');
+    c.fillStyle=shadow;c.fillRect(-p.height*.3,-p.height*.3,p.height*.6,p.height*.6);c.restore();
+    if(person.status==='shot') {
+      c.translate(center-p.height*.27,p.y);c.scale(size*.72,size*.22);c.rotate(Math.PI/2);
+      if(!this.drawSprite(`retrieval-${person.id-1}`,0,.55)){c.fillStyle='#74765c';c.fillRect(-10,-60,20,58);}
+    } else {
+      c.translate(center,p.y-4*size);c.scale(p.exitSide>0?-size:size,size);
+      const phase=this.reduced?.35:Number.isFinite(p.gait)?p.gait/(Math.PI*2):g.time*.6+person.id;
+      this.drawRetrievalMember(person.id-1,phase,1,`retrieval-${person.id-1}`,true);
     }
     c.restore();
   }

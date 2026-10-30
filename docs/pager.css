@@ -293,3 +293,5 @@
 #paper-dialog .choice .ending-requirement { display: inline-block; font-weight: bold; font-size: 11px; line-height: 1.45; }
 #paper-dialog .choice .requirement-met { color: #315426; }
 #paper-dialog .choice .requirement-unmet { color: #843d2b; }
+/* The final interview can change from the supervisor to a deputy. */
+#paper-dialog[data-kind="guide-debrief"] .interview-question .speaker-label { display: block; }

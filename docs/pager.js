@@ -41,7 +41,7 @@ export class DialogPager {
   prepare(article) {
     if (this.body) this.resize.unobserve(this.body);
     this.article = article;
-    this.decision = ['debrief', 'encounter', 'corn', 'sighting', 'confirm', 'guide-intro', 'evidence'].includes(this.dialog.dataset.kind);
+    this.decision = ['debrief', 'guide-debrief', 'encounter', 'corn', 'sighting', 'confirm', 'guide-intro', 'evidence'].includes(this.dialog.dataset.kind);
     article.classList.toggle('decision-sheet', this.decision);
     this.units = [];
     this.index = 0;
@@ -54,7 +54,7 @@ export class DialogPager {
     if (tag) { tag.classList.add('pager-tag'); heading.append(tag); }
     if (title) heading.append(title);
     let close = article.querySelector('.notebook-close');
-    if (!close && !['briefing', 'debrief', 'ending', 'encounter'].includes(this.dialog.dataset.kind)) {
+    if (!close && !['briefing', 'debrief', 'guide-debrief', 'ending', 'encounter'].includes(this.dialog.dataset.kind)) {
       close = document.createElement('button'); close.type = 'button';
       close.className = 'notebook-close'; close.dataset.action = 'close';
       close.textContent = '×'; close.setAttribute('aria-label', 'Close document');

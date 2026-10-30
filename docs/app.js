@@ -1,6 +1,6 @@
 import './image-viewer.js';
 import { watchNight, sightingPromptReady } from './watch-story.js';
-import { guideTravel, guideRouteStatus, inspectGuide, spareGuide, fireGuide, focusGuide, nearbyGuideSite, isGuideAftermath } from './guide.js';
+import { guideTravel, guideRouteStatus, inspectGuide, spareGuide, fireGuide, focusGuide, nearbyGuideSite, guideDebrief, answerGuideDebrief, isGuideAftermath } from './guide.js';
 import { createGame, startShift, advance, reload, shoot, focusNext, enterField, move, inspect, canEatCrop, eatCrop, nearbySite, investigationPressure, investigationComplete, beginDebrief, chooseFieldEncounter, continueFieldEncounter, getQuestion, getEnding, answer, serialize, restore, BRIEFINGS, EVIDENCE, ENDINGS, DATES, REPORT_DATES, SHIFT_LENGTH, COMPULSION_NOTICE } from './engine.js';
 import { Renderer, visibleGuideTarget } from './renderer.js';
 import { FieldMap } from './field-ui.js';
@@ -127,7 +127,7 @@ function begin(mode,fromSave=false) {
 function sceneDialog() {
   if(!game)return;
   const pending=game.fieldEvents.pending;
-  const key=`${game.phase}:${game.shift}:${game.question}:${game.ending}:${game.incident}:${sightingPromptReady(game)}:${pending?.id}:${pending?.choice}`;
+  const key=`${game.phase}:${game.shift}:${game.question}:${game.ending}:${game.incident}:${sightingPromptReady(game)}:${pending?.id}:${pending?.choice}:${game.guide?.stage}:${game.guide?.debriefQuestion}`;
   if(key===lastModalKey)return;
   lastModalKey=key;
   if(game.phase==='field'&&pending){showModal('encounter',encounterMarkup(game));save();return;}
@@ -141,6 +141,9 @@ function sceneDialog() {
   } else if(game.phase==='debrief') {
     const q=decisionQuestion(game);
     showModal('debrief',paper('For the record.',`<p class="eyebrow">${REPORT_DATES[game.shift]}, <span class="redacted-text">19XX</span></p>${game.question<3?`<span class="question-num" aria-label="Question ${game.question+1} of 3">${game.question+1} / 3</span>`:''}<div class="interview-question"><span class="speaker-label">SUPERVISOR</span><p>${esc(q.prompt)}</p></div><p class="note"><span class="decision-note-label">${esc(q.contextLabel)}</span> ${esc(q.context)}</p><div class="choices" role="group" aria-label="Your response"><span class="speaker-label">YOUR RESPONSE</span>${q.options.map((o,i)=>`<button class="choice" data-action="answer" data-value="${o.id}" ${o.disabled?'disabled':''}><span class="response-key" aria-hidden="true">${String.fromCharCode(65+i)}</span><span>${esc(o.label)}${o.detail?`<small>${esc(o.detail)}</small>`:''}${o.requirements?`<small class="ending-requirements">${o.requirements.map(r=>`<span class="ending-requirement ${r.met?'requirement-met':'requirement-unmet'}"><span aria-hidden="true">${r.met?'✓':'✗'}</span> <span class="sr-only">${r.met?'Met':'Unmet'}: </span>${esc(r.label)}${r.target>1?` ${r.current}/${r.target}`:''}</span>`).join('')}</small>`:''}</span></button>`).join('')}</div>`, 'DEBRIEF TRANSCRIPT'));
+  } else if(game.phase==='guide' && game.guide.stage==='debrief') {
+    const q=guideDebrief(game);
+    showModal('guide-debrief',paper('After the recovery.',`<p class="eyebrow">RECOVERY DETAIL / RECORDED INTERVIEW</p><span class="question-num" aria-label="Question ${game.guide.debriefQuestion+1} of 2">${game.guide.debriefQuestion+1} / 2</span><div class="interview-question"><span class="speaker-label">${esc(q.speaker||'SUPERVISOR')}</span><p>${esc(q.prompt)}</p></div><p class="note">${esc(q.context)}</p><div class="choices" role="group" aria-label="Your response"><span class="speaker-label">YOUR RESPONSE</span>${q.options.map((o,i)=>`<button class="choice" data-action="guide-answer" data-value="${o.id}"><span class="response-key" aria-hidden="true">${String.fromCharCode(65+i)}</span><span>${esc(o.label)}</span></button>`).join('')}</div>`, 'RECOVERY DEBRIEF'));
   } else if(game.phase==='guide' && game.guide.steps === 0) {
     showModal('guide-intro',paper('Between the rows.', '<p>Three recovery personnel wait beneath the tower. You take the rifle. They take lamps.</p><p class="note">“You know the way,” one of them says.</p><p class="small"><span class="touch-help">Tap Lead to follow the path. The team stops at each discovery so you can examine it.</span><span class="keyboard-help"><b>Space</b> or <b>W</b> leads onward or stops. The path turns for you. Press <b>E</b> to examine each discovery.</span></p><button class="primary" data-action="close">Lead them in ↗</button>', 'RECOVERY DETAIL'));
   } else if(game.phase==='ending') {
@@ -210,7 +213,7 @@ function updateUI(force=false) {
   $('pause').textContent=paused?'Resume':'Pause';
   fieldMap.render(game,paused);
   canvas.hidden=field;
-  $('guide-message').hidden=phase!=='guide'||paused;
+  $('guide-message').hidden=phase!=='guide'||game.guide?.stage==='debrief'||paused;
   if (phase === 'guide') updateGuideUI();
   if(aftermath){
     $('phase-label').textContent='RECOVERY DETAIL';
@@ -225,6 +228,12 @@ function updateUI(force=false) {
 }
 function updateGuideUI() {
   const g=game.guide, escaping=g.stage==='escape', route=guideRouteStatus(game);
+  if(g.stage==='debrief'){
+    $('phase-label').textContent='RECOVERY DEBRIEF';$('station-status').textContent='ON RECORD';
+    $('objective').textContent='Account for the team.';$('objective-detail').textContent='Your statement stays on tape.';
+    $('controls').innerHTML='';$('stats').hidden=true;return;
+  }
+  const committed=escaping&&g.fired>0;
   const stops=['First crossing','Central crossing','Northeast corner'];
   const destinations=['Lead to the first crossing','Continue to the central crossing','Lead to the northeast corner'];
   const examination=['Examine the boot print','Examine the radio','Search the bare earth'];
@@ -232,10 +241,10 @@ function updateGuideUI() {
   $('phase-label').textContent='RECOVERY DETAIL';
   $('station-status').textContent='RADIO SILENT';
   $('objective').textContent=escaping?'The team is leaving.':'Lead them through.';
-  $('objective-detail').textContent=escaping?'The road is behind you. The choice is yours.':'Your light leads. The team follows.';
+  $('objective-detail').textContent=escaping?(committed?'Your hands will not lower the rifle.':'The team is leaving for the road.'):'Your light leads. The team follows.';
   $('stats').innerHTML=escaping?stat('LIGHTS STILL MOVING',remaining,'/ 3')+stat('RIFLE',6-g.fired,'rounds'):stat('ROUTE SEARCHED',g.clues.length,'/ 3')+stat('FOLLOWING YOU',3,'people');
-  $('control-hint').textContent=escaping?'X AIM · SPACE FIRE · L LOWER RIFLE':'SPACE / W LEAD OR STOP · E EXAMINE';
-  const description=`Recovery team in the cornfield. ${g.message} ${escaping?'The team is in front of you, heading toward the road. X aims at a person; Space fires; L lowers your rifle and lets them leave.':`${stops[g.clues.length]}. Space or W leads onward or stops walking. The route turns automatically and stops at each discovery. E examines a discovery.`}`;
+  $('control-hint').textContent=escaping?(committed?'X AIM · SPACE FIRE':'X AIM · SPACE FIRE · L LOWER RIFLE'):'SPACE / W LEAD OR STOP · E EXAMINE';
+  const description=`Recovery team in the cornfield. ${g.message} ${escaping?`The team is moving toward cover. X aims at a person; Space fires. ${committed?'The order has taken over. You cannot lower the rifle.':'L lowers your rifle and lets them leave. Firing commits you to the order.'}`:`${stops[g.clues.length]}. Space or W leads onward or stops walking. The route turns automatically and stops at each discovery. E examines a discovery.`}`;
   if(canvas.getAttribute('aria-label')!==description)canvas.setAttribute('aria-label',description);
   if($('guide-message').textContent!==g.message)$('guide-message').textContent=g.message;
   const key=`guide:${paused}:${g.stage}:${g.clues.length}:${route?.walking}:${route?.ready}:${g.fired}:${remaining}:${revealing}`;
@@ -244,7 +253,7 @@ function updateGuideUI() {
     const focused=$('controls').contains(document.activeElement);
     const focusedAction=focused?document.activeElement.dataset.action:null;
     $('controls').innerHTML=escaping
-      ? `<div class="guide-deck guide-decision"><p class="guide-instruction">They are leaving for the road.</p><div class="guide-actions"><button data-action="guide-focus">Aim at next light</button><button data-action="guide-fire" ${g.fired>=6||revealing?'disabled':''}>Fire rifle</button><button class="primary" data-action="guide-spare" ${revealing?'disabled':''}>Lower rifle · let them leave</button></div><p class="guide-help">Tap a person to fire, or let the lights go.</p></div>`
+      ? `<div class="guide-deck guide-decision"><p class="guide-instruction">${committed?'Shoot any that try to escape.':'They are leaving for the road.'}</p><div class="guide-actions"><button data-action="guide-focus">Aim at next light</button><button data-action="guide-fire" ${g.fired>=6||revealing?'disabled':''}>Fire rifle</button>${committed?'':`<button class="primary" data-action="guide-spare" ${revealing?'disabled':''}>Lower rifle · let them leave</button>`}</div><p class="guide-help">${committed?'Your hands will not lower the rifle. Keep firing.':'Once you fire, the order will not let you stop.'}</p></div>`
       : `<div class="guide-deck"><ol class="guide-route" aria-label="Search route">${stops.map((label,i)=>`<li class="${i<g.clues.length?'searched':i===g.clues.length?'current':''}" ${i===g.clues.length?'aria-current="step"':''}><span>${i<g.clues.length?'✓':String(i+1).padStart(2,'0')}</span>${label}</li>`).join('')}</ol><div class="guide-progress" aria-hidden="true"><i></i></div><button class="${route.ready||!route.walking?'primary':'secondary'}" data-action="${route.ready?'guide-inspect':'guide-travel'}">${route.ready?examination[g.clues.length]:route.walking?'Stop here':destinations[g.clues.length]}</button><p class="guide-help">${route.ready?'The team waits while you examine the ground.':route.walking?'Your light follows the path. You can stop at any time.':'Follow the path. You stop at each discovery.'}</p></div>`;
     if(paused)$('controls').querySelectorAll('button').forEach(button=>button.disabled=true);
     if(focused)($('controls').querySelector(`[data-action="${focusedAction}"]`)||$('controls').querySelector('button'))?.focus({preventScroll:true});
@@ -256,6 +265,11 @@ function act(action,value) {
   if(action==='select-share-link'){const input=dialog.querySelector('.share-link');input?.focus();input?.select();return;}
   if(action==='share-ending'){if(game?.phase==='ending')shareDisposition(game.ending,getEnding(game).stamp);return;}
   if(action==='share-record'){const run=history.runs[Number(value)];if(run)shareDisposition(run.ending,run.stamp);return;}
+  if(action==='guide-answer'){
+    if(!game||game.phase!=='guide'||game.guide.stage!=='debrief'||modalKind!=='guide-debrief')return;
+    if(!answerGuideDebrief(game,value))return;
+    closeModal();lastModalKey='';save();updateUI(true);return;
+  }
   if(action.startsWith('guide-')&&(!game||game.phase!=='guide'||paused||dialog.open||menuOpen()))return;
   if(action==='encounter-choice') {
     if(!chooseFieldEncounter(game,value))return;
@@ -293,7 +307,7 @@ function act(action,value) {
   }
   if(action==='record-run') {
     const r=history.runs[Number(value)];if(!r)return;
-    showModal('record',paper(esc(r.title),`<p>${esc(r.text)}</p><p class="note">${esc(r.last)}</p><div class="transcript">${r.reports.map(t=>`<section><p class="eyebrow">SHIFT ${Number(t.shift)+1}</p><p>${esc(t.question)}</p><p><b>YOU</b> ${esc(t.answer)}</p>${t.supervisorReply?`<p class="note">SUPERVISOR: ${esc(t.supervisorReply)}</p>`:''}</section>`).join('')}</div><div class="paper-actions"><button class="secondary" data-action="share-record" data-value="${Number(value)}">Share ending ↗</button><button class="primary" data-action="records">Back to records</button><button class="secondary" data-action="close">Close</button></div>`,'PAST ASSIGNMENT'));return;
+    showModal('record',paper(esc(r.title),`<p>${esc(r.text)}</p><p class="note">${esc(r.last)}</p><div class="transcript">${r.reports.map(t=>`<section><p class="eyebrow">${t.kind==='recovery'?'RECOVERY DEBRIEF':`SHIFT ${Number(t.shift)+1}`}</p><p>${esc(t.question)}</p><p><b>YOU</b> ${esc(t.answer)}</p>${t.supervisorReply?`<p class="note">${esc(t.replySpeaker||'SUPERVISOR')}: ${esc(t.supervisorReply)}</p>`:''}</section>`).join('')}</div><div class="paper-actions"><button class="secondary" data-action="share-record" data-value="${Number(value)}">Share ending ↗</button><button class="primary" data-action="records">Back to records</button><button class="secondary" data-action="close">Close</button></div>`,'PAST ASSIGNMENT'));return;
   }
   if(action==='records'){$('records').click();return;}
   if(action==='guide-travel')guideTravel(game);
@@ -307,10 +321,10 @@ function act(action,value) {
       if(visibleGuideTarget(game.guide,target,renderer.view)){aim=p;break;}
     }
     if(aim)renderer.pointer=aim;
-    else {game.guide.focused=null;toast('The lights have moved beyond your sight. You can let them leave.');}
+    else {game.guide.focused=null;toast(game.guide.fired?'They have reached cover. Someone is calling for help.':'The lights have reached cover. You can let them leave.');}
   }
-  if(action==='guide-fire'){const t=game?.guide?.team.find(t=>t.id===game.guide.focused&&t.status==='running');const p=t&&visibleGuideTarget(game.guide,t,renderer.view);if(t&&!p){game.guide.focused=null;toast('The lights have moved beyond your sight. You can let them leave.');return;}if(p)renderer.pointer={x:p.x,y:p.y-p.height*.5};fire(renderer.pointer);}
-  if(action==='close'){closeModal();if(game&&['briefing','debrief','ending'].includes(game.phase)){lastModalKey='';updateUI(true);}return;}
+  if(action==='guide-fire'){const t=game?.guide?.team.find(t=>t.id===game.guide.focused&&t.status==='running');const p=t&&visibleGuideTarget(game.guide,t,renderer.view);if(t&&!p){game.guide.focused=null;toast(game.guide.fired?'They have reached cover. Someone is calling for help.':'The lights have reached cover. You can let them leave.');return;}if(p)renderer.pointer={x:p.x,y:p.y-p.height*.5};fire(renderer.pointer);}
+  if(action==='close'){closeModal();if(game&&(['briefing','debrief','ending'].includes(game.phase)||game.guide?.stage==='debrief')){lastModalKey='';updateUI(true);}return;}
   if(action==='start'){closeModal();startShift(game);canvas.focus({preventScroll:true});}
   if(action==='answer'){closeModal();answer(game,value);}
   if(action==='reload')reload(game);
@@ -338,7 +352,7 @@ $('new-game').addEventListener('click',()=>{
 $('resume').addEventListener('click',()=>begin(null,true));
 function togglePause(force) {if(!game||game.phase==='ending'||dialog.open)return;paused=typeof force==='boolean'?force:!paused;updateUI();save();syncAudio();}
 $('pause').addEventListener('click',()=>togglePause());$('unpause').addEventListener('click',()=>{togglePause(false);canvas.focus({preventScroll:true});});
-dialog.addEventListener('cancel',event=>{if(['briefing','debrief','ending','encounter'].includes(modalKind))event.preventDefault();else{event.preventDefault();closeModal();}});
+dialog.addEventListener('cancel',event=>{if(['briefing','debrief','guide-debrief','ending','encounter'].includes(modalKind))event.preventDefault();else{event.preventDefault();closeModal();}});
 $('manual').addEventListener('click',()=>showModal('manual',paper('The field manual.',`<ol class="orders"><li><span>01</span>Watch the corn. Shoot any that try to escape.</li><li><span>02</span>Remain in the watchtower.</li><li><span>03</span>Do not consume the crop.</li><li><span>04</span>Remember any irregularities for your debrief at the end of the night.</li></ol><button class="primary" data-action="close">Understood ↗</button>`)));
 
 $('about').addEventListener('click',()=>showModal('about',paper('About Debrief.', '<p>An interactive adaptation of the short story by Ryan L. Melvin.</p><p>Three shifts. About ten minutes. Headphones optional.</p><p class="small">Music: <a href="https://opengameart.org/content/lost-in-a-bad-place-horror-ambience-loop" target="_blank" rel="noopener">Lost in a Bad Place</a> by congusbongus · <a href="https://creativecommons.org/publicdomain/zero/1.0/" target="_blank" rel="noopener">CC0</a>.</p><p class="small">Field sounds (CC0): <a href="https://opengameart.org/content/crickets-ambient-noise-loopable" target="_blank" rel="noopener">crickets by Ted Kerr</a>; <a href="https://opengameart.org/content/random-sounds-samples" target="_blank" rel="noopener">footsteps and leaves by Brandon Morris</a>; <a href="https://opengameart.org/content/static" target="_blank" rel="noopener">radio static by xhunterko</a>.</p><p>The goal is to find your way through every possible ending. New endings added all the time.</p><p class="small">Your progress and records stay in this browser or app, on this device. Clearing site data deletes them; installation is not a backup.</p><button class="primary" data-action="close">Back ↗</button>', 'STATION 04')));
@@ -380,11 +394,11 @@ document.addEventListener('keydown',event=>{
     if(k===' '&&!['BUTTON','A'].includes(event.target.tagName)){event.preventDefault();const target=game.targets.find(t=>t.id===game.focused);if(target)renderer.pointer={x:target.x,y:target.y-34};fire(renderer.pointer);}
   }
   if(game.phase==='guide'){
-    if(event.repeat)return;
+    if(event.repeat||game.guide.stage==='debrief')return;
     const escaping=game.guide.stage==='escape';
     const actions=escaping?{x:['guide-focus'],' ':['guide-fire'],l:['guide-spare']}:{w:['guide-travel'],arrowup:['guide-travel'],e:['guide-inspect'],' ':[nearbyGuideSite(game)?'guide-inspect':'guide-travel']};
     if(!escaping&&['s','arrowdown'].includes(k)&&game.guide.walking){event.preventDefault();act('guide-travel');return;}
-    if(actions[k] && !(k===' ' && ['BUTTON','A'].includes(event.target.tagName))){event.preventDefault();act(...actions[k]);}
+    if(actions[k] && !(escaping&&k==='l'&&game.guide.fired>0) && !(k===' ' && ['BUTTON','A'].includes(event.target.tagName))){event.preventDefault();act(...actions[k]);}
   }
   if(game.phase==='field'){
     const directions={arrowup:'0,-1',w:'0,-1',arrowdown:'0,1',s:'0,1',arrowleft:'-1,0',a:'-1,0',arrowright:'1,0',d:'1,0'};
@@ -411,7 +425,7 @@ async function shareDisposition(ending,stamp) {
 }
 function exportRecord() {
   const e=getEnding(game);
-  const body=`DEBRIEF — PRIVATE TRANSCRIPT\nBased on the story by Ryan L. Melvin\n\n${e.title}\n${e.stamp}\n\n${e.text}\n${e.last}\n\nTESTIMONY\n\n${game.reports.map(r=>`SHIFT ${r.shift+1}\nQ: ${r.question}\nA: ${r.answer}${r.redacted?' [official wording]':''}${r.supervisorReply ? `\nSUPERVISOR: ${r.supervisorReply}` : ''}`).join('\n\n')}\n\nEXHIBITS\n\n${game.evidence.map(id=>`${EVIDENCE[id].title}\n${EVIDENCE[id].text}`).join('\n\n')}`;
+  const body=`DEBRIEF — PRIVATE TRANSCRIPT\nBased on the story by Ryan L. Melvin\n\n${e.title}\n${e.stamp}\n\n${e.text}\n${e.last}\n\nTESTIMONY\n\n${game.reports.map(r=>`${r.kind==='recovery'?'RECOVERY DEBRIEF':`SHIFT ${r.shift+1}`}\nQ: ${r.question}\nA: ${r.answer}${r.redacted?' [official wording]':''}${r.supervisorReply ? `\n${r.replySpeaker||'SUPERVISOR'}: ${r.supervisorReply}` : ''}`).join('\n\n')}\n\nEXHIBITS\n\n${game.evidence.map(id=>`${EVIDENCE[id].title}\n${EVIDENCE[id].text}`).join('\n\n')}`;
   const url=URL.createObjectURL(new Blob([body],{type:'text/plain;charset=utf-8'}));const a=document.createElement('a');a.href=url;a.download='debrief-private-transcript.txt';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
 }
 async function initAudio() {

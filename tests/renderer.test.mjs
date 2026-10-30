@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createGame, startShift, shoot, focusNext } from '../docs/engine.js';
 import { Renderer, cameraFor, targetProjection, aimProjection, updateGroundTracks, visibleGuideTarget } from '../docs/renderer.js';
-import { fireGuide, projectGuide } from '../docs/guide.js';
+import { startGuide, guideTravel, guideRouteStatus, inspectGuide, advanceGuide, fireGuide, projectGuide } from '../docs/guide.js';
 
 for (const [width,height] of [[390,844],[844,390],[1440,900]]) {
   test(`proportional camera and target taps at ${width} × ${height}`, () => {
@@ -99,4 +99,56 @@ test('distant guide figures have a 44px touch target without widening mouse aim'
   assert.equal(fireGuide(structuredClone(s),touch.x,touch.y),'person');
   const outside=Renderer.prototype.coords.call(renderer,{...event,clientX:event.clientX+3,pointerType:'touch'});
   assert.equal(fireGuide(structuredClone(s),outside.x,outside.y),'miss');
+});
+
+function departingTeam() {
+  const s=createGame();startGuide(s);
+  for(let stop=0;stop<3;stop++){
+    guideTravel(s);
+    while(!guideRouteStatus(s).ready)advanceGuide(s,.1);
+    inspectGuide(s);
+  }
+  advanceGuide(s,.7);
+  return s;
+}
+
+test('the departing team keeps a readable size while crossing into the rows', () => {
+  const s=departingTeam(),initial=s.guide.team.map(t=>projectGuide(s.guide,t));
+  for(const [width,height] of [[320,568],[390,844],[844,390],[1440,900]]) {
+    const view=cameraFor(width,height);
+    for(const person of s.guide.team)assert.ok(visibleGuideTarget(s.guide,person,view),'All three people start within the view.');
+  }
+  for(let second=0;second<20;second++) {
+    advanceGuide(s,1);
+    for(const person of s.guide.team) {
+      const p=projectGuide(s.guide,person);
+      assert.equal(p.height,initial[person.id-1].height,'Retreat never miniaturizes a worker.');
+      assert.ok(Math.abs(p.y-initial[person.id-1].y)<3,'Footsteps stay grounded instead of drifting toward a false horizon.');
+    }
+  }
+  assert.ok(projectGuide(s.guide,s.guide.team[0]).x<initial[0].x);
+  assert.ok(projectGuide(s.guide,s.guide.team[2]).x>initial[2].x);
+});
+
+test('guide pointer shots track the visible body, including when corn partly conceals it', () => {
+  for(const elapsed of [.7,12,22.5])for(const [width,height] of [[390,844],[844,390],[1440,900]]) {
+    const s=departingTeam();
+    for(let remaining=elapsed-.7;remaining>0;remaining-=1)advanceGuide(s,Math.min(1,remaining));
+    const view=cameraFor(width,height);
+    const renderer={scene:s,canvas:{getBoundingClientRect:()=>({left:0,top:0,width,height})}};
+    for(const person of s.guide.team) {
+      const p=visibleGuideTarget(s.guide,person,view);if(!p)continue;
+      const event={clientX:(p.x-view.left)*view.scale,clientY:(p.y-p.height*.5-view.top)*view.scale};
+      for(const pointerType of ['mouse','touch']){
+        const point=Renderer.prototype.coords.call(renderer,{...event,pointerType}),shot=structuredClone(s);
+        assert.equal(fireGuide(shot,point.x,point.y),'person');
+        assert.equal(shot.guide.team.find(t=>t.id===person.id).status,'shot','The selected visible person receives the shot.');
+      }
+      if(p.concealment>0){
+        const spriteWidth=p.height*(person.id===3?32:36)/76;
+        const visibleCenter=p.spriteX-p.exitSide*spriteWidth*p.concealment/2;
+        assert.ok(Math.abs(p.x-visibleCenter)<.001,'Assisted aim follows the exposed body, not the hidden center.');
+      }
+    }
+  }
 });

@@ -46,6 +46,7 @@ export function interviewRecord(game) {
 export function dialogArtwork(kind, shift = 0) {
   if (kind === 'debrief') return `<div class="interview-scene">${scenePlate('debrief')}<span class="recording-label"><i></i> REC / TAPE 0${shift + 1}</span></div>`;
   if (kind === 'guide-intro') return scenePlate('retrieval');
+  if (kind === 'guide-debrief') return scenePlate('debrief');
   if (['briefing', 'manual'].includes(kind)) return scenePlate('tower');
   if (kind === 'sighting') return scenePlate(shift === 2 ? 'hazmat' : shift === 1 ? 'retrieval' : 'sighting');
   if (['ending', 'records'].includes(kind)) return scenePlate('debrief');
@@ -71,7 +72,7 @@ export function notebookMarkup(game, requestedPage = 0) {
   const page = Math.max(0, Math.min(pages.length - 1, Number(requestedPage) || 0)), id = pages[page];
   let content;
   if (id === 'empty') content = `${scenePlate('tower')}`;
-  else if (id === 'testimony') content = `<h3>What went on record.</h3><div class="notebook-testimony">${game.reports.map(r => `<section><p class="eyebrow">SHIFT 0${r.shift + 1}</p><h4>${escape(r.question)}</h4><p>${r.redacted ? '<span class="withheld-note">Observation withheld</span> ' : ''}${escape(r.answer)}</p>${r.supervisorReply ? `<p class="pencil-note">Supervisor: ${escape(r.supervisorReply)}</p>` : ''}</section>`).join('')}</div>`;
+  else if (id === 'testimony') content = `<h3>What went on record.</h3><div class="notebook-testimony">${game.reports.map(r => `<section><p class="eyebrow">${r.kind==='recovery'?'RECOVERY DEBRIEF':`SHIFT 0${r.shift + 1}`}</p><h4>${escape(r.question)}</h4><p>${r.redacted ? '<span class="withheld-note">Observation withheld</span> ' : ''}${escape(r.answer)}</p>${r.supervisorReply ? `<p class="pencil-note">${escape(r.replySpeaker||'Supervisor')}: ${escape(r.supervisorReply)}</p>` : ''}</section>`).join('')}</div>`;
   else if(id==='encounters')content=`<h3>Between the rows.</h3><div class="notebook-encounters">${game.fieldEvents.journal.map(j=>{const e=encounterById(j.id),c=e.choices.find(c=>c.id===j.choice);return `<section><p class="eyebrow">NIGHT 0${e.night+1} · CROSSING ${j.x+1}, ${j.y+1}</p><h4>${escape(e.title)}</h4><p>${escape(e.report)}</p><p class="pencil-note">${escape(c.label)} ${escape(c.result)}</p></section>`;}).join('')}</div>`;
   else {
     const e = EVIDENCE[id];

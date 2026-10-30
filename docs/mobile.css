@@ -172,3 +172,10 @@ body[data-phase="guide"] .sidebar .controls { display: block; max-width: 520px; 
   .welcome .difficulty { flex-direction: column; align-items: flex-start; gap: 10px; font-size: 9px; margin-top: 28px; }
   .welcome .difficulty select { max-width: 100%; }
 }
+
+/* Keep the retreat visible between the statement and rifle controls. */
+@media (min-width: 900px) and (min-height: 501px) {
+  body[data-phase="guide"] .sidebar { display: grid; grid-template-columns: minmax(0, 440px) minmax(0, 380px); align-items: end; justify-content: space-between; gap: 24px; }
+  body[data-phase="guide"] .sidebar .controls { width: 100%; max-width: none; margin: 0; }
+  body[data-phase="guide"] .guide-message { max-width: none; margin: 0; }
+}
