@@ -1,8 +1,8 @@
 import { FIELD_SITES, investigationComplete, nearbySite } from './engine.js';
 import { FIELD_PATHS, fieldStepCost, planFieldRoute } from './field.js';
+import { FIELD_ART, landmarkDrawing } from './art.js';
 
 const descriptions={pump:'A light beneath the pump-house door.',corner:'Something pale at the edge of the field.',drain:'Water moving against the slope.',tower:'The ladder. The radio. A way out.'};
-const icons={pump:'⌂',corner:'◇',drain:'≈',tower:'⌁'};
 const percent=(n,size)=>`${(n+.5)/size*100}%`;
 const cost=n=>(Math.ceil(n*10)/10).toFixed(1);
 
@@ -14,10 +14,10 @@ export class FieldMap {
       <div class="field-board"><span class="field-north">N ↑</span><div class="field-map-surface">
         <svg viewBox="-.5 -.5 11 9" preserveAspectRatio="none" aria-hidden="true"><defs><pattern id="corn-rows" width="1" height="1" patternUnits="userSpaceOnUse"><path d="M.2 .15L.15 .8M.55 .15L.5 .8M.85 .15L.8 .8" stroke="#768352" stroke-opacity=".18" stroke-width=".025"/></pattern></defs><rect x="-.5" y="-.5" width="11" height="9" fill="url(#corn-rows)"/>
         ${FIELD_PATHS.map(points=>`<polyline points="${points.map(p=>p.join(',')).join(' ')}" class="field-path"/>`).join('')}<g id="field-footprints"></g><polyline id="field-route" class="field-route"/></svg>
-        ${FIELD_SITES.map(p=>`<button class="field-landmark" data-action="field-select" data-value="${p.id}" style="left:${percent(p.x,11)};top:${percent(p.y,9)}"><span class="field-site-icon" aria-hidden="true">${icons[p.id]}</span><span>${p.label}</span><small></small></button>`).join('')}
+        ${FIELD_SITES.map(p=>`<button class="field-landmark" data-action="field-select" data-value="${p.id}" style="left:${percent(p.x,11)};top:${percent(p.y,9)}"><span class="field-site-icon" aria-hidden="true">${landmarkDrawing(p.id)}</span><span>${p.label}</span><small></small></button>`).join('')}
         <span id="field-player" class="field-player" aria-hidden="true"></span>
       </div><span class="field-map-legend">Dotted paths: less exposure · Tap a landmark</span></div>
-      <section class="field-route-card" aria-label="Travel plan"><div class="field-destination"><div><span class="eyebrow" id="field-route-label">NEXT DISCOVERY</span><h3 id="field-destination"></h3></div><span id="field-step-count"></span></div><p id="field-route-note"></p>
+      <section class="field-route-card" aria-label="Travel plan"><img id="field-route-photo" class="field-route-photo" width="300" height="200" alt="" hidden><div class="field-destination"><div><span class="eyebrow" id="field-route-label">NEXT DISCOVERY</span><h3 id="field-destination"></h3></div><span id="field-step-count"></span></div><p id="field-route-note"></p>
         <div class="field-route-options" role="group" aria-label="Choose your route"><button data-action="field-style" data-value="quiet"><b>Follow paths</b><span id="field-quiet-cost"></span></button><button data-action="field-style" data-value="direct"><b>Cut through rows</b><span id="field-direct-cost"></span></button></div>
         <p id="field-risk" role="status"></p><button class="field-go" data-action="field-go"></button><button class="field-stop" data-action="field-stop" hidden>Stop walking</button>
       </section>`;
@@ -83,6 +83,9 @@ export class FieldMap {
     q('field-route').setAttribute('points',[s.player,...visibleSteps].map(p=>`${p.x},${p.y}`).join(' '));
     q('field-route-label').textContent=this.travel?'WALKING':site.id==='tower'?'RETURN ROUTE':s.inspected.includes(site.id)?'LOCATION SEARCHED':'NEXT DISCOVERY';
     q('field-destination').textContent=site.label;
+    const photo=q('field-route-photo'),art=FIELD_ART[site.id];
+    photo.hidden=site.id!=='tower'&&!s.inspected.includes(site.id);
+    if(!photo.hidden){const src=`./assets/${art.file}.webp`;if(photo.getAttribute('src')!==src)photo.setAttribute('src',src);photo.alt=art.alt;}
     q('field-step-count').textContent=here?'You are here':`${visibleSteps.length} steps`;
     q('field-route-note').textContent=this.travel?['The rows close behind your light.','Footsteps keep time on the other side of the row.','Your breathing comes back through the radio.'][s.shift]:descriptions[site.id];
     q('field-quiet-cost').textContent=`+${cost(quiet.exposure)} exposure · ~${Math.ceil(quiet.steps.length*.24)}s`;

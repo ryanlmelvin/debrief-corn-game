@@ -71,7 +71,7 @@ The game-rule tests cover ammunition, shooting, civilian encounters, timing, con
 | `docs/manifest.webmanifest` | Installable app metadata |
 | `DESIGN.md` | Adaptation choices and proposed next iteration |
 
-All visuals are drawn in code. Fonts use the system’s installed serif and monospace families. No font service, CDN, analytics, or external network call is used during play.
+The original landscape is drawn in code. Custom field photographs, nine specimen studies, notebook and survey textures, and station props are bundled locally in `docs/assets/`. The private notebook has an exhibit index and pages; discovered evidence keeps its own study and location image. The map uses a worn survey sheet and drawn landmarks, and briefings and interviews use illustrated station equipment. Asset prompts are recorded in `ASSET-PROMPTS.md`. Fonts use the system’s installed serif and monospace families. No font service, CDN, analytics, or external network call is used during play.
 
 ## Inspiration
 

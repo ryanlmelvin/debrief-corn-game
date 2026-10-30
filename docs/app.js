@@ -2,6 +2,7 @@ import { stepGuide, turnGuide, inspectGuide, spareGuide, fireGuide, focusGuide, 
 import { createGame, startShift, advance, reload, shoot, focusNext, enterField, move, inspect, canEatCrop, eatCrop, nearbySite, investigationUrge, investigationComplete, beginDebrief, getQuestion, getEnding, answer, serialize, restore, BRIEFINGS, EVIDENCE, ENDINGS, DATES, REPORT_DATES, SHIFT_LENGTH } from './engine.js';
 import { Renderer } from './renderer.js';
 import { FieldMap } from './field-ui.js';
+import { dialogArtwork, evidenceMount, notebookMarkup } from './art.js';
 
 const $ = id => document.getElementById(id);
 const canvas=$('field'), renderer=new Renderer(canvas), dialog=$('paper-dialog');
@@ -50,7 +51,11 @@ function paper(title,body,tag='PERSONNEL COPY',footer='DEPARTMENT OF AGRICULTURA
 function showModal(kind,html) {
   if(menuOpen())menu.hidePopover();
   modalKind=kind;$('dialog-content').innerHTML=html;
+  dialog.dataset.kind=kind;
+  const artwork=dialogArtwork(kind,game?.shift);
+  if(artwork)$('dialog-content').querySelector('.paper')?.insertAdjacentHTML('afterbegin',artwork);
   if(!dialog.open)dialog.showModal();
+  dialog.scrollTop=0;
   $('dialog-title')?.focus({preventScroll:true});
   syncAudio();
 }
@@ -156,6 +161,10 @@ function updateGuideUI() {
   if(paused)$('controls').querySelectorAll('button').forEach(button=>button.disabled=true);
 }
 function act(action,value) {
+  if(action==='notebook-page'){
+    if(game&&modalKind==='notebook')showModal('notebook',notebookMarkup(game,value));
+    return;
+  }
   if(action.startsWith('field-')) {
     if(!game||game.phase!=='field'||paused||dialog.open||menuOpen())return;
     if(action==='field-select')fieldMap.choose(game,value);
@@ -189,7 +198,7 @@ function act(action,value) {
   if(action==='eat-crop' && eatCrop(game))closeModal();
   if(action==='inspect'){
     const id=inspect(game);
-    if(id){const e=EVIDENCE[id];showModal('evidence',paper(e.title,`<p class="eyebrow">${e.code} / ${e.where.toUpperCase()}</p><p>${e.text}</p><p class="small">Retained in your private notebook. You decide what goes into the official record.</p>${canEatCrop(game)?'<button class="primary" data-action="corn">A pot is boiling on the stove. Look closer.</button>':''}<button class="primary" data-action="close">Close notebook ↗</button>`,'PRIVATE OBSERVATION'));}
+    if(id){const e=EVIDENCE[id];showModal('evidence',paper(e.title,`<p class="eyebrow">${e.code} / ${e.where.toUpperCase()}</p>${evidenceMount(id)}<p>${e.text}</p><p class="small">Retained in your private notebook. You decide what goes into the official record.</p>${canEatCrop(game)?'<button class="primary" data-action="corn">A pot is boiling on the stove. Look closer.</button>':''}<button class="primary" data-action="close">Close notebook ↗</button>`,'PRIVATE OBSERVATION'));}
   }
   if(action==='debrief')beginDebrief(game);
   if(action==='restart'){closeModal();begin(game.mode);return;}
@@ -209,10 +218,9 @@ dialog.addEventListener('cancel',event=>{if(['briefing','debrief','ending'].incl
 $('manual').addEventListener('click',()=>showModal('manual',paper('The field manual.',`<ol class="orders"><li><span>01</span>Watch the corn. Shoot any that try to escape.</li><li><span>02</span>Remain in the watchtower.</li><li><span>03</span>Do not consume the crop.</li><li><span>04</span>Remember any irregularities for your debrief at the end of the night.</li></ol><button class="primary" data-action="close">Understood ↗</button>`)));
 
 $('notebook').addEventListener('click',()=>{
-  const exhibits=game.evidence.map(id=>{const e=EVIDENCE[id];return `<section class="exhibit"><small>${e.code} / ${e.where.toUpperCase()}</small><h3>${e.title}</h3><p>${e.text}</p></section>`;}).join('');
-  const reports=game.reports.map(r=>`<p><b>SHIFT ${r.shift+1} / ${esc(r.question)}</b>${r.redacted?'<span class="redacted-text">OBSERVATION WITHHELD</span> ':''}${esc(r.answer)}${r.supervisorReply ? `<br><b>SUPERVISOR</b>${esc(r.supervisorReply)}` : ''}</p>`).join('');
-  showModal('notebook',paper('Your private record.',`<p class="small">These notes have not been reviewed by your supervisor.</p><div class="exhibits">${exhibits||'<p>No exhibits retained. The field may tell you more.</p>'}</div>${reports?`<h3>Previous testimony</h3><div class="transcript">${reports}</div>`:''}<button class="primary" data-action="close">Back to duty ↗</button>`,'DO NOT FILE'));
+  if(game)showModal('notebook',notebookMarkup(game,Math.max(0,game.evidence.length-1)));
 });
+
 canvas.addEventListener('pointermove',event=>{if(['tower','guide'].includes(game?.phase)){renderer.pointer=renderer.coords(event);game.focused=null;}});
 canvas.addEventListener('pointerdown',event=>{
   if(!game||paused||dialog.open||menuOpen())return;

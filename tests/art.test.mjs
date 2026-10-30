@@ -1,0 +1,35 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { readFileSync, readdirSync } from 'node:fs';
+import { createGame, EVIDENCE } from '../docs/engine.js';
+import { notebookMarkup, SPECIMENS } from '../docs/art.js';
+
+test('notebook exposes only discovered exhibits and clamps page navigation', () => {
+  const game=createGame();
+  assert.match(notebookMarkup(game), /pages are still empty/);
+  game.evidence=['dress','ledger'];
+  const first=notebookMarkup(game,-10), last=notebookMarkup(game,100);
+  assert.match(first,/Field sketch: White fabric/);
+  assert.match(last,/Field sketch: Application record/);
+  assert.doesNotMatch(first,/Field sketch: Application record/);
+  for(const [id,e] of Object.entries(EVIDENCE))if(!game.evidence.includes(id))assert.ok(!first.includes(e.title));
+  assert.match(last,/PAGE 02 \/ 02/);
+});
+
+test('testimony pages keep reported text inert and preserve withheld observations', () => {
+  const game=createGame();
+  game.reports=[{shift:0,question:'<img src=x onerror=alert(1)>',answer:'A & B',supervisorReply:'<script>bad</script>',redacted:true}];
+  const html=notebookMarkup(game);
+  assert.match(html,/Observation withheld/);
+  assert.match(html,/&lt;img src=x onerror=alert\(1\)&gt;/);
+  assert.match(html,/A &amp; B/);
+  assert.doesNotMatch(html,/<script>/);
+});
+
+test('every exhibit has a distinct illustration and all art ships in the offline cache', () => {
+  assert.deepEqual(Object.keys(SPECIMENS).sort(),Object.keys(EVIDENCE).sort());
+  assert.equal(new Set(Object.values(SPECIMENS).map(s=>s.cell)).size,9);
+  const worker=readFileSync(new URL('../docs/sw.js',import.meta.url),'utf8');
+  for(const name of readdirSync(new URL('../docs/assets/',import.meta.url)).filter(n=>n.endsWith('.webp')))assert.ok(worker.includes(`'./assets/${name}'`),`${name} must work offline`);
+  for(const name of ['art.js','art.css'])assert.ok(worker.includes(`'./${name}'`));
+});
