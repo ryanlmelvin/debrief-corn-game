@@ -1,10 +1,14 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { createGame,startShift,advance,shoot,reload,enterField,move,inspect,beginDebrief,answer,getQuestion,restore,serialize,SHIFT_LENGTH,focusNext,ENDINGS,EVIDENCE,investigationUrge,investigationPressure, canEatCrop, eatCrop } from '../docs/engine.js';
+import { createGame,startShift,advance,shoot,reload,enterField,move,inspect,beginDebrief,answer,getQuestion,restore,serialize,SHIFT_LENGTH,focusNext,ENDINGS,EVIDENCE,investigationUrge,investigationPressure, canEatCrop, eatCrop, chooseFieldEncounter, continueFieldEncounter } from '../docs/engine.js';
+
+import { currentEncounter } from '../docs/encounters.js';
+function settle(s){if(s.fieldEvents.pending){chooseFieldEncounter(s,currentEncounter(s).choices[0].id);continueFieldEncounter(s);}}
+function walkStep(s,dx,dy){settle(s);const result=move(s,dx,dy);settle(s);return result;}
 
 const watch=mode=>{const s=createGame(mode,42);startShift(s);return s;};
 function safeWatch(s,acknowledge=true){while(s.phase==='tower'){advance(s,.25);for(const t of [...s.targets]){if(t.kind!=='corn')continue;if(!s.rounds){reload(s);break;}shoot(s,t.x,t.y-34);}if(s.rounds<2)reload(s);}if(acknowledge&&s.phase==='decision')enterField(s);}
-function walkTo(s,x,y){while(s.phase==='field'&&s.player.x!==x)move(s,Math.sign(x-s.player.x),0);while(s.phase==='field'&&s.player.y!==y)move(s,0,Math.sign(y-s.player.y));}
+function walkTo(s,x,y){while(s.phase==='field'&&s.player.x!==x)walkStep(s,Math.sign(x-s.player.x),0);while(s.phase==='field'&&s.player.y!==y)walkStep(s,0,Math.sign(y-s.player.y));}
 function investigateAll(s){for(const [x,y] of [[3,3],[9,1],[7,5]]){walkTo(s,x,y);inspect(s);}walkTo(s,1,7);}
 function report(s,choice='comply'){if(s.phase==='field'&&!['corner','pump','drain'].every(id=>s.inspected.includes(id)))investigateAll(s);beginDebrief(s);answer(s,choice);answer(s,'evidence');answer(s,s.shift===2?'sign':'question');if(s.phase==='debrief'&&s.question===3)answer(s,'return');}
 

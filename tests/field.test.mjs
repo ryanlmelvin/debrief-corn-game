@@ -2,13 +2,16 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import vm from 'node:vm';
 import { readFileSync } from 'node:fs';
-import { createGame, move, inspect, FIELD_SITES, beginDebrief, answer, startShift, restore, serialize } from '../docs/engine.js';
+import { createGame, move, inspect, FIELD_SITES, beginDebrief, answer, startShift, restore, serialize, chooseFieldEncounter, continueFieldEncounter } from '../docs/engine.js';
 import { fieldStepCost, planFieldRoute } from '../docs/field.js';
 import { FieldMap } from '../docs/field-ui.js';
 
+import { currentEncounter } from '../docs/encounters.js';
+function settle(s){if(s.fieldEvents.pending){chooseFieldEncounter(s,currentEncounter(s).choices[0].id);continueFieldEncounter(s);}}
+
 const field=(mode='standard')=>({...createGame(mode,42),phase:'field',entered:true});
 const site=id=>FIELD_SITES.find(p=>p.id===id);
-function walk(s,route) { for(const p of route.steps)assert.equal(move(s,p.x-s.player.x,p.y-s.player.y),true); }
+function walk(s,route) { for(const p of route.steps){assert.equal(move(s,p.x-s.player.x,p.y-s.player.y),true);settle(s);} }
 function controller(selected='corner',style='quiet') { return Object.assign(Object.create(FieldMap.prototype),{selected,style,travel:null,lastKey:''}); }
 
 test('every route preview matches actual cardinal movement and exposure in both modes',()=>{
@@ -42,7 +45,7 @@ test('all site orders remain survivable across three nights with the suggested c
 });
 test('travel can stop mid-route, save, resume, and arrive exactly once without teleporting',()=>{
   let s=field();const c=controller();assert.equal(c.start(s),true);
-  let arrivals=0;const tick=()=>c.tick(s,.25,(dx,dy)=>move(s,dx,dy),()=>{arrivals++;inspect(s);});
+  let arrivals=0;const tick=()=>{c.tick(s,.4,(dx,dy)=>move(s,dx,dy),()=>{arrivals++;inspect(s);});if(s.fieldEvents.pending){settle(s);c.start(s);}};
   tick();assert.equal(s.fieldSteps,1);c.stop();const stopped=serialize(s);tick();assert.equal(serialize(s),stopped);
   s=restore(stopped);assert.ok(c.start(s));
   for(let i=0;i<30;i++)tick();
@@ -50,8 +53,8 @@ test('travel can stop mid-route, save, resume, and arrive exactly once without t
 });
 test('travel refuses a fatal route and clears when a step fails or the phase changes',()=>{
   const s=field(),c=controller();s.exposure=99;assert.equal(c.start(s),false);
-  s.exposure=0;assert.equal(c.start(s),true);c.tick(s,.25,()=>false,()=>assert.fail('must not arrive'));assert.equal(c.travel,null);
-  assert.equal(c.start(s),true);c.tick(s,.25,()=>{s.phase='ending';return true;},()=>assert.fail('must not arrive'));assert.equal(c.travel,null);
+  s.exposure=0;assert.equal(c.start(s),true);c.tick(s,.4,()=>false,()=>assert.fail('must not arrive'));assert.equal(c.travel,null);
+  assert.equal(c.start(s),true);c.tick(s,.4,()=>{s.phase='ending';return true;},()=>assert.fail('must not arrive'));assert.equal(c.travel,null);
   assert.equal(planFieldRoute(s,site('tower')),null);
   assert.equal(planFieldRoute(field(),{x:11,y:2}),null);assert.equal(planFieldRoute(field(),{x:1.2,y:2}),null);
 });

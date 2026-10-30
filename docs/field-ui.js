@@ -12,7 +12,7 @@ export class FieldMap {
     root.innerHTML=`<header class="field-heading"><div><p class="eyebrow" id="field-night"></p><h2 id="field-mission">Something is out here.</h2></div><div class="field-exposure"><span>EXPOSURE <b id="field-exposure-value"></b></span><div class="field-meter"><i id="field-exposure-fill"></i></div></div></header>
       <div class="field-board"><span class="field-north">N ↑</span><div class="field-map-surface">
         <svg viewBox="-.5 -.5 11 9" preserveAspectRatio="none" aria-hidden="true"><defs><pattern id="corn-rows" width="1" height="1" patternUnits="userSpaceOnUse"><path d="M.2 .15L.15 .8M.55 .15L.5 .8M.85 .15L.8 .8" stroke="#768352" stroke-opacity=".18" stroke-width=".025"/></pattern></defs><rect x="-.5" y="-.5" width="11" height="9" fill="url(#corn-rows)"/>
-        ${FIELD_PATHS.map(points=>`<polyline points="${points.map(p=>p.join(',')).join(' ')}" class="field-path"/>`).join('')}<g id="field-footprints"></g><polyline id="field-route" class="field-route"/></svg>
+        ${FIELD_PATHS.map(points=>`<polyline points="${points.map(p=>p.join(',')).join(' ')}" class="field-path"/>`).join('')}<g id="field-footprints"></g><polyline id="field-route" class="field-route"/><g id="field-traces"></g></svg>
         ${FIELD_SITES.map(p=>`<button class="field-landmark" data-action="field-select" data-value="${p.id}" style="left:${percent(p.x,11)};top:${percent(p.y,9)}"><span class="field-site-icon" aria-hidden="true">${landmarkDrawing(p.id)}</span><span>${p.label}</span><small></small></button>`).join('')}
         <span id="field-player" class="field-player" aria-hidden="true"></span>
       </div><span class="field-map-legend">Dotted paths: less exposure</span></div>
@@ -24,6 +24,7 @@ export class FieldMap {
   reset() { this.selected=null;this.travel=null;this.lastKey=''; }
   choose(s,id) {
     if(this.travel)return;
+    s.fieldEvents.journey=null;
     const site=FIELD_SITES.find(p=>p.id===id);if(site)this.selected=id;
     this.render(s);
   }
@@ -33,12 +34,13 @@ export class FieldMap {
   }
   route(s,style=this.style) { return planFieldRoute(s,FIELD_SITES.find(p=>p.id===this.selected),style); }
   start(s) {
-    if(this.travel)return false;
+    if(this.travel||s.fieldEvents.pending)return false;
     const route=this.route(s);
     if(!route||s.exposure+route.exposure>=100)return false;
-    this.travel={steps:[...route.steps],elapsed:0,interval:this.style==='direct'?.11:.24};this.lastKey='';return true;
+    s.fieldEvents.journey={destination:this.selected,style:this.style};
+    this.travel={steps:[...route.steps],elapsed:0,interval:this.style==='direct'?.22:.38};this.lastKey='';return true;
   }
-  stop() { this.travel=null;this.lastKey=''; }
+  stop(s) { this.travel=null;this.lastKey='';if(s)s.fieldEvents.journey=null; }
   tick(s,dt,step,arrive) {
     if(!this.travel)return;
     this.travel.elapsed+=dt;
@@ -46,15 +48,16 @@ export class FieldMap {
     this.travel.elapsed=0;
     const next=this.travel.steps.shift();
     if(next&&!step(next.x-s.player.x,next.y-s.player.y)){this.stop();return;}
-    if(s.phase!=='field'){this.stop();return;}
-    if(!this.travel.steps.length){this.stop();arrive();}
+    if(s.phase!=='field'||s.fieldEvents.pending){this.stop();return;}
+    if(!this.travel.steps.length){this.stop(s);arrive();}
   }
   render(s,paused=false) {
     const active=s.phase==='field';this.root.hidden=!active;
     if(!active){this.reset();return;}
+    if(!this.selected&&s.fieldEvents.journey){this.selected=s.fieldEvents.journey.destination;this.style=s.fieldEvents.journey.style;}
     if(!this.selected||(s.inspected.includes(this.selected)&&!this.travel&&this.lastInspected!==s.inspected.join(',')))this.selected=this.recommend(s);
     this.lastInspected=s.inspected.join(',');
-    const key=[s.shift,s.player.x,s.player.y,s.exposure,this.lastInspected,this.selected,this.style,!!this.travel,paused].join(':');
+    const key=[s.shift,s.player.x,s.player.y,s.exposure,this.lastInspected,this.selected,this.style,!!this.travel,paused,s.fieldEvents.journal.length].join(':');
     if(key===this.lastKey)return;this.lastKey=key;
     const q=id=>this.root.querySelector(`#${id}`), complete=investigationComplete(s),site=FIELD_SITES.find(p=>p.id===this.selected),quiet=this.route(s,'quiet'),direct=this.route(s,'direct'),here=nearbySite(s)?.id===site.id;
     const route=this.travel?{steps:this.travel.steps,exposure:this.travel.steps.reduce((total,p)=>total+fieldStepCost(s,p.x,p.y),0)}:this.route(s);
@@ -76,6 +79,7 @@ export class FieldMap {
     const player=q('field-player');player.style.left=percent(s.player.x,11);player.style.top=percent(s.player.y,9);
     player.classList.toggle('at-landmark',!!nearbySite(s));
     q('field-footprints').innerHTML=s.visited.filter(p=>typeof p==='string').map(p=>{const [x,y]=p.split(',').map(Number);return `<circle cx="${x}" cy="${y}" r=".06" fill="#c6b789" opacity=".5"/>`;}).join('');
+    q('field-traces').innerHTML=s.fieldEvents.journal.map(j=>`<path d="M${j.x-.12} ${j.y-.12}l.24 .24m0 -.24l-.24 .24" stroke="#803f2f" stroke-width=".065"/>`).join('');
     const visibleSteps=this.travel?this.travel.steps:route.steps;
     q('field-route').setAttribute('points',[s.player,...visibleSteps].map(p=>`${p.x},${p.y}`).join(' '));
     q('field-destination').textContent=site.label;
@@ -84,11 +88,11 @@ export class FieldMap {
     if(!photo.hidden){const src=`./assets/${art.file}.webp`;if(photo.getAttribute('src')!==src)photo.setAttribute('src',src);photo.alt=art.alt;}
     q('field-step-count').textContent=here?'You are here':`${visibleSteps.length} steps`;
     q('field-route-note').textContent=this.travel?['The rows close behind your light.','Footsteps keep time on the other side of the row.','Your breathing comes back through the radio.'][s.shift]:descriptions[site.id];
-    q('field-quiet-cost').textContent=`+${cost(quiet.exposure)} exposure · ~${Math.ceil(quiet.steps.length*.24)}s`;
-    q('field-direct-cost').textContent=`+${cost(direct.exposure)} exposure · ~${Math.ceil(direct.steps.length*.11)}s`;
+    q('field-quiet-cost').textContent=`Careful · +${cost(quiet.exposure)} exposure`;
+    q('field-direct-cost').textContent=`Quick · +${cost(direct.exposure)} exposure`;
     this.root.querySelectorAll('[data-action="field-style"]').forEach(b=>{b.setAttribute('aria-pressed',String(b.dataset.value===this.style));b.disabled=paused||!!this.travel;});
     this.root.querySelector('.field-route-options').hidden=here;
-    q('field-risk').textContent=fatal?'Route blocked: exposure would reach 100.':unsafeReturn?'Too much exposure to make it back.':site.id==='tower'&&!complete?'Search all three sites before debrief.':here?'':`On arrival: ${cost(s.exposure+route.exposure)} / 100 exposure`;
+    q('field-risk').textContent=fatal?'Route blocked: exposure would reach 100.':unsafeReturn?'Too much exposure to make it back.':site.id==='tower'&&!complete?'Search all three sites before debrief.':here?'':`Walking: ${cost(s.exposure+route.exposure)} / 100. Encounters may change exposure.`;
     q('field-risk').classList.toggle('risky',fatal||unsafeReturn);
     const go=this.root.querySelector('.field-go');go.hidden=!!this.travel;
     go.textContent=here?(site.id==='tower'?(complete?'Climb up & debrief ↗':'Choose a landmark'):site.id==='pump'&&s.inspected.includes('pump')?'Examine the boiling corn':'Inspect'):(site.id==='tower'?'Return to tower ↑':'Walk & investigate →');
