@@ -27,7 +27,7 @@ export function createGame(mode = 'standard', seed = Date.now()) {
   const s = { runId: String(seed), version: SAVE_VERSION, mode, rng: seed >>> 0 || 1, phase: 'briefing', shift: 0, time: 0,
     rounds: 6, reserve: 24, reload: 0, kills: 0, shots: 0, breaches: 0, exposure: 0,
     trust: 0, honesty: 0, evidence: [], reports: [], log: [], targets: [], nextSpawn: 3, nextId: 1,
-    incident: false, entered: false, searched: [], question: 0, ending: null, lastShot: null,
+    incident: false, entered: false, departure: null, searched: [], question: 0, ending: null, lastShot: null,
     player: { x: 1, y: 7 }, visited: ['1,7'], fieldSteps: 0, inspected: [], focused: null };
   return s;
 }
@@ -36,7 +36,7 @@ export function addLog(s, message, tone = 'normal') { s.log.unshift({ message, t
 export function startShift(s) {
   if (s.phase !== 'briefing') return false;
   Object.assign(s, { phase: 'tower', time: 0, rounds: 6, reserve: 24, reload: 0, targets: [], nextSpawn: 3,
-    incident: false, incidentPrompted: false, entered: false, question: 0, player: { x: 1, y: 7 }, visited: ['1,7'], fieldSteps: 0, inspected: [], focused: null, lastShot: null });
+    incident: false, incidentPrompted: false, entered: false, departure: null, question: 0, player: { x: 1, y: 7 }, visited: ['1,7'], fieldSteps: 0, inspected: [], focused: null, lastShot: null });
   addLog(s, `Station 04. Shift ${s.shift + 1}. Perimeter check complete.`);
   return true;
 }
@@ -71,7 +71,7 @@ export function advance(s, dt) {
       // A person crosses the field. Players must distinguish them from mobile crops.
       s.targets.push({ id: s.nextId++, x: 710, y: 331, direction: -1, speed: 9, kind: 'person', wobble: 0 });
       addLog(s, ['A white dress. Northeast corner. Someone went in.', 'A team light near the northeast corner. No radio response.', 'Three lights in the northeast. One by one, they go out.'][s.shift], 'story');
-      addLog(s, 'You may leave the tower to investigate, or remain at your post.', 'story');
+      addLog(s, 'Investigate. The thought arrives in your own voice. You can still remain at your post.', 'story');
     }
     for (const target of s.targets) {
       target.x += target.direction * target.speed * step;
@@ -83,12 +83,24 @@ export function advance(s, dt) {
     }
     s.targets = s.targets.filter(t => !t.gone);
     if (s.breaches >= 6) finish(s, 'breach');
-    else if (s.time >= SHIFT_LENGTH) { s.phase = 'decision'; addLog(s, 'Relief calls up from below. You are already on the ladder.', 'story'); enterField(s); }
+    else if (s.time >= SHIFT_LENGTH) {
+      // Relief ends containment duty, but the compulsion gets its own saved scene.
+      s.phase = 'decision'; s.departure = 'compelled'; s.targets = [];
+      addLog(s, 'You held your post until relief. The thought won anyway. Your body is going down the ladder.', 'story');
+    }
   }
 }
 export function investigationUrge(s) {
-  if (s.phase !== 'tower' || !s.incident) return 0;
-  return Math.max(0, Math.min(1, (s.time - 18) / (SHIFT_LENGTH - 19)));
+  if (s.phase !== 'tower' || !s.incident || s.time < 13) return 0;
+  return Math.min(1, .22 + .78 * (s.time - 13) / (SHIFT_LENGTH - 16));
+}
+export function investigationPressure(s) {
+  const strength = investigationUrge(s);
+  if (!strength) return null;
+  const stage = strength < .45 ? 0 : strength < .68 ? 1 : strength < .88 ? 2 : 3;
+  return { strength, stage,
+    thought: ['I should go down there.', 'I should go down there. I just thought that.', 'Something under the rows is thinking in my voice.', 'I am still saying no. My hands are letting go.'][stage],
+    echo: ['just a look', 'below the roots', 'it knows your name', 'you have been heard'][stage] };
 }
 export function reload(s) {
   if (s.phase !== 'tower' || s.reload > 0 || s.rounds === 6 || s.reserve <= 0) return false;
@@ -129,6 +141,7 @@ export function enterField(s) {
   }
   s.targets = [];
   if (s.breaches >= 6) { finish(s, 'breach'); return true; }
+  s.departure = s.phase === 'tower' ? 'chosen' : 'compelled';
   s.phase = 'field'; s.entered = true;
   s.searched.push(`shift-${s.shift}`);
   addLog(s, 'Choose a landmark. Follow the paths for lower exposure, or cut through the rows.', 'story');
@@ -192,17 +205,17 @@ export function getQuestion(s) {
   const found = s.evidence.includes(latest);
   const sighting = ['a figure in a white dress', 'a recovery team light', 'three lights going out'][s.shift];
   if (s.question === 0) return {
-    prompt: s.entered ? 'Your log shows you left the tower. What prompted you to investigate?' : 'Before we close the shift log, what did you observe in the northeast corner?',
-    context: `This interview concerns the watch you just completed. You saw ${sighting} near the northeast corner.`,
+    prompt: s.departure === 'compelled' ? 'Your relief says you went down the ladder without answering him. Why did you enter the field?' : s.entered ? 'Your log shows you left the tower. What prompted you to investigate?' : 'Before we close the shift log, what did you observe in the northeast corner?',
+    context: `This interview concerns the watch you just completed. You saw ${sighting} near the northeast corner.${s.departure === 'compelled' ? ' You waited for relief. The thought kept repeating until your body obeyed it.' : ''}`,
     options: [
-      { id: 'truth', label: s.entered ? `I saw ${sighting}. I went into the field to investigate.` : `I saw ${sighting}. I stayed at my post.`, detail: 'Put the sighting and your response on record.', honesty: 1, trust: -1 },
+      { id: 'truth', label: s.departure === 'compelled' ? `I saw ${sighting}. I tried to stay. I could not stop myself from going down.` : s.entered ? `I saw ${sighting}. I went into the field to investigate.` : `I saw ${sighting}. I stayed at my post.`, detail: 'Put the sighting and your response on record.', honesty: 1, trust: -1 },
       { id: 'comply', label: s.entered ? 'I was checking the perimeter, sir.' : 'Routine crop movement. Nothing further.', detail: 'Leave the sighting out of the official account.', honesty: -1, trust: 1 }
     ]
   };
   if (s.question === 1) {
     const followup = concealedSighting
       ? s.entered ? 'A perimeter check, then. Did you find anything that needs to go in the report?' : 'Routine movement. Did you see anything from the tower that would require a closer inspection?'
-      : s.entered ? 'You went in to investigate. What were you able to establish?' : 'You stayed in the tower. What could you establish from there?';
+      : s.departure === 'compelled' ? 'I will record that you went in to investigate. What were you able to establish?' : s.entered ? 'You went in to investigate. What were you able to establish?' : 'You stayed in the tower. What could you establish from there?';
     const background = ['We have no other report of anyone entering the field tonight.', 'The recovery team sent to that corner has not returned.', 'Another recovery team is overdue. We need to account for those lights.'][s.shift];
     return { prompt: `${followup} ${background}`,
       context: found ? `You recorded this in your private notebook: ${EVIDENCE[latest].text}` : s.entered ? 'You returned without an exhibit from the northeast corner. You can report that limit without inventing a finding.' : 'You did not search the corner. The sighting alone does not tell you what happened there.',
@@ -272,6 +285,7 @@ export const ENDINGS = {
 export function getEnding(s) {
   return s.ending === 'guide' && s.guide ? { ...ENDINGS.guide, ...guideDisposition(s) } : ENDINGS[s.ending];
 }
+
 function finish(s, ending) { s.phase = 'ending'; s.ending = ending; s.targets = []; }
 
 export function serialize(s) { return JSON.stringify(s); }
@@ -297,7 +311,10 @@ export function restore(raw) {
       if (!Array.isArray(g.team) || g.team.length>3 || !g.team.every(t=>Number.isInteger(t.id)&&Number.isFinite(t.x)&&Number.isFinite(t.y)&&Number.isFinite(t.distance)&&['running','shot','escaped'].includes(t.status))) return null;
       if (g.stage==='escape' && (g.team.length!==3 || g.clues.length!==3)) return null;
     }
-    if (s.phase === 'decision') enterField(s);
+    // Old end-of-watch saves also show the takeover before opening the map.
+    if (s.phase === 'decision') { s.departure = 'compelled'; s.incident = true; s.targets = []; }
+    else if (s.departure === undefined) s.departure = s.entered ? (s.time >= SHIFT_LENGTH ? 'compelled' : 'chosen') : null;
+    if (![null, 'chosen', 'compelled'].includes(s.departure)) return null;
     if (typeof s.runId !== 'string') s.runId = `legacy-${s.rng}`;
     // Older saves used discovery titles as log receipts, revealing them outside the exhibit.
     const oldReceipts = new Set(Object.values(EVIDENCE).map(e => `${e.title} entered in your private notebook.`));

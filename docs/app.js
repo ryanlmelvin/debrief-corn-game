@@ -1,5 +1,5 @@
 import { stepGuide, turnGuide, inspectGuide, spareGuide, fireGuide, focusGuide, nearbyGuideSite, projectGuide } from './guide.js';
-import { createGame, startShift, advance, reload, shoot, focusNext, enterField, move, inspect, canEatCrop, eatCrop, nearbySite, investigationUrge, investigationComplete, beginDebrief, getQuestion, getEnding, answer, serialize, restore, BRIEFINGS, EVIDENCE, ENDINGS, DATES, REPORT_DATES, SHIFT_LENGTH } from './engine.js';
+import { createGame, startShift, advance, reload, shoot, focusNext, enterField, move, inspect, canEatCrop, eatCrop, nearbySite, investigationPressure, investigationComplete, beginDebrief, getQuestion, getEnding, answer, serialize, restore, BRIEFINGS, EVIDENCE, ENDINGS, DATES, REPORT_DATES, SHIFT_LENGTH } from './engine.js';
 import { Renderer } from './renderer.js';
 import { FieldMap } from './field-ui.js';
 import { dialogArtwork, evidenceMount, notebookMarkup } from './art.js';
@@ -79,7 +79,10 @@ function sceneDialog() {
     showModal('briefing',paper(b.title,`<p class="eyebrow">SHIFT ${game.shift+1} / ${DATES[game.shift]}, <span class="redacted-text">19XX</span></p><p>${esc(b.text).replaceAll('██████', REDACTED_TOWN)}</p><ol class="orders">${b.orders.map((o,i)=>`<li><span>0${i+1}</span>${o}</li>`).join('')}</ol>${b.note?`<p class="note">${b.note}</p>`:''}${game.shift===0?'<p class="small">Click or tap to fire. <b>X</b> aims, <b>Space</b> fires, <b>R</b> reloads.</p>':''}<button class="primary" data-action="start">Take your post <span>↗</span></button>`, 'SHIFT ORDERS'));
   } else if(game.phase==='tower' && game.incident && !game.incidentPrompted) {
     game.incidentPrompted=true;
-    showModal('sighting',paper('Movement in the field.', '<p>A human entered the field. Investigate now or after relief comes.</p><p class="small">Leaving now means any loose crops can cross the perimeter.</p><div class="paper-actions"><button class="primary" data-action="confirm-enter">Investigate now ↗</button><button class="secondary" data-action="close">Wait for relief</button></div>', 'FIELD OBSERVATION'));
+    showModal('sighting',paper('Movement in the field.', '<p>Someone went into the rows. A thought follows, too quickly to feel like your own: <em>investigate.</em></p><p class="note">For a moment, you can feel the roots under the tower. Like fingers you have forgotten how to move.</p><p class="small">Leaving now means any loose crops can cross the perimeter.</p><div class="paper-actions"><button class="primary" data-action="confirm-enter">Follow the thought ↗</button><button class="secondary" data-action="close">Stay at my post</button></div>', 'FIELD OBSERVATION'));
+    save();
+  } else if(game.phase==='decision') {
+    showModal('compulsion',`<article class="compulsion-scene"><button id="dialog-update" class="secondary" data-update hidden>Update ready. Download?</button><p class="compulsion-time">RELIEF HAS ARRIVED / YOUR WATCH IS OVER</p><div class="compulsion-word" aria-hidden="true">investigate</div><h2 id="dialog-title" tabindex="-1">You did not decide to move.</h2><p>You held your post. You waited for relief.<br>The thought waited with you.</p><p>Now someone is calling up from below. You try to answer. Your mouth shapes a different word. Your hands lift the latch.</p><p class="compulsion-refusal">You tell yourself: <em>stay in the tower.</em><br>Your body starts down the ladder.</p><p>Below the soil, something vast loosens its grip. It no longer needs to pull. The thought has become the part of you that moves.</p><p class="compulsion-verdict">You kept the corn inside.<br>You could not keep it out of your head.</p><button class="primary" data-action="accept-compulsion">Your feet reach the soil <span>→</span></button></article>`);
     save();
   } else if(game.phase==='debrief') {
     const q=getQuestion(game);
@@ -104,11 +107,15 @@ function updateUI(force=false) {
   $('objective').textContent=field?(site?.label||'Find your way through.'):'Watch the corn.';
   $('objective-detail').textContent=field?(investigationComplete(game)?'Return to the watchtower.':'Follow the unread markers.'):'Shoot any that try to escape.';
   $('stats').innerHTML=field?stat('EXPOSURE',Math.floor(game.exposure),' / 100',game.exposure,game.exposure>=70)+stat('SEARCHED',['corner','pump','drain'].filter(id=>game.inspected.includes(id)).length,'/ 3'):stat('RELIEF IN',Math.max(0,Math.ceil(SHIFT_LENGTH-game.time)),'sec',(SHIFT_LENGTH-game.time)/SHIFT_LENGTH*100)+stat('BREACHES',game.breaches,'/ 6',game.breaches/6*100,game.breaches>=3);
-  const urge=investigationUrge(game);
-  $('investigate-urge').hidden=!active||urge<=0||paused;
-  $('investigate-urge').style.setProperty('--urge-opacity',String(.04+urge*.9));
-  $('investigate-urge').style.setProperty('--urge-size',`${26+urge*15}px`);
-  $('investigate-urge').style.setProperty('--urge-weight',String(400+Math.floor(urge*3)*100));
+  const pressure=investigationPressure(game), pressureLayer=$('investigation-pressure');
+  pressureLayer.hidden=!pressure||paused;
+  pressureLayer.classList.toggle('pressure-held',dialog.open||menuOpen());
+  if(pressure){
+    pressureLayer.dataset.stage=pressure.stage;
+    pressureLayer.style.setProperty('--pressure',String(pressure.strength));
+    if($('pressure-voice').textContent!==pressure.thought)$('pressure-voice').textContent=pressure.thought;
+    $('pressure-echo').textContent=pressure.echo;
+  }
   $('tower-hud').hidden=!active;
   $('hud-ammo').textContent=`${game.rounds} / ${game.reserve} · .22`;
   $('hud-reload').disabled=paused||game.reload>0||game.rounds===6||game.reserve===0;
@@ -187,12 +194,13 @@ function act(action,value) {
   if(action==='guide-spare')spareGuide(game);
   if(action==='guide-focus'){const p=focusGuide(game);if(p)renderer.pointer=p;}
   if(action==='guide-fire'){const t=game?.guide?.team.find(t=>t.id===game.guide.focused&&t.status==='running');const p=t&&projectGuide(game.guide,t);if(p)renderer.pointer={x:p.x,y:p.y-p.height*.5};fire(renderer.pointer);}
-  if(action==='close'){closeModal();if(game&&['briefing','debrief','ending'].includes(game.phase)){lastModalKey='';updateUI(true);}return;}
+  if(action==='close'){if(game?.phase==='decision'&&modalKind==='compulsion')return;closeModal();if(game&&['briefing','debrief','ending','decision'].includes(game.phase)){lastModalKey='';updateUI(true);}return;}
   if(action==='start'){closeModal();startShift(game);canvas.focus({preventScroll:true});}
   if(action==='answer'){closeModal();answer(game,value);}
   if(action==='reload')reload(game);
   if(action==='focus'){const p=focusNext(game);if(p)renderer.pointer=p;else toast('No moving crops in view.');canvas.focus({preventScroll:true});}
-  if(action==='confirm-enter'){closeModal();enterField(game);canvas.focus({preventScroll:true});}
+  if(action==='confirm-enter'&&game?.phase==='tower'&&!paused){closeModal();enterField(game);}
+  if(action==='accept-compulsion'&&game?.phase==='decision'){closeModal();enterField(game);}
   if(action==='move'){fieldMap.stop();const [dx,dy]=value.split(',').map(Number);move(game,dx,dy);}
   if(action==='corn' && canEatCrop(game))showModal('corn',paper('Something warm.',`<p>On a camping stove beside the treatment drums, ears of corn roll gently in a pot. A clean plate waits beside butter and a shaker of salt. The smell is sweet enough to make your stomach ache. You cannot remember when you last ate.</p><p>A notice above the stove reads: DO NOT CONSUME THE CROP.</p><div class="paper-actions"><button class="primary" data-action="eat-crop">Butter an ear. Take a bite.</button><button class="secondary" data-action="close">Leave it untouched.</button></div>`,'PUMP HOUSE'));
   if(action==='eat-crop' && eatCrop(game))closeModal();
@@ -205,6 +213,7 @@ function act(action,value) {
   if(action==='new-confirm'){closeModal();begin($('difficulty').value);return;}
   if(action==='export'){exportRecord();return;}
   save();updateUI(true);syncAudio();
+  if(['confirm-enter','accept-compulsion'].includes(action)&&game?.phase==='field')$('field-exploration').querySelector('.field-go')?.focus({preventScroll:true});
 }
 document.addEventListener('click',event=>{const button=event.target.closest('[data-action]');if(button&&!button.disabled)act(button.dataset.action,button.dataset.value);});
 $('new-game').addEventListener('click',()=>{
@@ -214,7 +223,7 @@ $('new-game').addEventListener('click',()=>{
 $('resume').addEventListener('click',()=>begin(null,true));
 function togglePause(force) {if(!game||dialog.open)return;paused=typeof force==='boolean'?force:!paused;updateUI();save();syncAudio();}
 $('pause').addEventListener('click',()=>togglePause());$('unpause').addEventListener('click',()=>{togglePause(false);canvas.focus({preventScroll:true});});
-dialog.addEventListener('cancel',event=>{if(['briefing','debrief','ending'].includes(modalKind))event.preventDefault();else{event.preventDefault();closeModal();}});
+dialog.addEventListener('cancel',event=>{if(['briefing','debrief','ending','compulsion'].includes(modalKind))event.preventDefault();else{event.preventDefault();closeModal();}});
 $('manual').addEventListener('click',()=>showModal('manual',paper('The field manual.',`<ol class="orders"><li><span>01</span>Watch the corn. Shoot any that try to escape.</li><li><span>02</span>Remain in the watchtower.</li><li><span>03</span>Do not consume the crop.</li><li><span>04</span>Remember any irregularities for your debrief at the end of the night.</li></ol><button class="primary" data-action="close">Understood ↗</button>`)));
 
 $('notebook').addEventListener('click',()=>{

@@ -53,7 +53,14 @@
 
           </div>
           <div id="pause-layer" class="pause-layer" hidden><p class="eyebrow">TRANSMISSION HELD</p><h2>Shift paused.</h2><p>Your post will be here.</p><button id="unpause" class="primary">Resume duty ↗</button></div>
-          <button id="investigate-urge" class="investigate-urge" data-action="confirm-enter" aria-label="Investigate the field now" hidden>investigate</button>
+          <div id="investigation-pressure" class="investigation-pressure" hidden>
+            <div class="pressure-roots" aria-hidden="true"></div>
+            <div class="pressure-echo" aria-hidden="true"><span id="pressure-echo">just a look</span><span>investigate</span></div>
+            <div class="pressure-thought">
+              <p id="pressure-voice" aria-live="polite"></p>
+              <button id="investigate-urge" class="investigate-urge" data-action="confirm-enter" aria-label="Give in and investigate the field now"><span>investigate</span></button>
+            </div>
+          </div>
           <div id="stats" class="stats"></div>
           <div id="tower-hud" class="tower-hud" hidden><span id="hud-ammo" aria-label="Rifle ammunition"></span><button id="hud-reload" data-action="reload" aria-label="Reload rifle">↻ Reload</button></div>
           <div id="scene-caption" class="scene-caption" hidden></div>
