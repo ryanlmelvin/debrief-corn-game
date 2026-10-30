@@ -1,11 +1,11 @@
 // Bump this version whenever a shipped asset changes. An active game keeps its
 // current worker; the new version activates after all old game tabs close.
-const VERSION = 'debrief-v27';
+const VERSION = 'debrief-v28';
 const DEVELOPMENT = ['localhost', '127.0.0.1', '[::1]'].includes(self.location.hostname);
 const SCOPE = new URL('./', self.location.href).pathname;
 const CACHE_PREFIX = `debrief:${SCOPE}:`;
 const CACHE = CACHE_PREFIX + VERSION;
-const FILES = ['./','./index.html','./style.css','./art.css','./field-kit.css','./art.js','./app.js','./engine.js','./field.js','./field-ui.js','./guide.js','./renderer.js','./manifest.webmanifest','./icons/icon.svg','./icons/icon-192.png','./icons/icon-512.png','./assets/debrief-desk.webp','./assets/field-corner.webp','./assets/field-drain.webp','./assets/field-pump.webp','./assets/field-sighting.webp','./assets/pump-stove.webp','./assets/notebook-paper.webp','./assets/specimen-studies.webp','./assets/station-kit.webp','./assets/survey-paper.webp'];
+const FILES = ['./','./index.html','./style.css','./art.css','./field-kit.css','./art.js','./app.js','./engine.js','./encounters.js','./field.js','./field-ui.js','./guide.js','./renderer.js','./manifest.webmanifest','./icons/icon.svg','./icons/icon-192.png','./icons/icon-512.png','./assets/encounter-radio.webp','./assets/encounter-tracks.webp','./assets/encounter-lantern.webp','./assets/debrief-desk.webp','./assets/field-corner.webp','./assets/field-drain.webp','./assets/field-pump.webp','./assets/field-sighting.webp','./assets/pump-stove.webp','./assets/notebook-paper.webp','./assets/specimen-studies.webp','./assets/station-kit.webp','./assets/survey-paper.webp'];
 self.addEventListener('install',event=>event.waitUntil((async()=>{
   const cache=await caches.open(CACHE);
   // A new worker must not populate its new cache with an older HTTP-cached build.

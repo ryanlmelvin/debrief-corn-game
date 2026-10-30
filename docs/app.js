@@ -1,8 +1,8 @@
 import { stepGuide, turnGuide, inspectGuide, spareGuide, fireGuide, focusGuide, nearbyGuideSite, projectGuide } from './guide.js';
-import { createGame, startShift, advance, reload, shoot, focusNext, enterField, move, inspect, canEatCrop, eatCrop, nearbySite, investigationPressure, investigationComplete, beginDebrief, getQuestion, getEnding, answer, serialize, restore, BRIEFINGS, EVIDENCE, ENDINGS, DATES, REPORT_DATES, SHIFT_LENGTH } from './engine.js';
+import { createGame, startShift, advance, reload, shoot, focusNext, enterField, move, inspect, canEatCrop, eatCrop, nearbySite, investigationPressure, investigationComplete, beginDebrief, chooseFieldEncounter, continueFieldEncounter, getQuestion, getEnding, answer, serialize, restore, BRIEFINGS, EVIDENCE, ENDINGS, DATES, REPORT_DATES, SHIFT_LENGTH } from './engine.js';
 import { Renderer } from './renderer.js';
 import { FieldMap } from './field-ui.js';
-import { dialogArtwork, evidenceMount, notebookMarkup } from './art.js';
+import { dialogArtwork, evidenceMount, notebookMarkup, encounterMarkup } from './art.js';
 
 const $ = id => document.getElementById(id);
 const canvas=$('field'), renderer=new Renderer(canvas), dialog=$('paper-dialog');
@@ -71,9 +71,11 @@ function begin(mode,fromSave=false) {
 }
 function sceneDialog() {
   if(!game)return;
-  const key=`${game.phase}:${game.shift}:${game.question}:${game.ending}:${game.incident}`;
+  const pending=game.fieldEvents.pending;
+  const key=`${game.phase}:${game.shift}:${game.question}:${game.ending}:${game.incident}:${pending?.id}:${pending?.choice}`;
   if(key===lastModalKey)return;
   lastModalKey=key;
+  if(game.phase==='field'&&pending){showModal('encounter',encounterMarkup(game));save();return;}
   if(game.phase==='briefing') {
     const b=BRIEFINGS[game.shift];
     showModal('briefing',paper(b.title,`<p class="eyebrow">SHIFT ${game.shift+1} / ${DATES[game.shift]}, <span class="redacted-text">19XX</span></p><p>${esc(b.text).replaceAll('██████', REDACTED_TOWN)}</p><ol class="orders">${b.orders.map((o,i)=>`<li><span>0${i+1}</span>${o}</li>`).join('')}</ol>${b.note?`<p class="note">${b.note}</p>`:''}${game.shift===0?'<p class="small">Click or tap to fire. <b>X</b> aims, <b>Space</b> fires, <b>R</b> reloads.</p>':''}<button class="primary" data-action="start">Take your post <span>↗</span></button>`, 'SHIFT ORDERS'));
@@ -168,6 +170,21 @@ function updateGuideUI() {
   if(paused)$('controls').querySelectorAll('button').forEach(button=>button.disabled=true);
 }
 function act(action,value) {
+  if(action==='encounter-choice') {
+    if(!chooseFieldEncounter(game,value))return;
+    if(game.phase==='ending')closeModal();
+    lastModalKey='';save();updateUI(true);return;
+  }
+  if(action==='encounter-continue'||action==='encounter-map') {
+    const journey=game.fieldEvents.journey;
+    if(!continueFieldEncounter(game))return;
+    closeModal();fieldMap.stop(game);
+    if(action==='encounter-continue'&&journey) {
+      fieldMap.choose(game,journey.destination);fieldMap.style=journey.style;
+      if(!fieldMap.start(game))toast('The walk is no longer safe. Choose a lower-exposure route.');
+    }
+    lastModalKey='';save();updateUI(true);return;
+  }
   if(action==='notebook-page'){
     if(game&&modalKind==='notebook')showModal('notebook',notebookMarkup(game,value));
     return;
@@ -176,7 +193,7 @@ function act(action,value) {
     if(!game||game.phase!=='field'||paused||dialog.open||menuOpen())return;
     if(action==='field-select')fieldMap.choose(game,value);
     if(action==='field-style'&&['quiet','direct'].includes(value)&&!fieldMap.travel)fieldMap.style=value;
-    if(action==='field-stop')fieldMap.stop();
+    if(action==='field-stop')fieldMap.stop(game);
     if(action==='field-go') {
       const site=nearbySite(game);
       if(site?.id===fieldMap.selected) {
@@ -201,7 +218,7 @@ function act(action,value) {
   if(action==='focus'){const p=focusNext(game);if(p)renderer.pointer=p;else toast('No moving crops in view.');canvas.focus({preventScroll:true});}
   if(action==='confirm-enter'&&game?.phase==='tower'&&!paused){closeModal();enterField(game);}
   if(action==='accept-compulsion'&&game?.phase==='decision'){closeModal();enterField(game);}
-  if(action==='move'){fieldMap.stop();const [dx,dy]=value.split(',').map(Number);move(game,dx,dy);}
+  if(action==='move'){fieldMap.stop(game);const [dx,dy]=value.split(',').map(Number);move(game,dx,dy);}
   if(action==='corn' && canEatCrop(game))showModal('corn',paper('Something warm.',`<p>On a camping stove beside the treatment drums, ears of corn roll gently in a pot. A clean plate waits beside butter and a shaker of salt. The smell is sweet enough to make your stomach ache. You cannot remember when you last ate.</p><p>A notice above the stove reads: DO NOT CONSUME THE CROP.</p><div class="paper-actions"><button class="primary" data-action="eat-crop">Butter an ear. Take a bite.</button><button class="secondary" data-action="close">Leave it untouched.</button></div>`,'PUMP HOUSE'));
   if(action==='eat-crop' && eatCrop(game))closeModal();
   if(action==='inspect'){
@@ -223,7 +240,7 @@ $('new-game').addEventListener('click',()=>{
 $('resume').addEventListener('click',()=>begin(null,true));
 function togglePause(force) {if(!game||dialog.open)return;paused=typeof force==='boolean'?force:!paused;updateUI();save();syncAudio();}
 $('pause').addEventListener('click',()=>togglePause());$('unpause').addEventListener('click',()=>{togglePause(false);canvas.focus({preventScroll:true});});
-dialog.addEventListener('cancel',event=>{if(['briefing','debrief','ending','compulsion'].includes(modalKind))event.preventDefault();else{event.preventDefault();closeModal();}});
+dialog.addEventListener('cancel',event=>{if(['briefing','debrief','ending','compulsion','encounter'].includes(modalKind))event.preventDefault();else{event.preventDefault();closeModal();}});
 $('manual').addEventListener('click',()=>showModal('manual',paper('The field manual.',`<ol class="orders"><li><span>01</span>Watch the corn. Shoot any that try to escape.</li><li><span>02</span>Remain in the watchtower.</li><li><span>03</span>Do not consume the crop.</li><li><span>04</span>Remember any irregularities for your debrief at the end of the night.</li></ol><button class="primary" data-action="close">Understood ↗</button>`)));
 
 $('notebook').addEventListener('click',()=>{
@@ -260,7 +277,7 @@ document.addEventListener('keydown',event=>{
   if(game.phase==='field'){
     const directions={arrowup:'0,-1',w:'0,-1',arrowdown:'0,1',s:'0,1',arrowleft:'-1,0',a:'-1,0',arrowright:'1,0',d:'1,0'};
     if(directions[k]){event.preventDefault();act('move',directions[k]);}
-    if(k==='e'){event.preventDefault();fieldMap.stop();act(nearbySite(game)?.id==='tower'?'debrief':'inspect');}
+    if(k==='e'){event.preventDefault();fieldMap.stop(game);act(nearbySite(game)?.id==='tower'?'debrief':'inspect');}
   }
 });
 document.addEventListener('visibilitychange',()=>{if(document.hidden){save();if(game&&!dialog.open)togglePause(true);audioContext?.suspend();}else syncAudio();});

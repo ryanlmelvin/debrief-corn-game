@@ -1,5 +1,6 @@
 import { startGuide, advanceGuide, guideDisposition } from './guide.js';
 import { fieldStepCost } from './field.js';
+import { freshFieldEvents, encounterAfterStep, resolveEncounter, dismissEncounter, migrateFieldEvents, validFieldEvents, encounterById } from './encounters.js';
 // All simulation and story state lives here. Rendering and storage are separate.
 export const SAVE_VERSION = 1;
 export const SHIFT_LENGTH = 55;
@@ -28,13 +29,14 @@ export function createGame(mode = 'standard', seed = Date.now()) {
     rounds: 6, reserve: 24, reload: 0, kills: 0, shots: 0, breaches: 0, exposure: 0,
     trust: 0, honesty: 0, evidence: [], reports: [], log: [], targets: [], nextSpawn: 3, nextId: 1,
     incident: false, entered: false, departure: null, searched: [], question: 0, ending: null, lastShot: null,
-    player: { x: 1, y: 7 }, visited: ['1,7'], fieldSteps: 0, inspected: [], focused: null };
+    player: { x: 1, y: 7 }, visited: ['1,7'], fieldSteps: 0, inspected: [], focused: null, fieldEvents: freshFieldEvents() };
   return s;
 }
 function random(s) { s.rng = (Math.imul(1664525, s.rng) + 1013904223) >>> 0; return s.rng / 4294967296; }
 export function addLog(s, message, tone = 'normal') { s.log.unshift({ message, tone, at: Math.floor(s.time) }); s.log = s.log.slice(0, 20); }
 export function startShift(s) {
   if (s.phase !== 'briefing') return false;
+  s.fieldEvents.pending=null;s.fieldEvents.journey=null;
   Object.assign(s, { phase: 'tower', time: 0, rounds: 6, reserve: 24, reload: 0, targets: [], nextSpawn: 3,
     incident: false, incidentPrompted: false, entered: false, departure: null, question: 0, player: { x: 1, y: 7 }, visited: ['1,7'], fieldSteps: 0, inspected: [], focused: null, lastShot: null });
   addLog(s, `Station 04. Shift ${s.shift + 1}. Perimeter check complete.`);
@@ -155,7 +157,7 @@ export const FIELD_SITES = [
 ];
 export function nearbySite(s) { return FIELD_SITES.find(p => p.x === s.player.x && p.y === s.player.y); }
 export function move(s, dx, dy) {
-  if (s.phase !== 'field' || Math.abs(dx) + Math.abs(dy) !== 1) return false;
+  if (s.phase !== 'field' || s.fieldEvents.pending || Math.abs(dx) + Math.abs(dy) !== 1) return false;
   const x = s.player.x + dx, y = s.player.y + dy;
   if (x < 0 || x > 10 || y < 0 || y > 8) return false;
   s.player = { x, y }; s.fieldSteps++;
@@ -164,10 +166,18 @@ export function move(s, dx, dy) {
   if (s.fieldSteps === 5) addLog(s, 'The rows close behind you. Nothing here smells like rain.', 'story');
   if (s.exposure >= 70 && !s.inspected.includes('warning')) { s.inspected.push('warning'); addLog(s, 'Your hands are cold. Return before exposure reaches 100.', 'alert'); }
   if (s.exposure >= 100) finish(s, 'assimilation');
+  else if(!nearbySite(s))encounterAfterStep(s);
   return true;
 }
+export function chooseFieldEncounter(s,id) {
+  if(!resolveEncounter(s,id))return false;
+  addLog(s,'An encounter between the rows is retained in your private notebook.','story');
+  if(s.exposure>=100)finish(s,'assimilation');
+  return true;
+}
+export function continueFieldEncounter(s) { return dismissEncounter(s); }
 export function inspect(s) {
-  if (s.phase !== 'field') return null;
+  if (s.phase !== 'field' || s.fieldEvents.pending) return null;
   const site = nearbySite(s);
   if (!site || site.id === 'tower' || s.inspected.includes(site.id)) return null;
   s.inspected.push(site.id);
@@ -177,7 +187,7 @@ export function inspect(s) {
   return id;
 }
 export function canEatCrop(s) {
-  return s.phase === 'field' && nearbySite(s)?.id === 'pump' && s.inspected.includes('pump');
+  return s.phase === 'field' && !s.fieldEvents.pending && nearbySite(s)?.id === 'pump' && s.inspected.includes('pump');
 }
 export function eatCrop(s) {
   if (!canEatCrop(s)) return false;
@@ -189,7 +199,8 @@ export function investigationComplete(s) {
   return ['corner', 'pump', 'drain'].every(id => s.inspected.includes(id));
 }
 export function beginDebrief(s) {
-  if (s.phase !== 'field' || nearbySite(s)?.id !== 'tower' || !investigationComplete(s)) return false;
+  if (s.phase !== 'field' || s.fieldEvents.pending || nearbySite(s)?.id !== 'tower' || !investigationComplete(s)) return false;
+  s.fieldEvents.journey=null;
   s.phase = 'debrief'; s.question = 0; return true;
 }
 export function getQuestion(s) {
@@ -213,6 +224,7 @@ export function getQuestion(s) {
     ]
   };
   if (s.question === 1) {
+    const fieldNote=s.fieldEvents.journal.find(j=>encounterById(j.id).night===s.shift);
     const followup = concealedSighting
       ? s.entered ? 'A perimeter check, then. Did you find anything that needs to go in the report?' : 'Routine movement. Did you see anything from the tower that would require a closer inspection?'
       : s.departure === 'compelled' ? 'I will record that you went in to investigate. What were you able to establish?' : s.entered ? 'You went in to investigate. What were you able to establish?' : 'You stayed in the tower. What could you establish from there?';
@@ -221,6 +233,7 @@ export function getQuestion(s) {
       context: found ? `You recorded this in your private notebook: ${EVIDENCE[latest].text}` : s.entered ? 'You returned without an exhibit from the northeast corner. You can report that limit without inventing a finding.' : 'You did not search the corner. The sighting alone does not tell you what happened there.',
       options: [
         { id: 'evidence', label: found ? ['I found white fabric in the corner. A stalk had grown through it.', 'I found a recovery team badge. Something shaped like an ear of corn was growing through the clip.', 'I found an ear of corn with teeth where the kernels should be.'][s.shift] : s.entered ? 'I cannot say what happened there. I did not recover anything from the corner.' : 'I cannot say. I did not reach the corner.', detail: found ? 'Add this finding to the report.' : 'Record the limits of your observation.', honesty: 1, trust: found ? -1 : 0 },
+        ...(fieldNote?[{id:'field-notes',label:encounterById(fieldNote.id).report,detail:'Put what happened between the landmarks on record.',honesty:1,trust:-1}]:[]),
         { id: 'redact', label: 'Nothing outside the expected growth pattern.', detail: 'Approve the routine-growth wording, without recording uncertainty or unusual findings.', honesty: -1, trust: 1 }
       ] };
   }
@@ -285,8 +298,7 @@ export const ENDINGS = {
 export function getEnding(s) {
   return s.ending === 'guide' && s.guide ? { ...ENDINGS.guide, ...guideDisposition(s) } : ENDINGS[s.ending];
 }
-
-function finish(s, ending) { s.phase = 'ending'; s.ending = ending; s.targets = []; }
+function finish(s, ending) { s.phase = 'ending'; s.ending = ending; s.targets = [];s.fieldEvents.pending=null;s.fieldEvents.journey=null; }
 
 export function serialize(s) { return JSON.stringify(s); }
 export function restore(raw) {
@@ -299,6 +311,8 @@ export function restore(raw) {
     for (const key of ['evidence','reports','log','targets','searched','visited','inspected']) if (!Array.isArray(s[key]) || s[key].length > 200) return null;
     if (!s.evidence.every(e => Object.hasOwn(EVIDENCE,e))) return null;
     if (!s.player || !Number.isInteger(s.player.x) || !Number.isInteger(s.player.y) || s.player.x < 0 || s.player.x > 10 || s.player.y < 0 || s.player.y > 8) return null;
+    migrateFieldEvents(s);
+    if(!validFieldEvents(s))return null;
     if (!s.targets.every(t => Number.isFinite(t.x) && Number.isFinite(t.y) && Number.isFinite(t.speed) && Number.isFinite(t.wobble) && [-1,1].includes(t.direction) && ['corn','person'].includes(t.kind))) return null;
     if (!s.log.every(l => typeof l.message === 'string') || !s.reports.every(r => typeof r.question === 'string' && typeof r.answer === 'string')) return null;
     if (s.phase === 'ending' && !Object.hasOwn(ENDINGS,s.ending)) return null;
