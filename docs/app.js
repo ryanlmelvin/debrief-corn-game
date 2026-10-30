@@ -35,7 +35,7 @@ $('records').addEventListener('click',()=>{
   archiveRun();
   const collection=Object.entries(ENDINGS).map(([id,e])=>`<li class="ending-slot ${history.collected.includes(id)?'collected':''}"><span>${e.code}</span> ${history.collected.includes(id)?esc(e.title):'Unrecorded'}</li>`).join('');
   const runs=history.runs.map(r=>`<details class="past-run"><summary>${esc(r.title)} · ${esc(new Date(r.date).toLocaleDateString())}</summary><p>${esc(r.text)}</p><p class="note">${esc(r.last)}</p>${r.reports.map(t=>`<p class="small"><b>SHIFT ${Number(t.shift)+1}</b><br>${esc(t.question)}<br>YOU: ${esc(t.answer)}${t.supervisorReply?`<br>SUPERVISOR: ${esc(t.supervisorReply)}`:''}</p>`).join('')}</details>`).join('');
-  showModal('records',paper('Your records.',`<p class="small">${history.collected.length} of 6 endings recorded on this device.</p><ol class="ending-collection">${collection}</ol>${runs||'<p class="small">No testimony on file.</p>'}<button class="primary" data-action="close">Close records ↗</button>`,'PRIVATE ARCHIVE'));
+  showModal('records',paper('Your records.',`<ol class="ending-collection">${collection}</ol>${runs}<button class="primary" data-action="close">Close records ↗</button>`,'PRIVATE ARCHIVE'));
 });
 let saved=readSave();
 $('resume').hidden=!saved;
@@ -46,8 +46,8 @@ function save() {
 }
 function toast(message) { $('toast').textContent=message;$('toast').hidden=false;clearTimeout(toastTimer);toastTimer=setTimeout(()=>$('toast').hidden=true,5000); }
 const REDACTED_TOWN = '<span class="censor-bar" role="img" aria-label="Town name redacted"></span>';
-function paper(title,body,tag='PERSONNEL COPY',footer='DEPARTMENT OF AGRICULTURAL CONTAINMENT') {
-  return `<article class="paper"><button id="dialog-update" class="secondary" data-update hidden>Update ready. Download?</button><div class="paper-top"><span>STATION 04 / ${REDACTED_TOWN}, ILLINOIS<br>RESTRICTED FIELD OPERATIONS</span><span>${tag}<br>FILE NO. 04–${game?String(game.shift+1).padStart(2,'0'):'00'}</span></div><h2 id="dialog-title" tabindex="-1">${title}</h2>${body}<div class="paper-footer"><span>${footer}</span><span>KEEP FOR YOUR RECORDS</span></div></article>`;
+function paper(title,body,tag='') {
+  return `<article class="paper"><button id="dialog-update" class="secondary" data-update hidden>Update ready. Download?</button>${tag?`<div class="paper-top"><span>STATION 04</span><span>${tag}</span></div>`:''}<h2 id="dialog-title" tabindex="-1">${title}</h2>${body}</article>`;
 }
 function showModal(kind,html) {
   if(menuOpen())menu.hidePopover();
@@ -89,13 +89,13 @@ function sceneDialog() {
     save();
   } else if(game.phase==='debrief') {
     const q=getQuestion(game);
-    showModal('debrief',paper('For the record.',`<p class="eyebrow">${REPORT_DATES[game.shift]}, <span class="redacted-text">19XX</span></p><span class="question-num">${game.question === 3 ? 'INTERVIEW CLOSED' : `QUESTION 0${game.question+1} / 03`}</span><p><strong>[SUPERVISOR]</strong><br>${esc(q.prompt)}</p><p class="note">${esc(q.context)}</p><div class="choices">${q.options.map(o=>`<button class="choice" data-action="answer" data-value="${o.id}" ${o.disabled?'disabled':''}>${esc(o.label)}${o.detail?`<small>${esc(o.detail)}</small>`:''}</button>`).join('')}</div>`, 'DEBRIEF TRANSCRIPT'));
+    showModal('debrief',paper('For the record.',`<p class="eyebrow">${REPORT_DATES[game.shift]}, <span class="redacted-text">19XX</span></p>${game.question<3?`<span class="question-num" aria-label="Question ${game.question+1} of 3">${game.question+1} / 3</span>`:''}<p><strong>[SUPERVISOR]</strong><br>${esc(q.prompt)}</p><p class="note">${esc(q.context)}</p><div class="choices">${q.options.map(o=>`<button class="choice" data-action="answer" data-value="${o.id}" ${o.disabled?'disabled':''}>${esc(o.label)}${o.detail?`<small>${esc(o.detail)}</small>`:''}</button>`).join('')}</div>`, 'DEBRIEF TRANSCRIPT'));
   } else if(game.phase==='guide' && game.guide.steps === 0) {
     showModal('guide-intro',paper('Between the rows.', '<p>Three recovery personnel wait beneath the tower. You take the rifle. They take lamps.</p><p class="note">“You know the way,” one of them says.</p><p class="small"><b>W/S</b> or <b>↑/↓</b> walk · <b>A/D</b> or <b>←/→</b> turn · <b>E</b> examine.</p><button class="primary" data-action="close">Lead them in ↗</button>', 'RECOVERY DETAIL'));
   } else if(game.phase==='ending') {
     archiveRun();
     const e=getEnding(game);
-    showModal('ending',paper(e.title,`<p class="eyebrow">ENDING ${e.code} / 06</p><p>${e.text}</p><p class="note">${e.last}</p><div class="stamp">${e.stamp}</div><div class="receipt-stats"><span>CROPS CONTAINED<strong>${game.kills}</strong></span><span>EXHIBITS RETAINED<strong>${game.evidence.length}</strong></span><span>PERIMETER BREACHES<strong>${game.breaches}</strong></span></div><p class="small">Based on <i>Debrief</i> by Ryan L. Melvin.</p><div class="paper-actions"><button class="primary" data-action="restart">Another assignment ↗</button><button class="secondary" data-action="export">Keep the transcript ↓</button><button class="secondary" data-action="records">View records · ${history.collected.length}/6</button></div>`, 'FINAL DISPOSITION'));
+    showModal('ending',paper(e.title,`<p class="eyebrow">ENDING ${e.code} / 06</p><p>${e.text}</p><p class="note">${e.last}</p><div class="stamp">${e.stamp}</div><div class="receipt-stats"><span>CROPS CONTAINED<strong>${game.kills}</strong></span><span>EXHIBITS RETAINED<strong>${game.evidence.length}</strong></span><span>PERIMETER BREACHES<strong>${game.breaches}</strong></span></div><div class="paper-actions"><button class="primary" data-action="restart">Another assignment ↗</button><button class="secondary" data-action="export">Keep the transcript ↓</button><button class="secondary" data-action="records">Records</button></div>`, 'FINAL DISPOSITION'));
   }
 }
 function stat(label,value,sub='',percent=null,warning=false) {return `<div class="stat ${warning?'warning':''}"><label>${label}</label><strong>${value}</strong><small> ${sub}</small>${percent!==null?`<div class="meter"><span style="width:${Math.min(100,Math.max(0,percent))}%"></span></div>`:''}</div>`;}
@@ -314,7 +314,6 @@ function refreshInstallGuide() {
 function showInstallGuide() {
   save();
   showModal('install',paper('Install on device.',`
-    <h3>1. Add Debrief to your device</h3>
     <p class="small" id="install-status" role="status"></p>
     <button class="primary" id="install-now" hidden>Install now ↗</button>
     <ul class="small">
@@ -323,10 +322,10 @@ function showInstallGuide() {
       <li><b>Computer:</b> Look for the install icon in the address bar or Install app in the browser menu. In Safari on Mac, use File → Add to Dock. If unavailable, try a browser that supports installation.</li>
     </ul>
     <p class="small">Open the new icon once online to prepare for offline play. Browsers and installed apps may keep separate saves.</p>
-    <h3>2. Protect local storage</h3>
-    <p class="small">Keep saves during automatic browser cleanup. Your browser may decide without a prompt.</p>
+    <h3>Protect saves</h3>
+    <p class="small">Keep saves during automatic browser cleanup.</p>
     <button id="protect-storage" class="secondary">Request persistent storage</button>
-    <p id="storage-status" class="small" role="status" aria-live="polite">Storage protection has not been checked.</p>
+    <p id="storage-status" class="small" role="status" aria-live="polite">Checking storage…</p>
     <p class="note"><b>Installation is not a backup.</b> Clearing this site’s data deletes saves even with storage protection. Private browsing may discard them when closed.</p>
     <button class="primary" data-action="close">Done ↗</button>`, 'DEVICE SETUP'));
   refreshInstallGuide();
@@ -346,7 +345,7 @@ function showInstallGuide() {
     status.textContent='Requesting storage protection…';
     try {
       const granted=await navigator.storage.persist();
-      status.textContent=granted ? 'Persistent storage is enabled.' : 'The browser did not grant persistent storage. You can keep playing; try again after installing and opening the app.';
+      status.textContent=granted ? 'Persistent storage is enabled.' : 'The browser did not grant persistent storage. Try from the installed app.';
       protect.textContent=granted ? 'Storage protected' : 'Try again';
       protect.disabled=granted;
     } catch {
@@ -362,7 +361,7 @@ function showInstallGuide() {
     try {
       await prompt.prompt();
       const choice=await prompt.userChoice;
-      if(modalKind==='install' && dialog.open)$('install-status').textContent=choice.outcome==='accepted' ? 'Installed. Open the new icon to play.' : 'Installation canceled. You can install later using your browser menu.';
+      if(modalKind==='install' && dialog.open)$('install-status').textContent=choice.outcome==='accepted' ? 'Installed. Open the new icon to play.' : 'Installation canceled.';
     } catch {
       if(modalKind==='install' && dialog.open)$('install-status').textContent='Installation could not start. Follow the browser steps below.';
     }

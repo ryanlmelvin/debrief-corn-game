@@ -6,14 +6,14 @@ import { notebookMarkup, SPECIMENS } from '../docs/art.js';
 
 test('notebook exposes only discovered exhibits and clamps page navigation', () => {
   const game=createGame();
-  assert.match(notebookMarkup(game), /pages are still empty/);
+  assert.match(notebookMarkup(game), /Unwritten/);
   game.evidence=['dress','ledger'];
   const first=notebookMarkup(game,-10), last=notebookMarkup(game,100);
   assert.match(first,/Field sketch: White fabric/);
   assert.match(last,/Field sketch: Application record/);
   assert.doesNotMatch(first,/Field sketch: Application record/);
   for(const [id,e] of Object.entries(EVIDENCE))if(!game.evidence.includes(id))assert.ok(!first.includes(e.title));
-  assert.match(last,/PAGE 02 \/ 02/);
+  assert.match(last,/02 \/ 02/);
 });
 
 test('testimony pages keep reported text inert and preserve withheld observations', () => {

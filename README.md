@@ -22,7 +22,7 @@ The game lasts roughly 8–15 minutes, depending on reading and exploration. **S
 | --- | --- | --- |
 | Fire | Click or tap a moving crop | X selects a crop; Space fires |
 | Reload | Reload button | R |
-| Travel | Tap a landmark, choose a route, then Walk & investigate | Tab between destinations; arrows/WASD for individual steps |
+| Travel | Tap a landmark, choose a route, then Walk | Tab between destinations; arrows/WASD for individual steps |
 | Inspect | Opens automatically on arrival | E |
 | Pause | Pause button | P or Escape |
 

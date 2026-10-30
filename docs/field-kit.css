@@ -160,9 +160,7 @@ button:disabled { cursor: default; }
 /* Map labels become pencilled annotations, not little interface cards. */
 body[data-phase="field"] .viewport { background-image: var(--cloth-grain); background-size: 700px 1050px; }
 .field-board { border: 0; border-radius: 0; box-shadow: 2px 3px #090f0a88; }
-.field-progress { gap: 7px 16px; }
-.field-progress span, .field-progress .done { border: 0; background: transparent; padding: 2px 0 4px; border-bottom: 1px dashed #79836666; }
-.field-progress .done { color: #c8bd88; border-bottom-color: #a89767; }
+
 .field-exposure { font-family: 'Courier New', monospace; }
 .field-meter { height: 5px; border-top: 1px dashed #b2aa78; background: #a9ad8517; }
 .field-meter i { background: repeating-linear-gradient(110deg,#b4aa78 0 5px,#c6bd8f 6px 7px); }
@@ -182,7 +180,7 @@ body[data-phase="field"] .viewport { background-image: var(--cloth-grain); backg
   border: 2px solid #89523bcc; border-radius: 48% 44% 52% 46%; transform: rotate(-8deg);
 }
 .field-landmark.selected .field-site-icon { color: #704631; }
-.field-map-legend { border-top: 1px dashed #737c56; font-family: 'Courier New',monospace; background: #c8c6a5c9; }
+
 .field-north { border: 0; border-bottom: 1px solid #4a583c88; transform: rotate(-3deg); }
 .field-player { border-width: 2px; box-shadow: 0 0 0 2px #e4d8ab,0 0 0 3px #7d573e; }
 .field-route-card {
@@ -213,7 +211,7 @@ body[data-phase="field"] .viewport { background-image: var(--cloth-grain); backg
 /* Paperwork uses blanks and check marks, without stacked choice cards. */
 .paper { background-image: linear-gradient(#e1ddbf9c,#d2cdac8c),var(--paper-grain); }
 .paper-top { border-bottom: 3px double #6e7957; font-family: 'Courier New',monospace; color: #546345; }
-.paper-footer { border-top: 1px dashed #7d8665; font-family: 'Courier New',monospace; }
+
 .paper .choice, dialog[data-kind="debrief"] .choice, .encounter-choices .choice {
   position: relative; background: transparent; border: 0; border-bottom: 1px dashed #8e94766b; padding: 15px 7px 15px 30px; color: #303e28;
 }
@@ -230,7 +228,7 @@ dialog:not([data-kind="notebook"]):not([data-kind="compulsion"]) { box-shadow: 3
 dialog::backdrop { backdrop-filter: none; background: #050e0bd9; }
 .recording-label { background-image: var(--cloth-grain); border-style: dashed; color: #c9bea0; box-shadow: none; }
 .recording-label i { box-shadow: none; }
-.paper>.scene-plate figcaption, .interview-scene figcaption { background-image: var(--cloth-grain); }
+
 /* Cloth binding, archive stamps and a folded pause notice. */
 .notebook-header { background-image: var(--cloth-grain); background-size: 500px 750px; border-bottom: 3px double #8c9170; }
 .notebook-header h2 { text-shadow: 0 1px #080d08, .5px 0 #dedbc04d; }
