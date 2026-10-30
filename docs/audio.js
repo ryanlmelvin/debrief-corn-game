@@ -71,7 +71,8 @@ export class PressureDrone {
   reset() { ramp(this.output.gain, 0, this.context.currentTime, 0); }
   setPressure(value) {
     const p = Number.isFinite(value) ? Math.max(0, Math.min(1, value)) : 0, now = this.context.currentTime;
-    ramp(this.output.gain, p ? .1 + .85 * p ** 1.3 : 0, now, p ? .6 : .3);
+    // Build tension through proximity and beating tones without a large bass jump.
+    ramp(this.output.gain, .28 * p ** .85, now, p ? .8 : .3);
     if (!p) return;
     // The delayed, muffled space gives way to a dry, almost centered beating tone.
     ramp(this.dry.gain, .12 + .78 * p, now, .6);
@@ -94,23 +95,35 @@ export class PressureDrone {
 export class GameAudio {
   constructor(context, musicBuffer, effects = {}) {
     this.context = context; this.active = false; this.pressure = -1; this.suspendTimer = null; this.shots = new Set();
+    this.shotGains = new Map();
     this.effects = effects; this.voices = new Map(); this.stepCount = 0; this.lastStepAt = -Infinity;
     this.encounterKey = ''; this.scene = ''; this.mixKey = '';
     this.master = context.createGain(); this.master.gain.value = 0; this.master.connect(context.destination);
+    // Level the music swells and overlapping effects before the final silence
+    // gate. Compressor look-ahead/release can never leak past a takeover cut.
+    this.mix = context.createDynamicsCompressor();
+    this.mix.threshold.value = -24; this.mix.knee.value = 12; this.mix.ratio.value = 3;
+    this.mix.attack.value = .015; this.mix.release.value = .35;
+    this.mix.connect(this.master);
     const noise = brownNoise(context);
     this.ambient = context.createBufferSource(); this.ambient.buffer = musicBuffer; this.ambient.loop = true;
     this.ambientLevel = context.createGain(); this.ambientLevel.gain.value = .55;
-    this.ambient.connect(this.ambientLevel); this.ambientLevel.connect(this.master); this.ambient.start();
-    this.drone = new PressureDrone(context, this.master, noise);
+    this.ambient.connect(this.ambientLevel); this.ambientLevel.connect(this.mix); this.ambient.start();
+    this.drone = new PressureDrone(context, this.mix, noise);
     if (effects.crickets) {
       this.crickets = context.createBufferSource(); this.crickets.buffer = effects.crickets; this.crickets.loop = true;
       this.cricketLevel = context.createGain(); this.cricketLevel.gain.value = 0;
       const filter = context.createBiquadFilter(); filter.type = 'lowpass'; filter.frequency.value = 4200;
-      this.crickets.connect(filter); filter.connect(this.cricketLevel); this.cricketLevel.connect(this.master); this.crickets.start();
+      this.crickets.connect(filter); filter.connect(this.cricketLevel); this.cricketLevel.connect(this.mix); this.crickets.start();
     }
   }
   sync({ enabled, held, pressure = 0, takeover = false, scene = 'tower', night = 0, encounter = null }) {
     const active = enabled && !held && !takeover, now = this.context.currentTime;
+    this.takeover = takeover;
+    if (takeover && this.previewVoice) {
+      ramp(this.previewVoice.gain.gain, 0, now, .012);
+      this.previewVoice.tone.stop(now + .012); this.previewVoice = null;
+    }
     const encounterKey = encounter ? `${encounter.id}:${encounter.choice || ''}` : '';
     if (scene !== this.scene || encounterKey !== this.encounterKey) {
       // Cancel scheduled scares on every story transition; they must not follow
@@ -125,7 +138,7 @@ export class GameAudio {
       // This is after the delay, so neither the drone nor its tail can escape it.
       ramp(this.master.gain, 0, now, .012);
       for (const shot of this.shots) shot.stop(now + .012);
-      this.shots.clear();
+      this.shots.clear(); this.shotGains.clear();
       this.stopEffects();
       this.suspendTimer = setTimeout(() => {
         this.suspendTimer = null;
@@ -136,7 +149,8 @@ export class GameAudio {
     if (!this.active) {
       clearTimeout(this.suspendTimer); this.suspendTimer = null;
       this.drone.reset(); this.active = true;
-      ramp(this.master.gain, .32, now, .06);
+      // Compensate for the compressor's built-in makeup gain.
+      ramp(this.master.gain, .22, now, .12);
       this.context.resume().catch(() => {});
     }
     const p = Number.isFinite(pressure) ? Math.max(0, Math.min(1, pressure)) : 0;
@@ -145,7 +159,7 @@ export class GameAudio {
     if (mixKey === this.mixKey) return;
     this.mixKey = mixKey;
     const ordinaryField = encounter?.id === 'second-call' && encounter.choice === 'compare';
-    ramp(this.ambientLevel.gain, .55 * (1 - .88 * p) * (encounter ? .78 : 1), now, .4);
+    ramp(this.ambientLevel.gain, .55 * (1 - .55 * p) * (encounter ? .9 : 1), now, .6);
     if (this.cricketLevel) {
       const outdoors = ['tower', 'field', 'guide'].includes(scene);
       const insects = outdoors && (!encounter || ordinaryField) ? .18 * (1 - p) ** 2 : 0;
@@ -173,7 +187,7 @@ export class GameAudio {
     gain.gain.setValueAtTime(level, start + Math.max(length / 2, length - .12));
     gain.gain.linearRampToValueAtTime(0, start + length);
     position.pan.setValueAtTime(pan, start); position.pan.linearRampToValueAtTime(toPan, start + length);
-    source.connect(filter); filter.connect(gain); gain.connect(position); position.connect(this.master);
+    source.connect(filter); filter.connect(gain); gain.connect(position); position.connect(this.mix);
     this.voices.set(source, {gain, name});
     source.onended = () => {
       this.voices.delete(source); source.disconnect(); filter.disconnect(); gain.disconnect(); position.disconnect();
@@ -185,7 +199,7 @@ export class GameAudio {
     const now = this.context.currentTime;
     if (!this.active || now - this.lastStepAt < .14) return;
     this.lastStepAt = now; this.stepCount++;
-    this.sample('footstep', {level:.34, pan:this.stepCount % 2 ? -.1 : .1, rate:[1,.96,1.035,.985][this.stepCount % 4], cutoff:2200});
+    this.sample('footstep', {level:.24, pan:this.stepCount % 2 ? -.1 : .1, rate:[1,.96,1.035,.985][this.stepCount % 4], cutoff:2200});
     if (this.stepCount % 3 === 0) {
       const shift = Math.max(0, Math.min(2, night));
       const side = this.stepCount % 2 ? -1 : 1;
@@ -197,7 +211,7 @@ export class GameAudio {
     if (!choice) {
       const radioNight = ['first-call', 'second-call', 'future-call'].indexOf(id);
       if (radioNight >= 0) this.sample('radio', {level:[.26,.22,.18][radioNight], duration:[1.2,.7,.3][radioNight], cutoff:3200, pan:-.18});
-      if (id === 'extra-step' || id === 'paired-tracks') this.sample('footstep', {level:.36, delay:id === 'extra-step' ? .55 : .35, pan:.45, rate:.93, cutoff:1700});
+      if (id === 'extra-step' || id === 'paired-tracks') this.sample('footstep', {level:.26, delay:id === 'extra-step' ? .55 : .35, pan:.45, rate:.93, cutoff:1700});
       if (id === 'last-follower') this.sample('leaves', {level:.31, delay:.15, pan:-.65, toPan:.55, rate:.9});
       if (id === 'lamp-keeper' || id === 'your-outline') this.sample('leaves', {level:.18 + Math.min(2, Math.max(0, night)) * .025, pan:.5, delay:.2, rate:.91});
     } else if (id === 'first-call' && choice === 'answer') {
@@ -211,25 +225,35 @@ export class GameAudio {
     // final radio choices intentionally add nothing after the follower stops.
   }
   preview() {
+    if (this.takeover) return;
     // Bypass the paused mix so enabling sound in the menu always confirms it.
     clearTimeout(this.suspendTimer); this.suspendTimer = null;
     const context = this.context, now = context.currentTime;
     const tone = context.createOscillator(), gain = context.createGain();
     tone.type = 'sine'; tone.frequency.setValueAtTime(660, now);
     gain.gain.setValueAtTime(0, now);
-    gain.gain.linearRampToValueAtTime(.12, now + .02);
+    gain.gain.linearRampToValueAtTime(.035, now + .03);
     gain.gain.exponentialRampToValueAtTime(.001, now + .3);
     tone.connect(gain); gain.connect(context.destination);
-    tone.onended = () => { tone.disconnect(); gain.disconnect(); };
+    if (this.previewVoice) this.previewVoice.tone.stop(now);
+    this.previewVoice = {tone,gain};
+    tone.onended = () => { if(this.previewVoice?.tone===tone)this.previewVoice=null; tone.disconnect(); gain.disconnect(); };
     tone.start(); tone.stop(now + .32);
   }
   shot(hit) {
     if (!this.active) return;
-    const context = this.context, oscillator = context.createOscillator(), gain = context.createGain(), now = context.currentTime;
+    const context = this.context, now = context.currentTime;
+    // Keep rapid clicks from piling up several full-volume impacts.
+    if (this.shots.size >= 2) {
+      const oldest = this.shots.values().next().value;
+      ramp(this.shotGains.get(oldest).gain, 0, now, .008);
+      oldest.stop(now + .008); this.shots.delete(oldest); this.shotGains.delete(oldest);
+    }
+    const oscillator = context.createOscillator(), gain = context.createGain();
     oscillator.type = 'triangle'; oscillator.frequency.setValueAtTime(hit ? 170 : 130, now); oscillator.frequency.exponentialRampToValueAtTime(45, now + .14);
-    gain.gain.setValueAtTime(.9, now); gain.gain.exponentialRampToValueAtTime(.001, now + .18);
-    oscillator.connect(gain); gain.connect(this.master); this.shots.add(oscillator);
-    oscillator.onended = () => { this.shots.delete(oscillator); oscillator.disconnect(); gain.disconnect(); };
+    gain.gain.setValueAtTime(0, now); gain.gain.linearRampToValueAtTime(.24, now + .006); gain.gain.exponentialRampToValueAtTime(.001, now + .18);
+    oscillator.connect(gain); gain.connect(this.mix); this.shots.add(oscillator); this.shotGains.set(oscillator,gain);
+    oscillator.onended = () => { this.shots.delete(oscillator); this.shotGains.delete(oscillator); oscillator.disconnect(); gain.disconnect(); };
     oscillator.start(); oscillator.stop(now + .2);
   }
 }

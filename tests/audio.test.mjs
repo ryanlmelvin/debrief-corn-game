@@ -13,7 +13,7 @@ class Param {
   exponentialRampToValueAtTime(value, time) { this.value = value; this.events.push(['exponential', value, time]); }
 }
 class Node {
-  constructor() { for (const key of ['gain', 'frequency', 'pan', 'delayTime', 'Q', 'playbackRate']) this[key] = new Param(); this.connections = []; this.stops = []; this.starts = []; }
+  constructor() { for (const key of ['gain', 'frequency', 'pan', 'delayTime', 'Q', 'playbackRate', 'threshold', 'knee', 'ratio', 'attack', 'release']) this[key] = new Param(); this.connections = []; this.stops = []; this.starts = []; }
   connect(node) { this.connections.push(node); }
   disconnect() { this.connections = []; }
   start(...args) { this.started = true; this.starts.push(args); }
@@ -28,6 +28,7 @@ class Context {
   createBufferSource() { return this.node(); }
   createBiquadFilter() { return this.node(); }
   createDelay() { return this.node(); }
+  createDynamicsCompressor() { return this.node(); }
   createBuffer(channels, length) { const data = Array.from({length:channels}, () => new Float32Array(length)); return {duration:length/this.sampleRate,getChannelData: channel => data[channel]}; }
   async resume() { this.resumes++; }
   async suspend() { this.suspends++; }
@@ -118,11 +119,26 @@ test('sound confirmation is audible through the destination while the game mix i
   assert.equal(sound.active,false);
   const tone = context.nodes.at(-2), gain = context.nodes.at(-1);
   assert.equal(tone.frequency.value,660);
-  assert.ok(gain.gain.events.some(e=>e[0]==='linear' && e[1]===.12));
+  assert.ok(gain.gain.events.some(e=>e[0]==='linear' && e[1]===.035));
   assert.deepEqual(gain.connections,[context.destination]);
   assert.equal(tone.stops.length,1);
   tone.onended();
   assert.equal(tone.connections.length,0);assert.equal(gain.connections.length,0);
+});
+
+test('compulsion also stops a confirmation tone while paused and prevents a new preview', () => {
+  const context = new Context(), sound = new GameAudio(context,{duration:134});
+  sound.sync({enabled:true,held:true});sound.preview();
+  const {tone,gain}=sound.previewVoice;
+  sound.sync({enabled:true,held:true,takeover:true});
+  assert.equal(sound.previewVoice,null);
+  assert.equal(gain.gain.value,0);assert.equal(tone.stops.at(-1),context.currentTime+.012);
+  const count=context.nodes.length;
+  sound.preview();assert.equal(context.nodes.length,count);
+  tone.onended();assert.equal(tone.connections.length,0);assert.equal(gain.connections.length,0);
+  sound.sync({enabled:true,held:true,takeover:false});sound.preview();
+  assert.ok(sound.previewVoice);sound.previewVoice.tone.onended();
+  assert.equal(sound.previewVoice,null);
 });
 
 
@@ -143,6 +159,67 @@ test('recorded music loads from the game host and decodes before playback', asyn
 });
 
 const fieldEffects = () => ({crickets:{duration:11.45},footstep:{duration:.42},leaves:{duration:1.4},radio:{duration:3}});
+
+test('music, drone, insects, footsteps and shots pass through compression before the final silence gate', () => {
+  const context = new Context(), sound = new GameAudio(context,{duration:134},fieldEffects());
+  sound.sync({enabled:true,scene:'field'});sound.step();sound.shot(true);
+  assert.deepEqual(sound.ambientLevel.connections,[sound.mix]);
+  assert.deepEqual(sound.drone.output.connections,[sound.mix]);
+  assert.deepEqual(sound.cricketLevel.connections,[sound.mix]);
+  const stepGain = [...sound.voices.values()][0].gain;
+  assert.deepEqual(stepGain.connections[0].connections,[sound.mix]);
+  const shot = [...sound.shots][0];
+  assert.deepEqual(shot.connections[0].connections,[sound.mix]);
+  assert.deepEqual(sound.mix.connections,[sound.master]);
+  assert.deepEqual(sound.master.connections,[context.destination]);
+  assert.deepEqual(context.nodes.filter(node=>node.connections.includes(context.destination)),[sound.master]);
+  assert.ok(sound.mix.threshold.value < 0 && sound.mix.ratio.value > 1);
+  assert.ok(sound.mix.knee.value > 0 && sound.mix.attack.value > 0 && sound.mix.release.value > sound.mix.attack.value);
+});
+
+test('rapid shots keep only two full envelopes, ease in from silence, and release every replaced voice', () => {
+  const context = new Context(), sound = new GameAudio(context,{duration:134});
+  sound.sync({enabled:true});
+  const shots = [];
+  for(let i=0;i<6;i++) {
+    sound.shot(i%2===0);
+    const source=[...sound.shots].at(-1), gain=sound.shotGains.get(source);
+    shots.push({source,gain});
+    assert.ok(sound.shots.size <= 2);assert.equal(sound.shotGains.size,sound.shots.size);
+    assert.deepEqual(gain.gain.events[0],['set',0,context.currentTime]);
+    const attack=gain.gain.events.find(event=>event[0]==='linear'&&event[1]>0);
+    assert.ok(attack && attack[1]<.5 && attack[2]>context.currentTime);
+    const release=gain.gain.events.find(event=>event[0]==='exponential');
+    assert.ok(release && release[1]<attack[1]/100 && release[2]>attack[2]);
+    context.currentTime+=.001;
+  }
+  assert.equal(sound.shots.size,2);
+  for(const {source,gain} of shots.slice(0,-2)) {
+    assert.ok(source.stops.at(-1)<source.stops[0]);
+    assert.equal(gain.gain.events.at(-1)[0],'linear');
+    assert.equal(gain.gain.events.at(-1)[1],0);
+    assert.equal(sound.shots.has(source),false);
+  }
+  for(const {source,gain} of shots) {
+    source.onended();assert.equal(source.connections.length,0);assert.equal(gain.connections.length,0);
+  }
+  assert.equal(sound.shots.size,0);assert.equal(sound.shotGains.size,0);
+});
+
+test('every pause gate clears shot tracking and silences the downstream gate without changing the compressor graph', async () => {
+  for(const gate of [{held:true},{enabled:false},{takeover:true}]) {
+    const context = new Context(), sound = new GameAudio(context,{duration:134});
+    sound.sync({enabled:true});sound.shot(true);sound.shot(false);
+    const sources=[...sound.shots], count=context.nodes.length;
+    sound.sync({enabled:true,...gate});
+    assert.equal(sound.shots.size,0);assert.equal(sound.shotGains.size,0);
+    assert.equal(sound.master.gain.value,0);assert.deepEqual(sound.mix.connections,[sound.master]);
+    for(const source of sources)assert.ok(source.stops.at(-1)<=context.currentTime+.012);
+    sound.sync({enabled:true});
+    await new Promise(resolve=>setTimeout(resolve,35));
+    assert.equal(context.nodes.length,count);assert.equal(context.suspends,0);
+  }
+});
 
 test('field samples load independently so a missing or unsupported clip cannot block sound', async () => {
   const requested = [], bytes = new ArrayBuffer(2);
