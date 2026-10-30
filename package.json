@@ -1,0 +1,12 @@
+{
+  "name": "debrief-corn-game",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "node scripts/serve.mjs",
+    "test": "node --test tests/*.test.mjs",
+    "check": "node --check docs/app.js && node --check docs/engine.js && node --check docs/renderer.js && node --check docs/sw.js"
+  },
+  "engines": { "node": ">=20" }
+}

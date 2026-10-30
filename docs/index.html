@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#141d18">
+  <meta name="description" content="Watch the corn. Follow procedure. Decide what goes on the record. A short rural horror game based on Debrief by Ryan L. Melvin.">
+  <title>DEBRIEF — A rural horror game</title>
+  <link rel="icon" href="./icons/icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="./icons/icon-192.png">
+  <link rel="manifest" href="./manifest.webmanifest">
+  <link rel="stylesheet" href="./style.css">
+  <script type="module" src="./app.js"></script>
+</head>
+<body>
+  <header class="masthead">
+    <a class="wordmark" href="./" aria-label="Debrief home"><svg viewBox="0 0 24 32" aria-hidden="true"><path d="M12 30V5M12 14Q1 13 2 6Q12 7 12 14M12 21Q23 20 22 13Q12 14 12 21M12 28Q1 27 2 20Q12 21 12 28M12 7L8 1M12 7V0M12 7L16 1"/></svg> DEBRIEF<span class="edition">FIELD EDITION / 0.1</span></a>
+    <nav aria-label="Game settings">
+      <button id="sound" class="quiet" aria-pressed="false">Sound off</button>
+      <button id="manual" class="quiet">Field manual</button>
+      <button id="pause" class="quiet" hidden>Pause</button>
+      <button id="install" class="quiet" hidden>Install</button>
+    </nav>
+  </header>
+  <main>
+    <section class="game-shell" aria-label="Debrief game">
+      <div class="station-bar"><span><i class="status-light"></i> STATION 04 <span class="bar-divider">/</span> <span id="station-status">ILLINOIS, USA</span></span><span id="date-label">OCTOBER, <span class="redaction">████</span></span></div>
+      <div class="workspace">
+        <section class="viewport" aria-label="North field">
+          <canvas id="field" width="960" height="600" tabindex="0" aria-label="Watchtower shooting gallery. Click moving corn to fire. Press X to select a crop, Space to fire, R to reload. White figures are not targets."></canvas>
+          <div id="welcome" class="welcome">
+            <div class="welcome-content">
+              <p class="eyebrow">A SHORT GAME ABOUT FOLLOWING ORDERS</p>
+              <h1>DEBRIEF<span class="title-period">.</span></h1>
+              <p class="opening">It’s your job to watch the corn grow.<br>Some of it tries to escape.</p>
+              <div class="start-actions"><button id="new-game" class="primary">Report for duty <span>↗</span></button><button id="resume" class="secondary" hidden>Continue shift</button></div>
+              <label class="difficulty">SHIFT INTENSITY <select id="difficulty"><option value="standard">Standard</option><option value="story">Story · slower targets, lower exposure</option></select></label>
+              <p class="welcome-meta">THREE SHIFTS · SIX ENDINGS · ABOUT 10 MINUTES</p>
+            </div>
+            <div class="welcome-bottom"><span>BASED ON THE SHORT STORY<br><strong>BY RYAN L. MELVIN</strong></span><span class="warning-sign">DO NOT<br>CONSUME THE CROP</span></div>
+          </div>
+          <div id="pause-layer" class="pause-layer" hidden><p class="eyebrow">TRANSMISSION HELD</p><h2>Shift paused.</h2><p>Your post will be here.</p><button id="unpause" class="primary">Resume duty ↗</button></div>
+          <div id="scene-caption" class="scene-caption" hidden></div>
+        </section>
+        <aside id="sidebar" class="sidebar" hidden>
+          <div class="panel-heading"><span id="phase-label">WATCHTOWER</span><span id="shift-number">01 / 03</span></div>
+          <div class="assignment"><p class="eyebrow">CURRENT ASSIGNMENT</p><h2 id="objective">Maintain the perimeter.</h2><p id="objective-detail">Fire on moving crops. Do not fire on people.</p></div>
+          <div id="stats" class="stats"></div>
+          <div id="controls" class="controls"></div>
+          <section class="radio"><div class="panel-heading"><span>RADIO / FIELD NOTES</span><span class="radio-wave">▁▃▆▂▅▁</span></div><ol id="radio-log"></ol></section>
+          <button id="notebook" class="notebook-button">Private notebook <span id="evidence-count">00</span></button>
+        </aside>
+      </div>
+      <footer class="statusbar"><span id="control-hint">CONTAINMENT IS A MATTER OF PROCEDURE.</span><span id="save-status">LOCAL SAVE / NO ACCOUNT REQUIRED</span></footer>
+    </section>
+    <div class="below-game"><span>AN INTERACTIVE ADAPTATION OF <em>DEBRIEF</em></span><span>Fictional ecological horror <span class="small-dot">·</span> Headphones optional</span></div>
+    <p id="announcement" class="sr-only" role="status" aria-live="polite"></p>
+    <noscript><p class="noscript">This game needs JavaScript. Enable it in your browser to report for duty.</p></noscript>
+  </main>
+  <dialog id="paper-dialog" aria-labelledby="dialog-title"><div id="dialog-content"></div></dialog>
+  <div id="toast" class="toast" role="status" hidden></div>
+</body>
+</html>

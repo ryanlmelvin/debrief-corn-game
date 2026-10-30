@@ -1,0 +1,14 @@
+.DS_Store
+node_modules/
+artifacts/
+*.log
+
+# Unpublished source manuscript: never commit or deploy.
+/manuscript/
+/manuscripts/
+/private/
+*.doc
+*.docx
+*.pdf
+*.rtf
+*.odt
