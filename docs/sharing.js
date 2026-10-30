@@ -16,15 +16,21 @@ export const GUIDE_TEAM_SHARE = {
   art: 'encounter-unattended-lamp', alt: 'An unattended lantern and an open equipment case among the corn rows.'
 };
 
+export function endingShareCaption(card) {
+  // Outcome URLs such as 02-team retain their parent ending's number.
+  return `${card.line} (ending #${Number.parseInt(card.code, 10)})`;
+}
+
 export function endingShareData(ending, collected = null, stamp = null) {
   if (!Object.hasOwn(ENDING_SHARES, ending)) return null;
   const card = ending === 'guide' && stamp === 'PERIMETER SECURED' ? GUIDE_TEAM_SHARE : ENDING_SHARES[ending];
-  let text = card.line;
+  const caption = endingShareCaption(card);
+  let text = caption;
   if (Array.isArray(collected)) {
     const found = new Set([...collected, ending].filter(id => Object.hasOwn(ENDING_SHARES, id))).size;
     text += `\nI've found ${found} of ${Object.keys(ENDING_SHARES).length} endings.`;
   }
-  return { title: `${card.line} — DEBRIEF`, text, url: `${SHARE_ROOT}share/${card.code}/` };
+  return { title: `${caption} — DEBRIEF`, text, url: `${SHARE_ROOT}share/${card.code}/` };
 }
 
 export async function shareEnding(ending, platform = navigator, collected = null, stamp = null) {
