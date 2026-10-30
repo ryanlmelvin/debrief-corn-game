@@ -2,12 +2,12 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import vm from 'node:vm';
 import { readFileSync } from 'node:fs';
-import { createGame, ENDINGS, getEnding } from '../docs/engine.js';
+import { createGame, ENDINGS, getEnding, endingId } from '../docs/engine.js';
 const source=readFileSync(new URL('../docs/app.js',import.meta.url),'utf8');
 const block=source.slice(source.indexOf('let history='),source.indexOf('let saved=readSave();'));
 function archive(storage=new Map()){
   const elements=new Map();
-  const context=vm.createContext({HISTORY_KEY:'archive',ENDINGS,getEnding,game:null,installHandoff:{update(){}},
+  const context=vm.createContext({HISTORY_KEY:'archive',ENDINGS,getEnding,endingId,game:null,installHandoff:{update(){}},
     localStorage:{getItem:key=>storage.get(key)||null,setItem:(key,value)=>storage.set(key,value)},
     $:id=>{if(!elements.has(id))elements.set(id,{textContent:'',addEventListener(){}});return elements.get(id)},toast(){},esc:String,paper(){},showModal(){}});
   vm.runInContext(block,context);return {context,storage,run:code=>vm.runInContext(code,context)};
@@ -41,7 +41,10 @@ test('guide outcome stamps survive archiving so all-three and partial shootings 
   }
   const resumed=archive(a.storage);
   assert.equal(resumed.run('history.runs.length'),4);
-  assert.equal(resumed.run('history.collected.length'),1);
+  assert.equal(resumed.run('history.collected.length'),3);
+  assert.equal(resumed.run('history.runs[0].ending'),'guide_shot');
+  assert.equal(resumed.run('history.runs[1].ending'),'guide_arrested');
+  assert.equal(resumed.run('history.runs[3].ending'),'guide');
   assert.equal(resumed.run('history.runs[0].stamp'),'PERIMETER SECURED');
   assert.equal(resumed.run('history.runs[1].stamp'),'PERSONNEL INCIDENT');
   assert.equal(resumed.run('history.runs[2].stamp'),'PERSONNEL INCIDENT');

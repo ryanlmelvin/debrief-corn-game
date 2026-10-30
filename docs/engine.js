@@ -1,5 +1,6 @@
 import { SIGHTING_TIME, sightingPeople, watchNight, personExitTime, observedSighting } from './watch-story.js';
 import { startGuide, advanceGuide, guideDisposition, restoreGuideRoute } from './guide.js';
+import { ENDING_SHARES } from './sharing.js';
 import { witnessRequirements, canTakeEvidenceOutside, retirePreparations } from './ending-requirements.js';
 import { fieldStepCost } from './field.js';
 import { freshFieldEvents, encounterAfterStep, resolveEncounter, dismissEncounter, migrateFieldEvents, validFieldEvents, encounterById } from './encounters.js';
@@ -295,14 +296,25 @@ function nextShift(s) {
 export const ENDINGS = {
   consumption: { code: '07', title: 'Nothing wasted.', stamp: 'SPECIMEN INGESTED', text: 'The first bite is sweet. You finish the ear before you notice the boiling has stopped. Something fine catches between your teeth. When you pull it free, the pain comes from beneath your tongue. Your radio calls you back to the tower. You try to answer, but your mouth is full of warm soil. Outside, the rows lean toward the pump house.', last: 'For the first time tonight, you are no longer hungry.' },
   witness: { code: '01', title: 'An unofficial record.', stamp: 'DISTRIBUTION UNAUTHORIZED', text: 'The photographs and application records reach someone outside the department. The field is closed pending an inquiry. For a week, no one calls you. Then a farmer three counties away sends a photograph of his drainage ditch.', last: 'You keep the original report.' },
-  guide: { code: '02', title: 'You remember where.', stamp: 'RECOVERY PENDING', text: 'They follow you between the rows. You know each turn before you take it. Behind you, someone asks why the path is so warm. At the northeast corner, the corn makes room.', last: 'This makes three, sir.' },
+  guide: { code: '02', title: ENDING_SHARES.guide.line, stamp: 'RECOVERY PENDING', text: 'They follow you between the rows. You know each turn before you take it. Behind you, someone asks why the path is so warm. At the northeast corner, the corn makes room.', last: 'This makes three, sir.' },
+  guide_shot: { code: '02-team', title: ENDING_SHARES.guide_shot.line, stamp: 'PERIMETER SECURED', text: 'The department records three escaping specimens contained and no personnel incident. Your account remains on a tape marked for reuse. At the next shift, the rifle is waiting in the tower. Three lamps have been removed from the equipment shelf.', last: 'Watch the corn. Shoot any that try to escape.' },
+  guide_arrested: { code: '08', title: ENDING_SHARES.guide_arrested.line, stamp: 'TAKEN INTO CUSTODY', text: 'Their account brings the police to the station. After the recorded interview, a deputy places you under arrest and takes your rifle, your badge, and the tape. The supervisor keeps the written orders.', last: 'For once, the record names the people who were there.' },
   compliance: { code: '03', title: 'Within acceptable limits.', stamp: 'REPORT APPROVED', text: 'The corrections are filed. The next treatment is authorized. From the tower, the road looks narrower than it did yesterday. Your replacement asks if the corn has always grown on both sides.', last: 'You watch the corn grow.' },
   dissent: { code: '04', title: 'Unfit for field duty.', stamp: 'TESTIMONY DISPUTED', text: 'Your final report is approved. The earlier objections are attached to your medical evaluation. They take your badge and issue a transfer. From the bus window, field after field passes in the dark.', last: 'You cannot see where this one ends.' },
   breach: { code: '05', title: 'Beyond the perimeter.', stamp: 'CONTAINMENT LOST', text: 'The sixth movement crosses the road. Dispatch tells you to stay on the line. From somewhere beyond the station comes the sound of stalks brushing together. There are no fields on that side.', last: '[static]' },
   assimilation: { code: '06', title: 'Expected growth.', stamp: 'PERSONNEL UNACCOUNTED FOR', text: 'You stop to catch your breath. The rows stop with you. Somewhere a radio calls your number, then calls it again. You understand at last why the field has been so patient.', last: 'Nothing here is wasted.' }
 };
+for (const [id, card] of Object.entries(ENDING_SHARES)) ENDINGS[id].title = card.line;
+export function endingId(s) {
+  if (s.ending !== 'guide' || !s.guide) return s.ending;
+  const outcome = s.guide.outcome;
+  if (outcome === 'secured') return 'guide_shot';
+  if (outcome === 'arrested') return 'guide_arrested';
+  if (s.guide.team?.some(person => person.status === 'shot')) return s.guide.team.every(person => person.status === 'shot') ? 'guide_shot' : 'guide_arrested';
+  return 'guide';
+}
 export function getEnding(s) {
-  return s.ending === 'guide' && s.guide ? { ...ENDINGS.guide, ...guideDisposition(s) } : ENDINGS[s.ending];
+  return s.ending === 'guide' && s.guide ? { ...ENDINGS[endingId(s)], ...guideDisposition(s), title: ENDINGS[endingId(s)].title } : ENDINGS[s.ending];
 }
 function finish(s, ending) { s.phase = 'ending'; s.ending = ending; s.targets = [];s.compulsionNotice=false;s.fieldEvents.pending=null;s.fieldEvents.journey=null; }
 

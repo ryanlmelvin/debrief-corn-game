@@ -1,7 +1,7 @@
 import './image-viewer.js';
 import { watchNight, sightingPromptReady } from './watch-story.js';
 import { guideTravel, guideRouteStatus, inspectGuide, spareGuide, fireGuide, focusGuide, nearbyGuideSite, guideDebrief, answerGuideDebrief, isGuideAftermath } from './guide.js';
-import { createGame, startShift, advance, reload, shoot, focusNext, enterField, move, inspect, canEatCrop, eatCrop, nearbySite, investigationPressure, investigationComplete, beginDebrief, chooseFieldEncounter, continueFieldEncounter, getQuestion, getEnding, answer, serialize, restore, BRIEFINGS, EVIDENCE, ENDINGS, DATES, REPORT_DATES, SHIFT_LENGTH, COMPULSION_NOTICE } from './engine.js';
+import { createGame, startShift, advance, reload, shoot, focusNext, enterField, move, inspect, canEatCrop, eatCrop, nearbySite, investigationPressure, investigationComplete, beginDebrief, chooseFieldEncounter, continueFieldEncounter, getQuestion, getEnding, endingId, answer, serialize, restore, BRIEFINGS, EVIDENCE, ENDINGS, DATES, REPORT_DATES, SHIFT_LENGTH, COMPULSION_NOTICE } from './engine.js';
 import { Renderer, visibleGuideTarget } from './renderer.js';
 import { FieldMap } from './field-ui.js';
 import { dialogArtwork, evidenceMount, notebookMarkup, encounterMarkup, interviewRecord } from './art.js';
@@ -38,19 +38,31 @@ try { if(isInstalled())carriedProgress=await recoverInstallHandoff(document,prog
 function readSave() { try { return restore(localStorage.getItem(SAVE_KEY)); } catch { return null; } }
 let history={ collected: [], runs: [] };
 try { const stored=JSON.parse(localStorage.getItem(HISTORY_KEY)); if(stored && Array.isArray(stored.collected) && Array.isArray(stored.runs)){history.collected=stored.collected.filter(id=>Object.hasOwn(ENDINGS,id));history.runs=stored.runs.filter(r=>r&&typeof r.id==='string'&&Object.hasOwn(ENDINGS,r.ending)&&Array.isArray(r.reports)).slice(0,30);} } catch {}
+const legacyGuideRuns=history.runs.filter(run=>run.ending==='guide');
+if(legacyGuideRuns.length)history.collected=history.collected.filter(id=>id!=='guide');
+for(const run of history.runs){
+  if(run.ending==='guide'){
+    run.ending=run.stamp==='PERIMETER SECURED'?'guide_shot':['TAKEN INTO CUSTODY','PERSONNEL INCIDENT'].includes(run.stamp)?'guide_arrested':'guide';
+    run.title=ENDINGS[run.ending].title;
+  }
+  if(!history.collected.includes(run.ending))history.collected.push(run.ending);
+}
 function updateHistoryCount(){ $('records').textContent=`Records · ${history.collected.length}/${Object.keys(ENDINGS).length}`; }
 updateHistoryCount();
 function archiveRun(){
   if(!game || game.phase!=='ending')return;
   const e=getEnding(game);
+  const id=endingId(game);
   const existing=history.runs.find(r=>r.id===game.runId);
   if(existing){
-    if(existing.stamp===e.stamp)return;
+    if(existing.stamp===e.stamp&&existing.ending===id)return;
     // A resumed ending can fill in the outcome omitted by older archives.
     existing.stamp=e.stamp;
+    existing.ending=id;existing.title=e.title;
+    if(!history.collected.includes(id))history.collected.push(id);
   }else{
-    if(!history.collected.includes(game.ending))history.collected.push(game.ending);
-    history.runs.unshift({id:game.runId,ending:game.ending,title:e.title,text:e.text,last:e.last,stamp:e.stamp,reports:game.reports.map(r=>({...r})),date:new Date().toISOString()});
+    if(!history.collected.includes(id))history.collected.push(id);
+    history.runs.unshift({id:game.runId,ending:id,title:e.title,text:e.text,last:e.last,stamp:e.stamp,reports:game.reports.map(r=>({...r})),date:new Date().toISOString()});
   }
   history.runs=history.runs.slice(0,30);
   try{localStorage.setItem(HISTORY_KEY,JSON.stringify(history));}catch{toast('Records are available for this session. Your browser could not save them.');}
@@ -263,7 +275,7 @@ function updateGuideUI() {
 }
 function act(action,value) {
   if(action==='select-share-link'){const input=dialog.querySelector('.share-link');input?.focus();input?.select();return;}
-  if(action==='share-ending'){if(game?.phase==='ending')shareDisposition(game.ending,getEnding(game).stamp);return;}
+  if(action==='share-ending'){if(game?.phase==='ending')shareDisposition(endingId(game),getEnding(game).stamp);return;}
   if(action==='share-record'){const run=history.runs[Number(value)];if(run)shareDisposition(run.ending,run.stamp);return;}
   if(action==='guide-answer'){
     if(!game||game.phase!=='guide'||game.guide.stage!=='debrief'||modalKind!=='guide-debrief')return;

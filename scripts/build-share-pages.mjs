@@ -1,13 +1,12 @@
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
-import { ENDING_SHARES, GUIDE_TEAM_SHARE, SHARE_ROOT, endingShareCaption } from '../docs/sharing.js';
+import { ENDING_SHARES, GUIDE_TEAM_SHARE, SHARE_ROOT } from '../docs/sharing.js';
 
 const escape = text => text.replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const description = 'Watch the corn. Follow procedure. Find your own ending in DEBRIEF, a short rural horror game.';
 for (const card of [...Object.values(ENDING_SHARES), GUIDE_TEAM_SHARE]) {
   const url = `${SHARE_ROOT}share/${card.code}/`;
   const image = `${SHARE_ROOT}share/${card.code}/preview.jpg`;
-  const caption = endingShareCaption(card);
-  const title = escape(`${caption} — DEBRIEF`);
+  const title = escape(`${card.line} — DEBRIEF`);
   // Static metadata is intentional: link-preview crawlers need no JavaScript.
   const html = `<!doctype html>
 <html lang="en" prefix="og: https://ogp.me/ns#">
@@ -43,7 +42,7 @@ for (const card of [...Object.values(ENDING_SHARES), GUIDE_TEAM_SHARE]) {
     <img src="./preview.jpg" width="1200" height="800" alt="${escape(card.alt)}">
     <div class="copy">
       <p class="eyebrow">AN ASSIGNMENT COMPLETED</p>
-      <h1>${escape(caption)}</h1>
+      <h1>${escape(card.line)}</h1>
       <p class="description">Watch the corn. Follow procedure.<br>What will you put on the record?</p>
       <a class="play" href="../../">Find your own ending ↗</a>
       <p class="credit">A short rural horror game · Based on Debrief by Ryan L. Melvin</p>
