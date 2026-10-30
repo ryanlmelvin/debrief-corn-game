@@ -5,7 +5,7 @@ const DEVELOPMENT = ['localhost', '127.0.0.1', '[::1]'].includes(self.location.h
 const SCOPE = new URL('./', self.location.href).pathname;
 const CACHE_PREFIX = `debrief:${SCOPE}:`;
 const CACHE = CACHE_PREFIX + VERSION;
-const FILES = ['./','./index.html','./style.css','./art.css','./art.js','./app.js','./audio.js','./engine.js','./field.js','./field-ui.js','./guide.js','./renderer.js','./manifest.webmanifest','./icons/icon.svg','./icons/icon-192.png','./icons/icon-512.png','./assets/debrief-desk.webp','./assets/field-corner.webp','./assets/field-drain.webp','./assets/field-pump.webp','./assets/field-sighting.webp','./assets/pump-stove.webp','./assets/notebook-paper.webp','./assets/specimen-studies.webp','./assets/station-kit.webp','./assets/survey-paper.webp'];
+const FILES = ['./','./index.html','./style.css','./art.css','./field-kit.css','./art.js','./app.js','./audio.js','./engine.js','./field.js','./field-ui.js','./guide.js','./renderer.js','./manifest.webmanifest','./icons/icon.svg','./icons/icon-192.png','./icons/icon-512.png','./assets/debrief-desk.webp','./assets/field-corner.webp','./assets/field-drain.webp','./assets/field-pump.webp','./assets/field-sighting.webp','./assets/pump-stove.webp','./assets/notebook-paper.webp','./assets/specimen-studies.webp','./assets/station-kit.webp','./assets/survey-paper.webp'];
 self.addEventListener('install',event=>event.waitUntil((async()=>{
   const cache=await caches.open(CACHE);
   // A new worker must not populate its new cache with an older HTTP-cached build.
