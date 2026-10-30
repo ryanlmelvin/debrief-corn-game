@@ -12,7 +12,7 @@ export class DialogPager {
     this.observer = new MutationObserver(records => {
       if (records.some(record => {
         const target = record.target.nodeType === Node.ELEMENT_NODE ? record.target : record.target.parentElement;
-        if (target?.closest('.pager-nav')) return false;
+        if (target?.closest('.pager-nav') && !(target.id === 'dialog-update' && record.attributeName === 'hidden')) return false;
         return record.type !== 'attributes' || (record.oldValue !== target.getAttribute(record.attributeName) && !target.classList.contains('pager-page'));
       })) this.schedule();
     });
@@ -41,6 +41,8 @@ export class DialogPager {
   prepare(article) {
     if (this.body) this.resize.unobserve(this.body);
     this.article = article;
+    this.decision = ['debrief', 'encounter', 'corn', 'sighting', 'confirm', 'guide-intro', 'evidence'].includes(this.dialog.dataset.kind);
+    article.classList.toggle('decision-sheet', this.decision);
     this.units = [];
     this.index = 0;
     article.classList.add('paged-sheet');
@@ -116,7 +118,7 @@ export class DialogPager {
     this.body.className = 'pager-body';
     this.nav = document.createElement('nav');
     this.nav.className = 'pager-nav';
-    this.nav.setAttribute('aria-label', 'Document pages');
+    this.nav.setAttribute('aria-label', this.decision ? 'Game update' : 'Document pages');
     this.previous = document.createElement('button');
     this.previous.type = 'button'; this.previous.textContent = '← Back';
     this.previous.setAttribute('aria-label', 'Previous document page');
@@ -158,7 +160,23 @@ export class DialogPager {
       };
       newPage();
       const fits = () => page.scrollHeight <= page.clientHeight + 1;
-      for (let i = 0; i < this.units.length; i++) {
+      if (this.decision) {
+        page.classList.add('decision-page');
+        const context = document.createElement('div'); context.className = 'decision-context';
+        const actions = document.createElement('div'); actions.className = 'decision-actions';
+        actions.setAttribute('role', 'group'); actions.setAttribute('aria-label', 'Your response');
+        const actionGroups = new Set(this.units.filter(unit => unit.node.matches('button')).map(unit => unit.group).filter(Boolean));
+        this.units.forEach((unit, i) => {
+          unit.node.dataset.pagerUnit = String(i);
+          (unit.node.matches('button') || actionGroups.has(unit.group) ? actions : context).append(unit.node);
+        });
+        page.append(context, actions);
+        // Decisions never lose their context to a page turn. Reclaim ornamental
+        // space first; compact spacing is a fallback for short browser windows.
+        article.classList.remove('decision-condensed', 'decision-tight');
+        if (!fits()) article.classList.add('decision-condensed');
+        if (!fits()) article.classList.add('decision-tight');
+      } else for (let i = 0; i < this.units.length; i++) {
         const unit = this.units[i], node = unit.node;
         node.dataset.pagerUnit = String(i);
         // A response is a set of alternatives. Move the whole set to a fresh

@@ -8,6 +8,7 @@ import { GameAudio } from './audio.js';
 import { pressureWordMarkup } from './pressure-word.js';
 import { DialogPager } from './pager.js';
 import { endingShareData, shareEnding } from './sharing.js';
+import { decisionQuestion } from './decision-copy.js';
 
 const $ = id => document.getElementById(id);
 const canvas=$('field'), renderer=new Renderer(canvas), dialog=$('paper-dialog');
@@ -117,8 +118,8 @@ function sceneDialog() {
     showModal('sighting',paper('Movement in the field.', `<p>${watchNight(game.shift).notice}</p><p class="small">Leaving now means any loose crops can cross the perimeter.</p><div class="paper-actions"><button class="primary" data-action="confirm-enter">Investigate now ↗</button><button class="secondary" data-action="close">Stay at my post</button></div>`, 'FIELD OBSERVATION'));
     save();
   } else if(game.phase==='debrief') {
-    const q=getQuestion(game);
-    showModal('debrief',paper('For the record.',`<p class="eyebrow">${REPORT_DATES[game.shift]}, <span class="redacted-text">19XX</span></p>${game.question<3?`<span class="question-num" aria-label="Question ${game.question+1} of 3">${game.question+1} / 3</span>`:''}<div class="interview-question"><span class="speaker-label">SUPERVISOR</span><p>${esc(q.prompt)}</p></div><p class="note">${esc(q.context)}</p><div class="choices" role="group" aria-label="Your response"><span class="speaker-label">YOUR RESPONSE</span>${q.options.map((o,i)=>`<button class="choice" data-action="answer" data-value="${o.id}" ${o.disabled?'disabled':''}><span class="response-key" aria-hidden="true">${String.fromCharCode(65+i)}</span><span>${esc(o.label)}${o.detail?`<small>${esc(o.detail)}</small>`:''}</span></button>`).join('')}</div>`, 'DEBRIEF TRANSCRIPT'));
+    const q=decisionQuestion(game);
+    showModal('debrief',paper('For the record.',`<p class="eyebrow">${REPORT_DATES[game.shift]}, <span class="redacted-text">19XX</span></p>${game.question<3?`<span class="question-num" aria-label="Question ${game.question+1} of 3">${game.question+1} / 3</span>`:''}<div class="interview-question"><span class="speaker-label">SUPERVISOR</span><p>${esc(q.prompt)}</p></div><p class="note"><span class="decision-note-label">${esc(q.contextLabel)}</span> ${esc(q.context)}</p><div class="choices" role="group" aria-label="Your response"><span class="speaker-label">YOUR RESPONSE</span>${q.options.map((o,i)=>`<button class="choice" data-action="answer" data-value="${o.id}" ${o.disabled?'disabled':''}><span class="response-key" aria-hidden="true">${String.fromCharCode(65+i)}</span><span>${esc(o.label)}${o.detail?`<small>${esc(o.detail)}</small>`:''}</span></button>`).join('')}</div>`, 'DEBRIEF TRANSCRIPT'));
   } else if(game.phase==='guide' && game.guide.steps === 0) {
     showModal('guide-intro',paper('Between the rows.', '<p>Three recovery personnel wait beneath the tower. You take the rifle. They take lamps.</p><p class="note">“You know the way,” one of them says.</p><p class="small"><span class="touch-help">Use the arrow pad to walk and turn. Tap Examine when your light catches a clue.</span><span class="keyboard-help"><b>W/S</b> or <b>↑/↓</b> walk · <b>A/D</b> or <b>←/→</b> turn · <b>E</b> examine.</span></p><button class="primary" data-action="close">Lead them in ↗</button>', 'RECOVERY DETAIL'));
   } else if(game.phase==='ending') {
@@ -288,7 +289,7 @@ function act(action,value) {
   if(action==='focus'){const p=focusNext(game);if(p)renderer.pointer=p;else toast('No moving crops in view.');canvas.focus({preventScroll:true});}
   if(action==='confirm-enter'&&game?.phase==='tower'&&!paused){closeModal();enterField(game);}
   if(action==='move'){fieldMap.stop(game);const [dx,dy]=value.split(',').map(Number);move(game,dx,dy);}
-  if(action==='corn' && canEatCrop(game))showModal('corn',paper('Something warm.',`<p>On a camping stove beside the treatment drums, ears of corn roll gently in a pot. A clean plate waits beside butter and a shaker of salt. The smell is sweet enough to make your stomach ache. You cannot remember when you last ate.</p><p>A notice above the stove reads: DO NOT CONSUME THE CROP.</p><div class="paper-actions"><button class="primary" data-action="eat-crop">Butter an ear. Take a bite.</button><button class="secondary" data-action="close">Leave it untouched.</button></div>`,'PUMP HOUSE'));
+  if(action==='corn' && canEatCrop(game))showModal('corn',paper('Something warm.',`<p>Corn boils on a stove beside the treatment drums. Butter, salt, and a clean plate wait. The sweet smell makes your stomach ache. You cannot remember when you last ate.</p><p>A notice above the stove reads: DO NOT CONSUME THE CROP.</p><div class="paper-actions"><button class="primary" data-action="eat-crop">Butter an ear. Take a bite.</button><button class="secondary" data-action="close">Leave it untouched.</button></div>`,'PUMP HOUSE'));
   if(action==='eat-crop' && eatCrop(game))closeModal();
   if(action==='inspect'){
     const id=inspect(game);

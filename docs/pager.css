@@ -190,3 +190,87 @@
 @media(max-height: 500px) and (max-width: 539px) {
   #paper-dialog.paged-dialog .paged-sheet.pager-has-art { grid-template-rows: auto 60px minmax(0, 1fr) var(--pager-footer-height, 56px); }
 }
+
+/* A decision is one scene: context and every alternative stay together. */
+#paper-dialog .decision-sheet { --pager-footer-height: 0px; }
+#paper-dialog .decision-sheet:has(#dialog-update:not([hidden])) { --pager-footer-height: 50px; }
+#paper-dialog .decision-sheet > .pager-nav { padding: 0; border: 0; display: none; }
+#paper-dialog .decision-sheet > .pager-nav:has(#dialog-update:not([hidden])) { display: flex; justify-content: center; padding: 3px 10px; border-top: 1px solid #8b9271; }
+#paper-dialog .decision-sheet .pager-nav > button, #paper-dialog .decision-sheet .pager-position > span { display: none; }
+#paper-dialog .decision-sheet .pager-position { width: 100%; }
+#paper-dialog .decision-sheet .pager-nav #dialog-update { max-width: 240px; }
+#paper-dialog .decision-page { display: flex; flex-direction: column; gap: 14px; }
+#paper-dialog .decision-context { display: flex; flex-direction: column; gap: 10px; }
+#paper-dialog .decision-actions { display: flex; flex-direction: column; gap: 8px; margin-top: auto; }
+#paper-dialog .decision-page :is(.decision-context, .decision-actions) > * { margin: 0; }
+#paper-dialog .decision-page .pager-action:first-of-type { margin-top: 0; }
+#paper-dialog .decision-page .choice { min-height: 48px; padding: 10px 12px; line-height: 1.35; }
+#paper-dialog .decision-page .note { padding-left: 10px; }
+#paper-dialog .decision-page .decision-note-label { font: bold 10px/1.4 'Courier New',monospace; letter-spacing: .5px; }
+#paper-dialog .decision-page .choice small { margin-top: 4px; font-size: 11px; }
+#paper-dialog .decision-page .encounter-cost { color: var(--rust-ink); }
+#paper-dialog .decision-page .decision-actions > .speaker-label { display: none; }
+#paper-dialog .decision-page .interview-question { padding: 0; border: 0; }
+#paper-dialog .decision-page .interview-question .speaker-label { display: none; }
+#paper-dialog .decision-page .interview-question p { margin: 0; }
+#paper-dialog .decision-page .encounter-story { line-height: 1.45; }
+#paper-dialog .decision-page .choice:has(> small) { display: grid; grid-template-columns: minmax(0,1fr) auto; align-items: center; gap: 10px; }
+#paper-dialog .decision-page .choice > small { max-width: 84px; margin: 0; text-align: right; }
+
+@media(max-width: 899px) {
+  #paper-dialog .decision-sheet > .pager-heading { padding: 12px 18px 10px; }
+  #paper-dialog .decision-sheet .pager-heading h2 { font-size: 28px; }
+  #paper-dialog .decision-sheet .pager-tag { display: none; }
+  #paper-dialog .decision-sheet .pager-body { padding: 14px 18px; }
+  #paper-dialog .decision-sheet .decision-context > .eyebrow { font-size: 10px; }
+  #paper-dialog[data-kind="debrief"] .decision-context > .eyebrow { display: none; }
+  #paper-dialog .decision-page p { font-size: 16px; line-height: 1.4; }
+  #paper-dialog .decision-page .note { font-size: 15px; line-height: 1.4; }
+  #paper-dialog .decision-page .choice { font-size: 14px; }
+}
+/* Short portraits trade the photo band for enough room to make a choice. */
+@media(max-height: 650px) and (max-width: 539px) {
+  #paper-dialog.paged-dialog .decision-sheet.pager-has-art { grid-template-rows: auto minmax(0,1fr) var(--pager-footer-height,0px); }
+  #paper-dialog.paged-dialog .paged-sheet.decision-sheet > .pager-art { display: none; }
+  #paper-dialog .decision-sheet > .pager-heading { padding: 10px 14px 9px; }
+  #paper-dialog .decision-sheet .pager-heading h2 { font-size: 25px; }
+  #paper-dialog .decision-sheet .pager-body { padding: 12px 14px; }
+  #paper-dialog .decision-context { gap: 8px; }
+  #paper-dialog .decision-page { gap: 10px; }
+  #paper-dialog .decision-page .choice { padding: 9px 10px; min-height: 48px; }
+}
+/* Wide, short screens put the situation beside the choices. */
+@media(min-width: 540px) and (max-height: 500px) {
+  #paper-dialog.paged-dialog .decision-sheet.pager-has-art { grid-template-columns: minmax(0,1fr); grid-template-rows: auto minmax(0,1fr) var(--pager-footer-height,0px); }
+  #paper-dialog .decision-sheet > .pager-heading { grid-column: 1; grid-row: 1; padding: 8px 16px; }
+  #paper-dialog.paged-dialog .paged-sheet.decision-sheet > .pager-art { display: none; }
+  #paper-dialog .decision-sheet > .pager-body { grid-column: 1; grid-row: 2; padding: 10px 16px; }
+  #paper-dialog .decision-sheet > .pager-nav { grid-column: 1; grid-row: 3; }
+  #paper-dialog .decision-sheet .pager-heading h2 { font-size: 25px; }
+  #paper-dialog .decision-sheet .pager-tag { display: none; }
+  #paper-dialog .decision-page { display: grid; grid-template-columns: minmax(0,1fr) minmax(0,1.15fr); gap: 18px; align-items: start; }
+  #paper-dialog .decision-page > .decision-actions { margin: 0; }
+  #paper-dialog .decision-page .choice { min-height: 48px; padding: 9px; font-size: 13px; }
+  #paper-dialog .decision-page p { font-size: 15px; line-height: 1.35; }
+  #paper-dialog .decision-page .note { font-size: 14px; line-height: 1.35; }
+  #paper-dialog .decision-context { gap: 8px; }
+}
+/* Measured fallback: remove ornamental space, keeping text and touch targets. */
+#paper-dialog.paged-dialog .decision-sheet.decision-condensed { grid-template-columns: minmax(0,1fr); grid-template-rows: auto minmax(0,1fr) var(--pager-footer-height,0px); }
+#paper-dialog.paged-dialog .decision-sheet.decision-condensed > .pager-art { display: none; }
+#paper-dialog .decision-condensed > .pager-heading { grid-column: 1; grid-row: 1; padding: 9px 14px; }
+#paper-dialog .decision-condensed > .pager-body { grid-column: 1; grid-row: 2; }
+#paper-dialog .decision-condensed > .pager-nav { grid-column: 1; grid-row: 3; }
+#paper-dialog .decision-condensed .pager-tag { display: none; }
+#paper-dialog .decision-condensed .pager-heading h2 { font-size: 25px; }
+#paper-dialog .decision-tight .pager-body { padding: 8px 12px; }
+#paper-dialog .decision-tight .decision-context, #paper-dialog .decision-tight .decision-actions, #paper-dialog .decision-tight .decision-page { gap: 7px; }
+#paper-dialog .decision-tight .decision-page p { font-size: 15px; line-height: 1.3; }
+#paper-dialog .decision-tight .decision-page .note { font-size: 14px; line-height: 1.3; }
+#paper-dialog .decision-tight .decision-page .choice { font-size: 13px; padding: 7px 8px; min-height: 44px; }
+@media(min-width: 540px) and (max-height: 500px) {
+  /* An available update shares the context column, not the answer space. */
+  #paper-dialog .decision-sheet:has(#dialog-update:not([hidden])) { --pager-footer-height: 0px; }
+  #paper-dialog .decision-sheet > .pager-nav:has(#dialog-update:not([hidden])) { position: absolute; bottom: 10px; left: 16px; width: calc(46.5% - 24px); padding: 0; background: transparent; border: 0; }
+  #paper-dialog .decision-sheet:has(#dialog-update:not([hidden])) .decision-context { padding-bottom: 54px; }
+}

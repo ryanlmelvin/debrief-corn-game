@@ -51,7 +51,7 @@ With sound enabled, the investigate pressure starts as a distant low drone. The 
 
 ## Phone and desktop play
 
-The game stays within the visible screen in portrait and landscape, including short phone screens with browser controls showing. Briefings, interviews, evidence, encounters, installation help, and records use readable pages with Back/Next controls instead of scrolling. Choices stay together when they fit. Optional documents can be closed from their header; the notebook has a direct entry selector.
+The game stays within the visible screen in portrait and landscape, including short phone screens with browser controls showing. Briefings, notebook entries, installation help, and records use readable pages with Back/Next controls instead of scrolling. Decision screens keep the situation, a concise notebook reminder, costs, and every response on one screen. Full interview wording remains in the saved transcript. Optional documents can be closed from their header; the notebook has a direct entry selector.
 
 The field map keeps travel costs and Walk/Stop within reach. The recovery walk uses a compact thumb pad, a separate readable narrative line, and larger touch targets. Desktop retains mouse aiming, keyboard controls, and roomy illustrated documents. Arrow keys turn document pages; Tab navigates actions. The game pauses behind documents, the kit, and background tabs.
 
