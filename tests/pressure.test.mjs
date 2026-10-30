@@ -5,38 +5,42 @@ import { readFileSync } from 'node:fs';
 import * as engine from '../docs/engine.js';
 
 const source=readFileSync(new URL('../docs/app.js',import.meta.url),'utf8');
-function takeover() {
+function notice() {
   const game=engine.createGame();
-  Object.assign(game,{phase:'decision',time:engine.SHIFT_LENGTH,incident:true,departure:'compelled'});
-  let shown=[],saves=[],closed=0,focused=0,cancel;
-  const context=vm.createContext({...engine,game,lastModalKey:'',modalKind:'',paused:false,
-    showModal(kind,html){context.modalKind=kind;shown.push({kind,html});},
-    closeModal(){context.modalKind='';closed++;},
-    save(){saves.push(engine.serialize(game));},updateUI(){},syncAudio(){},
-    $:()=>({querySelector:()=>({focus(){focused++;}})}),
-    dialog:{addEventListener(type,handler){if(type==='cancel')cancel=handler;}}
+  Object.assign(game,{phase:'decision',time:engine.SHIFT_LENGTH,incident:true});
+  engine.enterField(game);
+  let open=false,shows=0,saves=[],timer=null,closed;
+  const message={textContent:''};
+  const popover={matches:()=>open,showPopover(){open=true;shows++;},hidePopover(){closed({newState:'closed'});open=false;},addEventListener(type,listener){if(type==='beforetoggle')closed=listener;}};
+  const context=vm.createContext({...engine,game,paused:false,dialog:{open:false},menuOpen:()=>false,
+    $:id=>id==='compulsion-notice'?popover:message,
+    save(){saves.push(engine.serialize(game));},syncAudio(){},
+    setTimeout(fn,delay){timer={fn,delay};return 1;},clearTimeout(){timer=null;}
   });
-  vm.runInContext(source.slice(source.indexOf('function sceneDialog()'),source.indexOf('function stat(')),context);
-  vm.runInContext(source.slice(source.indexOf('function act('),source.indexOf("document.addEventListener('click',event=>")),context);
-  vm.runInContext(source.split('\n').find(line=>line.startsWith("dialog.addEventListener('cancel'")),context);
-  return {game,shown,saves,run:code=>vm.runInContext(code,context),cancel:()=>{let prevented=false;cancel({preventDefault(){prevented=true;}});return prevented;},closed:()=>closed,focused:()=>focused};
+  vm.runInContext(source.slice(source.indexOf("const compulsionNotice=$"),source.indexOf('const REDACTED_TOWN')),context);
+  return {game,popover,context,message,saves,show:()=>vm.runInContext('showCompulsionNotice()',context),shows:()=>shows,expire:()=>{assert.equal(timer.delay,8000);timer.fn();}};
 }
 
-test('the takeover opens once, saves before acknowledgement, and retains the update control',()=>{
-  const view=takeover();view.run('sceneDialog();sceneDialog();');
-  assert.equal(view.shown.length,1);assert.equal(view.shown[0].kind,'compulsion');
-  assert.match(view.shown[0].html,/data-update/);
-  assert.match(view.shown[0].html,/data-action="accept-compulsion"/);
-  assert.equal(engine.restore(view.saves.at(-1)).phase,'decision');
-  assert.equal(view.cancel(),true);view.run("act('close');act('confirm-enter');");
-  assert.equal(view.game.phase,'decision');assert.equal(view.closed(),0);
+test('the brief popover leaves the map playable and automatically clears without replaying',()=>{
+  const view=notice();view.show();view.show();
+  assert.equal(view.shows(),1);assert.equal(view.message.textContent,engine.COMPULSION_NOTICE);
+  assert.equal(view.game.phase,'field');assert.equal(engine.move(view.game,1,0),true);
+  assert.equal(engine.restore(view.saves.at(-1)).compulsionNotice,true);
+  view.expire();assert.equal(view.popover.matches(),false);assert.equal(view.game.compulsionNotice,false);
+  assert.equal(engine.restore(view.saves.at(-1)).compulsionNotice,false);
+  view.show();assert.equal(view.shows(),1);
 });
 
-test('acknowledging the takeover opens the map once and moves keyboard focus into it',()=>{
-  const view=takeover();view.run("sceneDialog();act('accept-compulsion');");
-  assert.equal(view.game.phase,'field');assert.equal(view.game.departure,'compelled');
-  assert.equal(view.closed(),1);assert.equal(view.focused(),1);
-  assert.equal(engine.restore(view.saves.at(-1)).phase,'field');
-  view.run("act('accept-compulsion');");
-  assert.equal(view.closed(),1);assert.deepEqual(view.game.searched,['shift-0']);
+test('the arrival notice waits behind pause, menus and dialogs, and light dismissal saves it as seen',()=>{
+  const view=notice();
+  view.context.paused=true;view.show();assert.equal(view.shows(),0);
+  view.context.paused=false;view.context.dialog.open=true;view.show();assert.equal(view.shows(),0);
+  view.context.dialog.open=false;view.context.menuOpen=()=>true;view.show();assert.equal(view.shows(),0);
+  view.context.menuOpen=()=>false;view.show();view.popover.hidePopover();
+  assert.equal(view.game.compulsionNotice,false);view.show();assert.equal(view.shows(),1);
+});
+
+test('choosing to investigate early does not show the compulsion notice',()=>{
+  const view=notice();view.game.compulsionNotice=false;view.game.departure='chosen';
+  view.show();assert.equal(view.shows(),0);
 });

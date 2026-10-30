@@ -19,8 +19,7 @@ button:focus-visible, a:focus-visible, select:focus-visible, summary:focus-visib
 }
 /* The main actions read as ink impressions, rather than raised controls. */
 .primary, .secondary, .paper .primary, .paper .secondary,
-.field-go, .field-stop, .playing .controls button, .playing .tower-hud button,
-.compulsion-scene .primary {
+.field-go, .field-stop, .playing .controls button, .playing .tower-hud button {
   background-image: var(--cloth-grain);
   background-size: 320px 480px;
   background-color: #2b3927;
@@ -226,7 +225,7 @@ body[data-phase="field"] .viewport { background-image: var(--cloth-grain); backg
 .paper .orders li { border-bottom-style: dashed; }
 .paper .stamp { border-style: double; border-width: 3px; text-shadow: .7px 0 #8f533d44; }
 .paper .receipt-stats { border-top: 3px double #8b9271; border-bottom-style: dashed; }
-dialog:not([data-kind="notebook"]):not([data-kind="compulsion"]) { box-shadow: 3px 4px #2d3825,5px 6px #929477,7px 8px #111a12,0 14px 60px #0008; }
+dialog:not([data-kind="notebook"]) { box-shadow: 3px 4px #2d3825,5px 6px #929477,7px 8px #111a12,0 14px 60px #0008; }
 dialog::backdrop { backdrop-filter: none; background: #050e0bd9; }
 .recording-label { background-image: var(--cloth-grain); border-style: dashed; color: #c9bea0; box-shadow: none; }
 .recording-label i { box-shadow: none; }

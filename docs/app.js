@@ -1,5 +1,5 @@
-import { stepGuide, turnGuide, inspectGuide, spareGuide, fireGuide, focusGuide, nearbyGuideSite, projectGuide } from './guide.js';
-import { createGame, startShift, advance, reload, shoot, focusNext, enterField, move, inspect, canEatCrop, eatCrop, nearbySite, investigationPressure, investigationComplete, beginDebrief, chooseFieldEncounter, continueFieldEncounter, getQuestion, getEnding, answer, serialize, restore, BRIEFINGS, EVIDENCE, ENDINGS, DATES, REPORT_DATES, SHIFT_LENGTH } from './engine.js';
+import { stepGuide, turnGuide, inspectGuide, spareGuide, fireGuide, focusGuide, nearbyGuideSite, projectGuide, isGuideAftermath } from './guide.js';
+import { createGame, startShift, advance, reload, shoot, focusNext, enterField, move, inspect, canEatCrop, eatCrop, nearbySite, investigationPressure, investigationComplete, beginDebrief, chooseFieldEncounter, continueFieldEncounter, getQuestion, getEnding, answer, serialize, restore, BRIEFINGS, EVIDENCE, ENDINGS, DATES, REPORT_DATES, SHIFT_LENGTH, COMPULSION_NOTICE } from './engine.js';
 import { Renderer } from './renderer.js';
 import { FieldMap } from './field-ui.js';
 import { dialogArtwork, evidenceMount, notebookMarkup, encounterMarkup } from './art.js';
@@ -45,6 +45,24 @@ function save() {
   catch { $('save-status').textContent='SAVING UNAVAILABLE';if(!storageWarned){toast('Your browser is blocking local saves. Keep this tab open to retain your progress.');storageWarned=true;} }
 }
 function toast(message) { $('toast').textContent=message;$('toast').hidden=false;clearTimeout(toastTimer);toastTimer=setTimeout(()=>$('toast').hidden=true,5000); }
+const compulsionNotice=$('compulsion-notice');
+let compulsionTimer;
+function showCompulsionNotice() {
+  const available=game?.phase==='field'&&!paused&&!dialog.open&&!menuOpen();
+  if(!available){if(compulsionNotice.matches(':popover-open'))compulsionNotice.hidePopover();return;}
+  if(!game.compulsionNotice||compulsionNotice.matches(':popover-open'))return;
+  $('compulsion-message').textContent=COMPULSION_NOTICE;
+  compulsionNotice.showPopover();
+  clearTimeout(compulsionTimer);
+  compulsionTimer=setTimeout(()=>{if(compulsionNotice.matches(':popover-open'))compulsionNotice.hidePopover();},8000);
+  save();
+}
+compulsionNotice.addEventListener('beforetoggle',event=>{
+  if(event.newState!=='closed')return;
+  clearTimeout(compulsionTimer);
+  if(game)game.compulsionNotice=false;
+  save();syncAudio();
+});
 const REDACTED_TOWN = '<span class="censor-bar" role="img" aria-label="Town name redacted"></span>';
 function paper(title,body,tag='PERSONNEL COPY',footer='DEPARTMENT OF AGRICULTURAL CONTAINMENT') {
   return `<article class="paper"><button id="dialog-update" class="secondary" data-update hidden>Update ready. Download?</button><div class="paper-top"><span>STATION 04 / ${REDACTED_TOWN}, ILLINOIS<br>RESTRICTED FIELD OPERATIONS</span><span>${tag}<br>FILE NO. 04–${game?String(game.shift+1).padStart(2,'0'):'00'}</span></div><h2 id="dialog-title" tabindex="-1">${title}</h2>${body}<div class="paper-footer"><span>${footer}</span><span>KEEP FOR YOUR RECORDS</span></div></article>`;
@@ -62,6 +80,9 @@ function showModal(kind,html) {
 }
 function closeModal() {dialog.close();modalKind='';syncAudio();(game?.phase==='field'?$('field-exploration').querySelector('.field-go'):canvas).focus({preventScroll:true});}
 function begin(mode,fromSave=false) {
+  if(compulsionNotice.matches(':popover-open'))compulsionNotice.hidePopover();
+  clearTimeout(compulsionTimer);
+  if($('guide-aftermath').matches(':popover-open'))$('guide-aftermath').hidePopover();
   game=fromSave?readSave():createGame(mode);
   if(!game){toast('The saved shift could not be read. You can start a new one.');return;}
   paused=false;lastModalKey='';lastControlsKey='';lastLog='';
@@ -82,19 +103,21 @@ function sceneDialog() {
     showModal('briefing',paper(b.title,`<p class="eyebrow">SHIFT ${game.shift+1} / ${DATES[game.shift]}, <span class="redacted-text">19XX</span></p><p>${esc(b.text).replaceAll('██████', REDACTED_TOWN)}</p><ol class="orders">${b.orders.map((o,i)=>`<li><span>0${i+1}</span>${o}</li>`).join('')}</ol>${b.note?`<p class="note">${b.note}</p>`:''}${game.shift===0?'<p class="small">Click or tap to fire. <b>X</b> aims, <b>Space</b> fires, <b>R</b> reloads.</p>':''}<button class="primary" data-action="start">Take your post <span>↗</span></button>`, 'SHIFT ORDERS'));
   } else if(game.phase==='tower' && game.incident && !game.incidentPrompted) {
     game.incidentPrompted=true;
-    showModal('sighting',paper('Movement in the field.', '<p>Someone went into the rows. You keep watching the gap after it closes.</p><p class="note">Your thumb is resting on the tower latch.</p><p class="small">Leaving now means any loose crops can cross the perimeter.</p><div class="paper-actions"><button class="primary" data-action="confirm-enter">Investigate now ↗</button><button class="secondary" data-action="close">Stay at my post</button></div>', 'FIELD OBSERVATION'));
-    save();
-  } else if(game.phase==='decision') {
-    showModal('compulsion',`<article class="compulsion-scene"><button id="dialog-update" class="secondary" data-update hidden>Update ready. Download?</button><p class="compulsion-time">RELIEF HAS ARRIVED / YOUR WATCH IS OVER</p><div class="compulsion-word" aria-hidden="true">investigate</div><h2 id="dialog-title" tabindex="-1">You meant to stay.</h2><p>Relief calls from below. You try to answer.</p><p>Your hand lifts the latch.</p><p class="compulsion-refusal"><em>Stay in the tower.</em><br>One boot finds the top rung.</p><p>Then the next. And the next.<br>You cannot make your fingers let go of the rail.</p><p class="compulsion-verdict">Behind you, your relief asks where you are going.</p><button class="primary" data-action="accept-compulsion">Your feet reach the soil <span>→</span></button></article>`);
+    showModal('sighting',paper('Movement in the field.', '<p>Someone went into the rows.</p><p class="small">Leaving now means any loose crops can cross the perimeter.</p><div class="paper-actions"><button class="primary" data-action="confirm-enter">Investigate now ↗</button><button class="secondary" data-action="close">Stay at my post</button></div>', 'FIELD OBSERVATION'));
     save();
   } else if(game.phase==='debrief') {
     const q=getQuestion(game);
-    showModal('debrief',paper('For the record.',`<p class="eyebrow">${REPORT_DATES[game.shift]}, <span class="redacted-text">19XX</span></p><span class="question-num">${game.question === 3 ? 'INTERVIEW CLOSED' : `QUESTION 0${game.question+1} / 03`}</span><p><strong>[SUPERVISOR]</strong><br>${esc(q.prompt)}</p><p class="note">${esc(q.context)}</p><div class="choices">${q.options.map(o=>`<button class="choice" data-action="answer" data-value="${o.id}" ${o.disabled?'disabled':''}>${esc(o.label)}${o.detail?`<small>${esc(o.detail)}</small>`:''}</button>`).join('')}</div>`, 'DEBRIEF TRANSCRIPT'));
+    showModal('debrief',paper('For the record.',`<p class="eyebrow">${REPORT_DATES[game.shift]}, <span class="redacted-text">19XX</span></p><span class="question-num">${game.question === 3 ? 'INTERVIEW CLOSED' : `QUESTION 0${game.question+1} / 03`}</span><div class="interview-question"><span class="speaker-label">SUPERVISOR</span><p>${esc(q.prompt)}</p></div><p class="note">${esc(q.context)}</p><div class="choices" role="group" aria-label="Your response"><span class="speaker-label">YOUR RESPONSE</span>${q.options.map((o,i)=>`<button class="choice" data-action="answer" data-value="${o.id}" ${o.disabled?'disabled':''}><span class="response-key" aria-hidden="true">${String.fromCharCode(65+i)}</span><span>${esc(o.label)}${o.detail?`<small>${esc(o.detail)}</small>`:''}</span></button>`).join('')}</div>`, 'DEBRIEF TRANSCRIPT'));
   } else if(game.phase==='guide' && game.guide.steps === 0) {
     showModal('guide-intro',paper('Between the rows.', '<p>Three recovery personnel wait beneath the tower. You take the rifle. They take lamps.</p><p class="note">“You know the way,” one of them says.</p><p class="small"><b>W/S</b> or <b>↑/↓</b> walk · <b>A/D</b> or <b>←/→</b> turn · <b>E</b> examine.</p><button class="primary" data-action="close">Lead them in ↗</button>', 'RECOVERY DETAIL'));
   } else if(game.phase==='ending') {
     archiveRun();
     const e=getEnding(game);
+    if(isGuideAftermath(game)){
+      $('aftermath-message').textContent=e.last;
+      if(!$('guide-aftermath').matches(':popover-open'))$('guide-aftermath').showPopover();
+      return;
+    }
     showModal('ending',paper(e.title,`<p class="eyebrow">ENDING ${e.code} / 06</p><p>${e.text}</p><p class="note">${e.last}</p><div class="stamp">${e.stamp}</div><div class="receipt-stats"><span>CROPS CONTAINED<strong>${game.kills}</strong></span><span>EXHIBITS RETAINED<strong>${game.evidence.length}</strong></span><span>PERIMETER BREACHES<strong>${game.breaches}</strong></span></div><p class="small">Based on <i>Debrief</i> by Ryan L. Melvin.</p><div class="paper-actions"><button class="primary" data-action="restart">Another assignment ↗</button><button class="secondary" data-action="export">Keep the transcript ↓</button><button class="secondary" data-action="records">View records · ${history.collected.length}/6</button></div>`, 'FINAL DISPOSITION'));
   }
 }
@@ -102,6 +125,9 @@ function stat(label,value,sub='',percent=null,warning=false) {return `<div class
 function updateUI(force=false) {
   if(!game)return;
   document.body.dataset.phase=game.phase;
+  const aftermath=isGuideAftermath(game);
+  $('stats').hidden=aftermath;
+  $('pause').hidden=game.phase==='ending';
   const phase=game.phase,field=phase==='field',site=nearbySite(game),active=phase==='tower';
   $('date-label').textContent=`${DATES[game.shift]}, ████`;
   $('station-status').textContent=field?'RADIO SIGNAL WEAK':phase==='ending'?'FILE CLOSED':'PERIMETER ACTIVE';
@@ -116,8 +142,6 @@ function updateUI(force=false) {
   if(pressure){
     pressureLayer.dataset.stage=pressure.stage;
     pressureLayer.style.setProperty('--pressure',String(pressure.strength));
-    if($('pressure-voice').textContent!==pressure.thought)$('pressure-voice').textContent=pressure.thought;
-    $('pressure-echo').textContent=pressure.echo;
   }
   $('tower-hud').hidden=!active;
   $('hud-ammo').textContent=`${game.rounds} / ${game.reserve} · .22`;
@@ -132,7 +156,7 @@ function updateUI(force=false) {
   if(phase!=='guide'&&(force||controlKey!==lastControlsKey)) {
     lastControlsKey=controlKey;
     const focusedAction=$('controls').contains(document.activeElement)?document.activeElement.dataset.action:null;
-    let html='';
+    let html=aftermath?'<button class="primary" data-action="restart">Another assignment ↗</button><button class="secondary" data-action="records">View records</button><button class="secondary" data-action="export">Keep the transcript ↓</button>':'';
     if(field){
       html='<div class="dpad" aria-label="Walk through the field"><button class="up" data-action="move" data-value="0,-1" aria-label="Move north">↑</button><button class="left" data-action="move" data-value="-1,0" aria-label="Move west">←</button><button class="down" data-action="move" data-value="0,1" aria-label="Move south">↓</button><button class="right" data-action="move" data-value="1,0" aria-label="Move east">→</button></div>';
       if(site?.id==='tower'){if(investigationComplete(game))html+='<button class="primary" data-action="debrief">Return / submit report ↗</button>';}
@@ -145,7 +169,7 @@ function updateUI(force=false) {
     if(focusedAction)$('controls').querySelector(`[data-action="${focusedAction}"]`)?.focus({preventScroll:true});
   }
   const logKey=JSON.stringify(game.log);
-  if(logKey!==lastLog){lastLog=logKey;$('radio-log').innerHTML=game.log.slice(0,6).map(l=>`<li class="${['story','alert'].includes(l.tone)?l.tone:''}">${esc(l.message)}</li>`).join('');$('announcement').textContent=game.log[0]?.message||'';}
+  if(logKey!==lastLog){lastLog=logKey;$('radio-log').innerHTML=game.log.slice(0,6).map(l=>`<li class="${['story','alert'].includes(l.tone)?l.tone:''}">${esc(l.message)}</li>`).join('');$('announcement').textContent=game.compulsionNotice?'':game.log[0]?.message||'';}
   $('scene-caption').hidden=!field;
   if(field)$('scene-caption').textContent='';
   $('pause-layer').hidden=!paused;
@@ -153,7 +177,15 @@ function updateUI(force=false) {
   fieldMap.render(game,paused);
   canvas.hidden=field;
   if (phase === 'guide') updateGuideUI();
+  if(aftermath){
+    $('phase-label').textContent='RECOVERY DETAIL';
+    $('station-status').textContent='RADIO SILENT';
+    $('objective').textContent='';$('objective-detail').textContent='';
+    $('control-hint').textContent='END OF ASSIGNMENT';
+    canvas.setAttribute('aria-label',`${game.guide.team.filter(t=>t.status==='shot').length} fallen lights in the corn rows. The field is still.`);
+  }
   sceneDialog();
+  showCompulsionNotice();
   syncAudio();
 }
 function updateGuideUI() {
@@ -213,13 +245,12 @@ function act(action,value) {
   if(action==='guide-spare')spareGuide(game);
   if(action==='guide-focus'){const p=focusGuide(game);if(p)renderer.pointer=p;}
   if(action==='guide-fire'){const t=game?.guide?.team.find(t=>t.id===game.guide.focused&&t.status==='running');const p=t&&projectGuide(game.guide,t);if(p)renderer.pointer={x:p.x,y:p.y-p.height*.5};fire(renderer.pointer);}
-  if(action==='close'){if(game?.phase==='decision'&&modalKind==='compulsion')return;closeModal();if(game&&['briefing','debrief','ending','decision'].includes(game.phase)){lastModalKey='';updateUI(true);}return;}
+  if(action==='close'){closeModal();if(game&&['briefing','debrief','ending'].includes(game.phase)){lastModalKey='';updateUI(true);}return;}
   if(action==='start'){closeModal();startShift(game);canvas.focus({preventScroll:true});}
   if(action==='answer'){closeModal();answer(game,value);}
   if(action==='reload')reload(game);
   if(action==='focus'){const p=focusNext(game);if(p)renderer.pointer=p;else toast('No moving crops in view.');canvas.focus({preventScroll:true});}
   if(action==='confirm-enter'&&game?.phase==='tower'&&!paused){closeModal();enterField(game);}
-  if(action==='accept-compulsion'&&game?.phase==='decision'){closeModal();enterField(game);}
   if(action==='move'){fieldMap.stop(game);const [dx,dy]=value.split(',').map(Number);move(game,dx,dy);}
   if(action==='corn' && canEatCrop(game))showModal('corn',paper('Something warm.',`<p>On a camping stove beside the treatment drums, ears of corn roll gently in a pot. A clean plate waits beside butter and a shaker of salt. The smell is sweet enough to make your stomach ache. You cannot remember when you last ate.</p><p>A notice above the stove reads: DO NOT CONSUME THE CROP.</p><div class="paper-actions"><button class="primary" data-action="eat-crop">Butter an ear. Take a bite.</button><button class="secondary" data-action="close">Leave it untouched.</button></div>`,'PUMP HOUSE'));
   if(action==='eat-crop' && eatCrop(game))closeModal();
@@ -232,7 +263,7 @@ function act(action,value) {
   if(action==='new-confirm'){closeModal();begin($('difficulty').value);return;}
   if(action==='export'){exportRecord();return;}
   save();updateUI(true);syncAudio();
-  if(['confirm-enter','accept-compulsion'].includes(action)&&game?.phase==='field')$('field-exploration').querySelector('.field-go')?.focus({preventScroll:true});
+  if(action==='confirm-enter'&&game?.phase==='field')$('field-exploration').querySelector('.field-go')?.focus({preventScroll:true});
 }
 document.addEventListener('click',event=>{const button=event.target.closest('[data-action]');if(button&&!button.disabled)act(button.dataset.action,button.dataset.value);});
 $('new-game').addEventListener('click',()=>{
@@ -240,9 +271,9 @@ $('new-game').addEventListener('click',()=>{
   else begin($('difficulty').value);
 });
 $('resume').addEventListener('click',()=>begin(null,true));
-function togglePause(force) {if(!game||dialog.open)return;paused=typeof force==='boolean'?force:!paused;updateUI();save();syncAudio();}
+function togglePause(force) {if(!game||game.phase==='ending'||dialog.open)return;paused=typeof force==='boolean'?force:!paused;updateUI();save();syncAudio();}
 $('pause').addEventListener('click',()=>togglePause());$('unpause').addEventListener('click',()=>{togglePause(false);canvas.focus({preventScroll:true});});
-dialog.addEventListener('cancel',event=>{if(['briefing','debrief','ending','compulsion','encounter'].includes(modalKind))event.preventDefault();else{event.preventDefault();closeModal();}});
+dialog.addEventListener('cancel',event=>{if(['briefing','debrief','ending','encounter'].includes(modalKind))event.preventDefault();else{event.preventDefault();closeModal();}});
 $('manual').addEventListener('click',()=>showModal('manual',paper('The field manual.',`<ol class="orders"><li><span>01</span>Watch the corn. Shoot any that try to escape.</li><li><span>02</span>Remain in the watchtower.</li><li><span>03</span>Do not consume the crop.</li><li><span>04</span>Remember any irregularities for your debrief at the end of the night.</li></ol><button class="primary" data-action="close">Understood ↗</button>`)));
 
 $('notebook').addEventListener('click',()=>{
@@ -263,6 +294,8 @@ function fire(p,padding=0) {const result=game.phase==='guide'?fireGuide(game,p.x
 document.addEventListener('keydown',event=>{
   if(!game||dialog.open||menuOpen()||event.ctrlKey||event.metaKey||event.altKey||['INPUT','SELECT','TEXTAREA'].includes(event.target.tagName))return;
   const k=event.key.toLowerCase();
+  if(k==='escape'&&compulsionNotice.matches(':popover-open')){event.preventDefault();compulsionNotice.hidePopover();return;}
+  if(k==='escape'&&$('guide-aftermath').matches(':popover-open')){event.preventDefault();$('guide-aftermath').hidePopover();return;}
   if(k==='p'||k==='escape'){event.preventDefault();togglePause();return;}
   if(paused)return;
   if(game.phase==='tower'){
@@ -296,7 +329,7 @@ async function initAudio() {
   }
   await audioContext.resume();return true;
 }
-function syncAudio(){soundscape?.sync({enabled:soundEnabled,held:paused||dialog.open||menuOpen()||document.hidden,pressure:game?investigationPressure(game)?.strength||0:0,takeover:game?.phase==='decision'});}
+function syncAudio(){soundscape?.sync({enabled:soundEnabled,held:paused||dialog.open||menuOpen()||document.hidden||game?.phase==='ending',pressure:game?investigationPressure(game)?.strength||0:0,takeover:game?.phase==='field'&&game.compulsionNotice===true});}
 $('sound').addEventListener('click',async()=>{
   if(!soundEnabled){try{if(!await initAudio())return;}catch{toast('Sound could not start. You can keep playing silently.');return;}}
   soundEnabled=!soundEnabled;$('sound').textContent=soundEnabled?'Sound on':'Sound off';$('sound').setAttribute('aria-pressed',String(soundEnabled));syncAudio();

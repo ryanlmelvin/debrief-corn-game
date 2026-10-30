@@ -1,7 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import vm from 'node:vm';
+import { readFileSync } from 'node:fs';
 import { createGame, answer, advance, restore, serialize, getEnding, BRIEFINGS, enterField, inspect } from '../docs/engine.js';
-import { stepGuide, turnGuide, inspectGuide, focusGuide, fireGuide, spareGuide, guideWall } from '../docs/guide.js';
+import { stepGuide, turnGuide, inspectGuide, focusGuide, fireGuide, spareGuide, guideWall, isGuideAftermath } from '../docs/guide.js';
 function begin(){const s=createGame('story',123);Object.assign(s,{phase:'debrief',shift:2,question:2});answer(s,'guide');return s;}
 function steps(s,n){for(let i=0;i<n;i++)assert.equal(stepGuide(s),true);}
 function explore(){
@@ -34,4 +36,25 @@ test('guide saves reject corrupt state and retain exploration progress',()=>{
 test('orders stay restrained, and every landmark has a new exhibit each night',()=>{
   for(const b of BRIEFINGS)assert.deepEqual(b.orders,['Watch the corn. Shoot any that try to escape.','Remain in the watchtower.','Do not consume the crop.','Remember any irregularities for your debrief at the end of the night.']);
   for(const [x,y] of [[9,1],[3,3],[7,5]]){const exhibits=[];for(let shift=0;shift<3;shift++){const s=createGame();Object.assign(s,{phase:'decision',shift,incident:true});enterField(s);s.player={x,y};exhibits.push(inspect(s));}assert.equal(new Set(exhibits).size,3);}
+});
+
+test('shooting aftermath stays in the field with only the final order, including after resume',()=>{
+  const source=readFileSync(new URL('../docs/app.js',import.meta.url),'utf8');
+  const scene=source.slice(source.indexOf('function sceneDialog()'),source.indexOf('function stat('));
+  for(const shots of [1,2,3]){
+    const s=explore();
+    for(let i=0;i<shots;i++){const p=focusGuide(s);fireGuide(s,p.x,p.y);}
+    if(shots<3)spareGuide(s);
+    const game=restore(serialize(s));assert.equal(isGuideAftermath(game),true);
+    let archived=0,shown=0;const message={textContent:''};
+    const context=vm.createContext({game,lastModalKey:'',isGuideAftermath,getEnding,
+      archiveRun(){archived++;},$:id=>id==='aftermath-message'?message:{matches:()=>shown>0,showPopover(){shown++;}},
+      showModal(){assert.fail('The field should remain visible.');}});
+    vm.runInContext(scene+';sceneDialog();sceneDialog();',context);
+    assert.equal(archived,1);assert.equal(shown,1);
+    assert.equal(message.textContent,'Shoot any that try to escape.');
+    assert.equal(getEnding(game).text,'');
+  }
+  const spared=explore();spareGuide(spared);assert.equal(isGuideAftermath(spared),false);
+  assert.equal(isGuideAftermath(begin()),false);
 });

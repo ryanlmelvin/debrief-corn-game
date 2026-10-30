@@ -1,4 +1,4 @@
-import { guideWall, GUIDE_SITES, projectGuide } from './guide.js';
+import { guideWall, GUIDE_SITES, projectGuide, isGuideAftermath } from './guide.js';
 import { FIELD_SITES, SHIFT_LENGTH } from './engine.js';
 
 const W = 960, H = 600;
@@ -132,7 +132,7 @@ export class Renderer {
       this.shotPoint=s?.lastShot&&(this.pointer.view||aimProjection(s.lastShot,this.view,this.previousTargets||s.targets));
       this.lastShot=s?.lastShot;
     }
-    if(s?.phase==='guide') { this.drawGuide(s); return; }
+    if(s?.phase==='guide'||isGuideAftermath(s)) { this.drawGuide(s); return; }
     if(s?.phase==='field') { this.drawMap(s); return; }
     const active=s&&!title;
     if(this.trackScene!==s||this.trackShift!==s?.shift||s?.time<this.trackTime) this.groundTracks=[];
@@ -298,7 +298,7 @@ export class Renderer {
     c.restore();
   }
   drawGuide(s) {
-    const c=this.c,g=s.guide;
+    const c=this.c,g=s.guide,aftermath=isGuideAftermath(s);
     c.save();
     const sky=c.createLinearGradient(0,0,0,300);sky.addColorStop(0,'#080f0e');sky.addColorStop(1,'#394338');c.fillStyle=sky;c.fillRect(0,0,W,300);
     const soil=c.createLinearGradient(0,300,0,H);soil.addColorStop(0,'#2d3324');soil.addColorStop(1,'#111b15');c.fillStyle=soil;c.fillRect(0,300,W,300);
@@ -332,16 +332,18 @@ export class Renderer {
     const vignette=c.createRadialGradient(480,320,40,480,320,480);vignette.addColorStop(0,'#02080500');vignette.addColorStop(.65,'#02080560');vignette.addColorStop(1,'#020805f2');c.fillStyle=vignette;c.fillRect(0,0,W,H);
     c.fillStyle='#afba98';c.font='11px monospace';c.textAlign='left';
     const compass=['E','S','W','N'][((Math.round(g.angle/(Math.PI/2))%4)+4)%4];
-    c.fillText(`RECOVERY DETAIL  /  ${compass}`,this.view.left+18,this.view.top+110);
+    if(!aftermath)c.fillText(`RECOVERY DETAIL  /  ${compass}`,this.view.left+18,this.view.top+110);
     if(g.stage==='escape'){
+      if(!aftermath){
       const p=this.pointer;c.strokeStyle='#d6cfad';c.lineWidth=1;c.beginPath();c.arc(p.x,p.y,10,0,Math.PI*2);c.stroke();
       // Slow fades, with a steady equivalent for reduced-motion preferences.
       c.globalAlpha=this.reduced ? .8 :Math.max(0,Math.sin(g.time*.55-.8))*.85;
       c.fillStyle='#c65b4f';c.font='22px Georgia';c.textAlign='center';c.fillText('shoot any that try to escape.',480,112);c.globalAlpha=1;
+      }
       c.fillStyle='#191f18';c.beginPath();c.moveTo(620,600);c.lineTo(493,401);c.lineTo(483,401);c.lineTo(535,600);c.fill();
     }
     c.fillStyle='#d4d2b7';c.font='15px Georgia';c.textAlign='center';
-    const words=g.message.split(' ');let row='',y=Math.min(490,this.view.top+this.view.height-150);
+    const words=(aftermath?'':g.message).split(' ');let row='',y=Math.min(490,this.view.top+this.view.height-150);
     for(const word of words){if(c.measureText(row+word).width>Math.min(730,this.view.width-36)){c.fillText(row,480,y);y+=22;row='';}row+=word+' ';}c.fillText(row,480,y);
     c.restore();
   }

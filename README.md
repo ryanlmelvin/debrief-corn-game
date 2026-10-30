@@ -2,7 +2,7 @@
 
 A playable rural horror game based on **Debrief**, the short story by **Ryan L. Melvin**.
 
-Work three watchtower shifts. Shoot corn that tries to escape, distinguish human figures from moving crops, try to resist an intrusive urge to investigate, and choose what goes into the official debrief. The urge becomes legible just after the sighting and grows into a command. Holding your post until relief triggers a distinct loss-of-control scene before the field investigation; your later testimony remembers whether you chose to leave or were compelled. Inspect all three locations and return to the tower for debrief; your evidence changes your answers and available endings.
+Work three watchtower shifts. Shoot corn that tries to escape, distinguish human figures from moving crops, try to resist an intrusive urge to investigate, and choose what goes into the official debrief. The urge becomes legible just after the sighting and grows into a command. Holding your post until relief leads straight to the map with a brief notice that you could no longer resist; your later testimony remembers whether you chose to leave or were compelled. Inspect all three locations and return to the tower for debrief; your evidence changes your answers and available endings.
 
 This is a first playable adaptation, with original additional scenes and six alternate outcomes. The source manuscript has not been copied into the project. The application records and environmental anomalies are fictional story elements.
 
@@ -15,6 +15,8 @@ npm start
 ```
 
 Open **http://localhost:4317**. To use another port: `PORT=4321 npm start`.
+
+If you fire on the recovery team, the final field view stays on screen with only “Shoot any that try to escape.” The outcome remains in Records.
 
 The game lasts roughly 8–15 minutes, depending on reading and exploration. **Story** intensity slows moving crops and reduces the exposure cost of walking.
 
@@ -45,7 +47,7 @@ Repository: https://github.com/ryanlmelvin/debrief-corn-game
 
 Play online: https://ryanlmelvin.github.io/debrief-corn-game/
 
-With sound enabled, the investigate pressure starts as a distant low drone. The pulse and close, beating tones build as the outdoor ambience recedes. The entire mix cuts to silence when the compulsion wins, and ordinary ambience returns in the field. Pause, menus, and background tabs mute the sound; turning it back on resumes the current pressure level.
+With sound enabled, the investigate pressure starts as a distant low drone. The pulse and close, beating tones build as the outdoor ambience recedes. The entire mix cuts to silence when the compulsion wins; ordinary ambience returns after the map notice closes. Pause, menus, and background tabs mute the sound; turning it back on resumes the current pressure level.
 
 ## Offline play and saves
 

@@ -101,9 +101,13 @@ export function advanceGuide(s,dt) {
   }
   resolveGuide(s);
 }
+// Keep the last field view on screen when the player has fired on the team.
+export function isGuideAftermath(s) {
+  return s?.phase === 'ending' && s.ending === 'guide' && !!s.guide?.team.some(t => t.status === 'shot');
+}
 export function guideDisposition(s) {
   const shot = s.guide?.team.filter(t => t.status==='shot').length || 0;
-  if (shot===3) return { text: 'You count three lights in the dirt. From the radio comes a request for a perimeter report. You say nothing crossed the boundary. The words arrive easily. Behind you, the corn is still.', last: 'Shoot any that try to escape.', stamp: 'PERIMETER SECURED' };
-  if (shot) return { text: 'Some of the lights reach the road. One of the survivors keeps calling your name. You try to explain the order, but each time you begin, you say it exactly as it was given to you.', last: 'Watch the corn. Shoot any that try to escape.', stamp: 'PERSONNEL INCIDENT' };
+  if (shot===3) return { text: '', last: 'Shoot any that try to escape.', stamp: 'PERIMETER SECURED' };
+  if (shot) return { text: '', last: 'Shoot any that try to escape.', stamp: 'PERSONNEL INCIDENT' };
   return { text: 'You lower the rifle. Three lights reach the road. You follow them as far as the last row, where your feet stop. Someone calls back for you. The instruction continues, although your radio is off.', last: 'Watch the corn. Shoot any that try to escape.', stamp: 'RECOVERY INCOMPLETE' };
 }

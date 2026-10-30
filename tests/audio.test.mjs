@@ -94,7 +94,8 @@ test('the game sends sound preference, pressure, all pause gates and the takeove
     vm.runInContext(`${gate}=true;syncAudio();${gate}=false`,context);assert.equal(calls.at(-1).held,true);
   }
   context.menuOpen=()=>true;vm.runInContext('syncAudio()',context);assert.equal(calls.at(-1).held,true);
-  context.menuOpen=()=>false;context.game.phase='decision';vm.runInContext('syncAudio()',context);assert.equal(calls.at(-1).takeover,true);
+  context.menuOpen=()=>false;context.game.phase='field';context.game.compulsionNotice=true;vm.runInContext('syncAudio()',context);assert.equal(calls.at(-1).takeover,true);
+  context.game.compulsionNotice=false;vm.runInContext('syncAudio()',context);assert.equal(calls.at(-1).takeover,false);
   context.soundEnabled=false;vm.runInContext('syncAudio()',context);assert.equal(calls.at(-1).enabled,false);
   const worker = readFileSync(new URL('../docs/sw.js',import.meta.url),'utf8');
   assert.ok(worker.includes("'./audio.js'"));

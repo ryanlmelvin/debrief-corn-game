@@ -56,9 +56,8 @@
           <div id="pause-layer" class="pause-layer" hidden><h2>Shift paused.</h2><button id="unpause" class="primary">Resume duty ↗</button></div>
           <div id="investigation-pressure" class="investigation-pressure" hidden>
             <div class="pressure-roots" aria-hidden="true"></div>
-            <div class="pressure-echo" aria-hidden="true"><span id="pressure-echo">just a look</span><span>investigate</span></div>
+            <div class="pressure-echo" aria-hidden="true"><span>investigate</span><span>investigate</span></div>
             <div class="pressure-thought">
-              <p id="pressure-voice" aria-live="polite"></p>
               <button id="investigate-urge" class="investigate-urge" data-action="confirm-enter" aria-label="Investigate the field now"><span>investigate</span></button>
             </div>
           </div>
@@ -78,5 +77,7 @@
   </main>
   <dialog id="paper-dialog" aria-labelledby="dialog-title"><div id="dialog-content"></div></dialog>
   <div id="toast" class="toast" role="status" hidden></div>
+  <div id="compulsion-notice" class="compulsion-notice" popover="auto" role="status" aria-live="polite" aria-atomic="true"><p id="compulsion-message"></p><button type="button" popovertarget="compulsion-notice" popovertargetaction="hide" aria-label="Dismiss notice">×</button></div>
+  <div id="guide-aftermath" class="compulsion-notice" popover="auto" role="status" aria-live="polite" aria-atomic="true"><p id="aftermath-message"></p><button type="button" popovertarget="guide-aftermath" popovertargetaction="hide" aria-label="Dismiss final line">×</button></div>
 </body>
 </html>

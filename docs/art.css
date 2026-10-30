@@ -3,7 +3,6 @@
    Only its word is clickable; the encroaching texture never intercepts a shot. */
 .investigation-pressure{position:absolute;inset:0;z-index:1;pointer-events:none;overflow:hidden;--pressure:0}
 .pressure-thought{position:absolute;top:clamp(116px,21%,200px);left:50%;transform:translateX(-50%);width:min(90%,560px);text-align:center;color:#d8d6b8;text-shadow:0 2px 8px #080d09,0 0 25px #080d09}
-.pressure-thought p{font:italic clamp(13px,1.6vw,17px)/1.45 Georgia,serif;margin:0 auto 2px;max-width:95%;opacity:calc(.7 + var(--pressure)*.3)}
 .investigate-urge{position:relative;isolation:isolate;pointer-events:auto;min-height:58px;padding:6px 24px 12px;border:0;background:transparent;color:#c39278;font:italic 400 clamp(38px,5.2vw,65px)/1.1 Georgia,serif;letter-spacing:calc(.025em + var(--pressure)*.055em);text-shadow:1px 2px 0 #161b12,-1px 0 #d8d6b855,0 0 18px #080c07;transform:rotate(-2deg);transition:color 1.8s,letter-spacing 2s;touch-action:manipulation}
 .investigate-urge::before{content:"";position:absolute;inset:8% -10% 0;z-index:-1;background:linear-gradient(#141d18b3,#141d1866),url('./assets/notebook-paper.webp') center/cover;opacity:calc(.3 + var(--pressure)*.45);mix-blend-mode:multiply;clip-path:polygon(2% 14%,18% 9%,26% 14%,45% 3%,69% 11%,88% 5%,98% 20%,94% 48%,100% 73%,81% 88%,58% 81%,34% 96%,14% 84%,0 91%,5% 55%)}
 .investigate-urge:hover:not(:disabled),.investigate-urge:focus-visible{color:#e1c1a0;background:transparent;filter:none;text-shadow:0 0 12px #8f533d}
@@ -16,27 +15,11 @@
 .investigation-pressure[data-stage="2"] .pressure-echo{opacity:.4}
 .investigation-pressure[data-stage="3"] .pressure-echo{opacity:.58}
 .investigation-pressure[data-stage="2"] .investigate-urge,.investigation-pressure[data-stage="3"] .investigate-urge{color:#d6aa89;animation:thought-breath 6s ease-in-out infinite}
-.investigation-pressure[data-stage="3"] .pressure-thought p{color:#e0cfad}
 .investigation-pressure::after{content:"";position:absolute;inset:0;box-shadow:inset 0 0 100px #080e0a;opacity:calc(var(--pressure)*.6);pointer-events:none}
 @keyframes thought-breath{0%,100%{transform:rotate(-2deg) scale(1)}50%{transform:rotate(-1deg) scale(1.035)}}
 body:has(dialog[open]) .investigate-urge,body:has(#game-menu:popover-open) .investigate-urge,.pressure-held .investigate-urge{animation-play-state:paused}
-/* A break in agency, without the institutional frame of a routine report. */
-dialog[data-kind="compulsion"]{max-width:780px;border:1px solid #766b4a;background:#141d18;color:#d8d6b8;box-shadow:0 0 0 7px #141d1855,0 25px 130px #000;color-scheme:dark}
-dialog[data-kind="compulsion"]::backdrop{background:#080e0af0;backdrop-filter:blur(8px)}
-.compulsion-scene{position:relative;isolation:isolate;overflow:hidden;padding:32px clamp(24px,6vw,64px) 38px;background:linear-gradient(#141d18e8,#141d18f5),url('./assets/notebook-paper.webp') center/cover}
-.compulsion-scene::before{content:"";position:absolute;inset:0;z-index:-1;background:linear-gradient(#141d1844 0,#141d18b3 38%,#141d18f5 70%),url('./assets/field-drain.webp') center top/auto 580px no-repeat;opacity:.85}
-.compulsion-time{font:9px/1.6 'Courier New',monospace;letter-spacing:1.4px;color:#b8ad8c;margin:0 0 18px}
-.compulsion-word{font:italic clamp(56px,10vw,98px)/1 Georgia,serif;letter-spacing:-3px;color:#b68d70;opacity:.7;transform:rotate(-4deg);margin:0 0 30px;text-shadow:-2px 1px #34412b,2px -1px #141d18}
-.compulsion-scene h2{font:400 clamp(29px,5vw,42px)/1.08 Georgia,serif;letter-spacing:-.6px;max-width:500px;margin:0 0 22px;color:#e0d9bc;text-wrap:balance}
-.compulsion-scene h2:focus{outline:none}
-.compulsion-scene>p:not(.compulsion-time){font:16px/1.65 Georgia,serif;max-width:540px;margin:16px 0;color:#c5c5a8}
-.compulsion-scene>.compulsion-refusal{padding-left:18px;border-left:2px solid #a57a59;color:#e0d9bc!important}
-.compulsion-refusal em{color:#d6aa89}
-.compulsion-scene>.compulsion-verdict{font-style:italic!important;color:#d6aa89!important;margin-top:24px!important}
-.compulsion-scene .primary{margin-top:14px;min-height:52px;background:#c0a67c;color:#1c271d;border-color:#c0a67c;gap:20px}
-.compulsion-scene #dialog-update{margin:0 0 18px}
-@media(max-width:600px){.pressure-thought{top:22%;width:94%}.pressure-thought p{max-width:310px;font-size:14px}.pressure-echo span{top:17%;left:7%;font-size:14px}.pressure-echo span+span{top:37%;right:7%;font-size:23px}.compulsion-scene{padding:25px 24px 28px}.compulsion-word{margin-bottom:24px}.compulsion-scene>p:not(.compulsion-time){font-size:15px}.compulsion-scene .primary{width:100%;font-size:11px}}
-@media(max-height:500px){.pressure-thought{top:26%;left:60%;width:70%}.pressure-thought p{font-size:12px}.investigate-urge{font-size:36px;min-height:48px}.pressure-echo span{top:53%;left:4%;font-size:13px}.pressure-echo span+span{top:70%;right:4%;font-size:20px}.compulsion-word{font-size:52px;margin-bottom:18px}}
+@media(max-width:600px){.pressure-thought{top:22%;width:94%}.pressure-echo span{top:17%;left:7%;font-size:14px}.pressure-echo span+span{top:37%;right:7%;font-size:23px}}
+@media(max-height:500px){.pressure-thought{top:26%;left:60%;width:70%}.investigate-urge{font-size:36px;min-height:48px}.pressure-echo span{top:53%;left:4%;font-size:13px}.pressure-echo span+span{top:70%;right:4%;font-size:20px}}
 @media(prefers-reduced-motion:reduce){.investigate-urge{animation:none!important;transition:none}.pressure-echo{transition:none}}
 
 .scene-plate{position:relative;margin:0;background:#d8d3b6;padding:7px 7px 0;box-shadow:0 2px 8px #17201540}
@@ -162,3 +145,9 @@ dialog[data-kind="encounter"]{max-width:760px;background:#d8d6b8;border-color:#8
  dialog[data-kind="encounter"]{width:calc(100% - 24px);max-width:900px;max-height:calc(100dvh - 20px)}
  .encounter-sheet{display:grid;grid-template-columns:32% 1fr}.encounter-image img{height:100%;min-height:300px;object-position:45% center}.encounter-image>span{font-size:8px;line-height:1.6;padding:24px 12px 12px}.encounter-copy{padding:20px 24px}.encounter-copy h2{font-size:28px}.encounter-story{font-size:15px}.encounter-choices .choice{padding:10px;min-height:54px}
 }
+
+/* A short, dismissible note over the map, without interrupting exploration. */
+.compulsion-notice{position:fixed;inset:44% auto auto 50%;transform:translate(-50%,-50%);margin:0;width:min(420px,calc(100vw - 32px));padding:18px 54px 18px 20px;border:1px solid #9a8e66;background:linear-gradient(#1d2b21f0,#1d2b21f0),url('./assets/notebook-paper.webp') center/cover;color:#d8d6b8;box-shadow:0 8px 30px #07100b80}
+.compulsion-notice p{margin:0;font:italic 18px/1.5 Georgia,serif}
+.compulsion-notice button{position:absolute;top:4px;right:4px;width:44px;min-height:44px;padding:0;border:0;background:transparent;color:#d8d6b8;font:24px Georgia,serif}
+.compulsion-notice::backdrop{background:transparent;pointer-events:none}

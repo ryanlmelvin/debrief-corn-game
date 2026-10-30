@@ -1,13 +1,13 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { createGame,startShift,advance,shoot,reload,enterField,move,inspect,beginDebrief,answer,getQuestion,restore,serialize,SHIFT_LENGTH,focusNext,ENDINGS,EVIDENCE,investigationUrge,investigationPressure, canEatCrop, eatCrop, chooseFieldEncounter, continueFieldEncounter } from '../docs/engine.js';
+import { createGame,startShift,advance,shoot,reload,enterField,move,inspect,beginDebrief,answer,getQuestion,restore,serialize,SHIFT_LENGTH,COMPULSION_NOTICE,focusNext,ENDINGS,EVIDENCE,investigationUrge,investigationPressure, canEatCrop, eatCrop, chooseFieldEncounter, continueFieldEncounter } from '../docs/engine.js';
 
 import { currentEncounter } from '../docs/encounters.js';
 function settle(s){if(s.fieldEvents.pending){chooseFieldEncounter(s,currentEncounter(s).choices[0].id);continueFieldEncounter(s);}}
 function walkStep(s,dx,dy){settle(s);const result=move(s,dx,dy);settle(s);return result;}
 
 const watch=mode=>{const s=createGame(mode,42);startShift(s);return s;};
-function safeWatch(s,acknowledge=true){while(s.phase==='tower'){advance(s,.25);for(const t of [...s.targets]){if(t.kind!=='corn')continue;if(!s.rounds){reload(s);break;}shoot(s,t.x,t.y-34);}if(s.rounds<2)reload(s);}if(acknowledge&&s.phase==='decision')enterField(s);}
+function safeWatch(s){while(s.phase==='tower'){advance(s,.25);for(const t of [...s.targets]){if(t.kind!=='corn')continue;if(!s.rounds){reload(s);break;}shoot(s,t.x,t.y-34);}if(s.rounds<2)reload(s);}}
 function walkTo(s,x,y){while(s.phase==='field'&&s.player.x!==x)walkStep(s,Math.sign(x-s.player.x),0);while(s.phase==='field'&&s.player.y!==y)walkStep(s,0,Math.sign(y-s.player.y));}
 function investigateAll(s){for(const [x,y] of [[3,3],[9,1],[7,5]]){walkTo(s,x,y);inspect(s);}walkTo(s,1,7);}
 function report(s,choice='comply'){if(s.phase==='field'&&!['corner','pump','drain'].every(id=>s.inspected.includes(id)))investigateAll(s);beginDebrief(s);answer(s,choice);answer(s,'evidence');answer(s,s.shift===2?'sign':'question');if(s.phase==='debrief'&&s.question===3)answer(s,'return');}
@@ -24,18 +24,17 @@ test('keyboard target selection excludes humans',()=>{const s=watch();advance(s,
 test('investigation is unavailable before the sighting',()=>{const s=watch();assert.equal(enterField(s),false);});
 test('abandoning the post counts remaining mobile crops as breaches',()=>{const s=watch();advance(s,13);const n=s.targets.filter(t=>t.kind==='corn').length;enterField(s);assert.equal(s.phase,'field');assert.equal(s.breaches,n);});
 test('six total breaches end the assignment',()=>{const s=watch();s.breaches=5;s.targets=[{id:1,kind:'corn',x:895,y:400,direction:1,speed:20,wobble:0}];advance(s,.1);assert.equal(s.phase,'ending');assert.equal(s.ending,'breach');});
-test('holding the post ends in a saved compulsion scene before the field',()=>{
+test('holding the post enters the map immediately with a saved notice and no abandonment penalty',()=>{
   for(let shift=0;shift<3;shift++){
-    const s=watch();s.shift=shift;safeWatch(s,false);
-    assert.equal(s.phase,'decision');assert.equal(s.departure,'compelled');
-    assert.equal(s.entered,false);assert.equal(s.breaches,0);
-    assert.match(s.log[0].message,/hand lifts the latch/);
-    assert.equal(move(s,1,0),false);assert.equal(shoot(s,0,0),'blocked');assert.equal(beginDebrief(s),false);
+    const s=watch();s.shift=shift;safeWatch(s);
+    assert.equal(s.phase,'field');assert.equal(s.departure,'compelled');
+    assert.equal(s.entered,true);assert.equal(s.compulsionNotice,true);assert.equal(s.breaches,0);
+    assert.equal(s.log[0].message,COMPULSION_NOTICE);
+    assert.equal(shoot(s,0,0),'blocked');assert.equal(beginDebrief(s),false);
     const resumed=restore(serialize(s));assert.deepEqual(resumed,s);
     advance(resumed,20);assert.deepEqual(resumed,s);
-    assert.equal(enterField(resumed),true);assert.equal(resumed.phase,'field');
-    assert.equal(resumed.departure,'compelled');assert.equal(resumed.breaches,0);
-    assert.equal(enterField(resumed),false);
+    assert.equal(enterField(resumed),false);assert.equal(move(resumed,1,0),true);
+    assert.equal(resumed.breaches,0);
   }
 });
 test('all three standard shifts are defendable with supplied ammunition',()=>{const s=watch();for(let i=0;i<3;i++){safeWatch(s);assert.equal(s.phase,'field');assert.equal(s.breaches,0);report(s);if(s.phase==='briefing')startShift(s);}assert.equal(s.phase,'ending');});
@@ -169,9 +168,9 @@ test('every completed watch requires all three inspections before debrief',()=>{
   walkTo(s,9,1);inspect(s);walkTo(s,1,7);assert.equal(beginDebrief(s),false);
   walkTo(s,7,5);inspect(s);walkTo(s,1,7);assert.equal(beginDebrief(s),true);
 });
-test('old end-of-watch saves show the compulsion before investigation',()=>{
+test('old end-of-watch saves skip the removed scene and resume on the map',()=>{
   const s=createGame();Object.assign(s,{phase:'decision',incident:true,time:SHIFT_LENGTH});
-  const resumed=restore(serialize(s));assert.equal(resumed.phase,'decision');assert.equal(resumed.departure,'compelled');assert.equal(beginDebrief(resumed),false);enterField(resumed);assert.equal(resumed.phase,'field');assert.equal(resumed.entered,true);
+  const resumed=restore(serialize(s));assert.equal(resumed.phase,'field');assert.equal(resumed.departure,'compelled');assert.equal(resumed.compulsionNotice,true);assert.equal(beginDebrief(resumed),false);assert.equal(resumed.entered,true);
 });
 
 
@@ -218,7 +217,6 @@ test('intrusive thoughts escalate while remaining gated by the sighting and towe
   s.incident=true;
   const stages=[13,26,38,49].map(time=>{s.time=time;return investigationPressure(s);});
   assert.deepEqual(stages.map(p=>p.stage),[0,1,2,3]);
-  assert.equal(new Set(stages.map(p=>p.thought)).size,4);
   for(let i=1;i<stages.length;i++)assert.ok(stages[i].strength>stages[i-1].strength);
   for(const phase of ['briefing','decision','field','debrief','guide','ending']){s.phase=phase;assert.equal(investigationPressure(s),null);}
 });
@@ -226,9 +224,9 @@ test('intrusive thoughts escalate while remaining gated by the sighting and towe
 test('voluntary departure and compulsion remain distinct through testimony, saves and next shift',()=>{
   for(const compelled of [false,true]){
     const s=watch();
-    if(compelled)safeWatch(s,false);else advance(s,13);
+    if(compelled)safeWatch(s);else advance(s,13);
     enterField(s);investigateAll(s);beginDebrief(s);
-    assert.equal(s.departure,compelled?'compelled':'chosen');
+    assert.equal(s.departure,compelled?'compelled':'chosen');assert.equal(s.compulsionNotice,false);
     const resumed=restore(serialize(s));const q=getQuestion(resumed);
     if(compelled)assert.match(q.options[0].label,/deciding to stay. Then I was on the ladder/);
     else assert.match(q.options[0].label,/went into the field to investigate/);
@@ -241,4 +239,12 @@ test('voluntary departure and compulsion remain distinct through testimony, save
   assert.equal(restore(serialize(legacy)).departure,'chosen');
   legacy.time=SHIFT_LENGTH;assert.equal(restore(serialize(legacy)).departure,'compelled');
   legacy.departure='unknown';assert.equal(restore(serialize(legacy)),null);
+});
+
+
+test('existing field saves do not replay the new arrival notice',()=>{
+  const s=watch();safeWatch(s);delete s.compulsionNotice;
+  assert.equal(restore(serialize(s)).compulsionNotice,false);
+  s.compulsionNotice='yes';assert.equal(restore(serialize(s)),null);
+  const chosen=watch();advance(chosen,13);enterField(chosen);assert.equal(chosen.compulsionNotice,false);
 });

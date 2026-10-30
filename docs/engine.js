@@ -4,6 +4,7 @@ import { freshFieldEvents, encounterAfterStep, resolveEncounter, dismissEncounte
 // All simulation and story state lives here. Rendering and storage are separate.
 export const SAVE_VERSION = 1;
 export const SHIFT_LENGTH = 55;
+export const COMPULSION_NOTICE = 'You could not resist the urge to investigate any longer.';
 export const DATES = ['SEPTEMBER 30', 'OCTOBER 14', 'OCTOBER 29'];
 export const REPORT_DATES = ['OCTOBER 01', 'OCTOBER 15', 'OCTOBER 30'];
 export const EVIDENCE = {
@@ -28,7 +29,7 @@ export function createGame(mode = 'standard', seed = Date.now()) {
   const s = { runId: String(seed), version: SAVE_VERSION, mode, rng: seed >>> 0 || 1, phase: 'briefing', shift: 0, time: 0,
     rounds: 6, reserve: 24, reload: 0, kills: 0, shots: 0, breaches: 0, exposure: 0,
     trust: 0, honesty: 0, evidence: [], reports: [], log: [], targets: [], nextSpawn: 3, nextId: 1,
-    incident: false, entered: false, departure: null, searched: [], question: 0, ending: null, lastShot: null,
+    incident: false, entered: false, departure: null, compulsionNotice: false, searched: [], question: 0, ending: null, lastShot: null,
     player: { x: 1, y: 7 }, visited: ['1,7'], fieldSteps: 0, inspected: [], focused: null, fieldEvents: freshFieldEvents() };
   return s;
 }
@@ -38,7 +39,7 @@ export function startShift(s) {
   if (s.phase !== 'briefing') return false;
   s.fieldEvents.pending=null;s.fieldEvents.journey=null;
   Object.assign(s, { phase: 'tower', time: 0, rounds: 6, reserve: 24, reload: 0, targets: [], nextSpawn: 3,
-    incident: false, incidentPrompted: false, entered: false, departure: null, question: 0, player: { x: 1, y: 7 }, visited: ['1,7'], fieldSteps: 0, inspected: [], focused: null, lastShot: null });
+    incident: false, incidentPrompted: false, entered: false, departure: null, compulsionNotice: false, question: 0, player: { x: 1, y: 7 }, visited: ['1,7'], fieldSteps: 0, inspected: [], focused: null, lastShot: null });
   addLog(s, `Station 04. Shift ${s.shift + 1}. Perimeter check complete.`);
   return true;
 }
@@ -86,9 +87,8 @@ export function advance(s, dt) {
     s.targets = s.targets.filter(t => !t.gone);
     if (s.breaches >= 6) finish(s, 'breach');
     else if (s.time >= SHIFT_LENGTH) {
-      // Relief ends containment duty, but the compulsion gets its own saved scene.
-      s.phase = 'decision'; s.departure = 'compelled'; s.targets = [];
-      addLog(s, 'Relief calls. You mean to answer. Your hand lifts the latch.', 'story');
+      // Relief prevents abandonment penalties. Go directly to the playable map.
+      s.phase = 'decision'; enterField(s);
     }
   }
 }
@@ -100,9 +100,7 @@ export function investigationPressure(s) {
   const strength = investigationUrge(s);
   if (!strength) return null;
   const stage = strength < .45 ? 0 : strength < .68 ? 1 : strength < .88 ? 2 : 3;
-  return { strength, stage,
-    thought: ['Just a look.', 'Your thumb rests on the latch.', 'You put your hand back. Again.', 'Stay at your post. Stay.'][stage],
-    echo: ['just a look', 'again', 'a little closer', 'down'][stage] };
+  return { strength, stage };
 }
 export function reload(s) {
   if (s.phase !== 'tower' || s.reload > 0 || s.rounds === 6 || s.reserve <= 0) return false;
@@ -144,9 +142,11 @@ export function enterField(s) {
   s.targets = [];
   if (s.breaches >= 6) { finish(s, 'breach'); return true; }
   s.departure = s.phase === 'tower' ? 'chosen' : 'compelled';
+  s.compulsionNotice = s.departure === 'compelled';
   s.phase = 'field'; s.entered = true;
   s.searched.push(`shift-${s.shift}`);
   addLog(s, 'Choose a landmark. Follow the paths for lower exposure, or cut through the rows.', 'story');
+  if (s.compulsionNotice) addLog(s, COMPULSION_NOTICE, 'story');
   return true;
 }
 export const FIELD_SITES = [
@@ -201,6 +201,7 @@ export function investigationComplete(s) {
 export function beginDebrief(s) {
   if (s.phase !== 'field' || s.fieldEvents.pending || nearbySite(s)?.id !== 'tower' || !investigationComplete(s)) return false;
   s.fieldEvents.journey=null;
+  s.compulsionNotice=false;
   s.phase = 'debrief'; s.question = 0; return true;
 }
 export function getQuestion(s) {
@@ -298,7 +299,7 @@ export const ENDINGS = {
 export function getEnding(s) {
   return s.ending === 'guide' && s.guide ? { ...ENDINGS.guide, ...guideDisposition(s) } : ENDINGS[s.ending];
 }
-function finish(s, ending) { s.phase = 'ending'; s.ending = ending; s.targets = [];s.fieldEvents.pending=null;s.fieldEvents.journey=null; }
+function finish(s, ending) { s.phase = 'ending'; s.ending = ending; s.targets = [];s.compulsionNotice=false;s.fieldEvents.pending=null;s.fieldEvents.journey=null; }
 
 export function serialize(s) { return JSON.stringify(s); }
 export function restore(raw) {
@@ -325,10 +326,12 @@ export function restore(raw) {
       if (!Array.isArray(g.team) || g.team.length>3 || !g.team.every(t=>Number.isInteger(t.id)&&Number.isFinite(t.x)&&Number.isFinite(t.y)&&Number.isFinite(t.distance)&&['running','shot','escaped'].includes(t.status))) return null;
       if (g.stage==='escape' && (g.team.length!==3 || g.clues.length!==3)) return null;
     }
-    // Old end-of-watch saves also show the takeover before opening the map.
-    if (s.phase === 'decision') { s.departure = 'compelled'; s.incident = true; s.targets = []; }
+    // Saves from the removed interstitial now resume directly on the map.
+    if (s.phase === 'decision') { s.incident = true; s.targets = []; enterField(s); }
     else if (s.departure === undefined) s.departure = s.entered ? (s.time >= SHIFT_LENGTH ? 'compelled' : 'chosen') : null;
     if (![null, 'chosen', 'compelled'].includes(s.departure)) return null;
+    if (s.compulsionNotice === undefined) s.compulsionNotice = false;
+    if (typeof s.compulsionNotice !== 'boolean') return null;
     if (typeof s.runId !== 'string') s.runId = `legacy-${s.rng}`;
     // Older saves used discovery titles as log receipts, revealing them outside the exhibit.
     const oldReceipts = new Set(Object.values(EVIDENCE).map(e => `${e.title} entered in your private notebook.`));
