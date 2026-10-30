@@ -17,7 +17,7 @@ function save() {
 }
 function toast(message) { $('toast').textContent=message;$('toast').hidden=false;clearTimeout(toastTimer);toastTimer=setTimeout(()=>$('toast').hidden=true,5000); }
 function paper(title,body,tag='PERSONNEL COPY',footer='DEPARTMENT OF AGRICULTURAL CONTAINMENT') {
-  return `<article class="paper"><div class="paper-top"><span>STATION 04 / ILLINOIS<br>RESTRICTED FIELD OPERATIONS</span><span>${tag}<br>FILE NO. 04–${game?String(game.shift+1).padStart(2,'0'):'00'}</span></div><h2 id="dialog-title" tabindex="-1">${title}</h2>${body}<div class="paper-footer"><span>${footer}</span><span>KEEP FOR YOUR RECORDS</span></div></article>`;
+  return `<article class="paper"><button id="dialog-update" class="secondary" data-update hidden>Update ready. Download?</button><div class="paper-top"><span>STATION 04 / ILLINOIS<br>RESTRICTED FIELD OPERATIONS</span><span>${tag}<br>FILE NO. 04–${game?String(game.shift+1).padStart(2,'0'):'00'}</span></div><h2 id="dialog-title" tabindex="-1">${title}</h2>${body}<div class="paper-footer"><span>${footer}</span><span>KEEP FOR YOUR RECORDS</span></div></article>`;
 }
 function showModal(kind,html) {
   modalKind=kind;$('dialog-content').innerHTML=html;
@@ -196,13 +196,55 @@ function shotSound(hit) {
 window.addEventListener('beforeinstallprompt',event=>{event.preventDefault();installPrompt=event;$('install').hidden=false;});
 $('install').addEventListener('click',async()=>{if(installPrompt){await installPrompt.prompt();installPrompt=null;$('install').hidden=true;}});
 window.addEventListener('appinstalled',()=>{$('install').hidden=true;toast('Debrief installed. Your saved shift stays on this device.');});
-if('serviceWorker'in navigator && ['https:','http:'].includes(location.protocol)){
-  navigator.serviceWorker.register('./sw.js').then(reg=>{
-    const announce=()=>toast('An updated field manual is ready. Close all Debrief tabs and reopen to load it.');
-    if(reg.waiting)announce();
-    reg.addEventListener('updatefound',()=>{reg.installing?.addEventListener('statechange',event=>{if(event.target.state==='installed'&&navigator.serviceWorker.controller)announce();});});
-  }).catch(()=>toast('Offline installation is unavailable. The game still works while this page is open.'));
+if ('serviceWorker' in navigator && ['https:', 'http:'].includes(location.protocol)) {
+  let waitingWorker = null, applyingUpdate = false, refreshing = false;
+  const showUpdate = () => {
+    $('update-game').hidden = !waitingWorker;
+    const inDialog = $('dialog-update');
+    if (inDialog) inDialog.hidden = !waitingWorker;
+  };
+  const applyUpdate = () => {
+    if (!waitingWorker || applyingUpdate) return;
+    save();
+    applyingUpdate = true;
+    paused = true;
+    syncAudio();
+    document.querySelectorAll('[data-update]').forEach(button => {
+      button.disabled = true;
+      button.textContent = 'Loading update…';
+    });
+    waitingWorker.postMessage({ type: 'SKIP_WAITING' });
+  };
+  document.addEventListener('click', event => {
+    if (event.target.closest('[data-update]')) applyUpdate();
+  });
+  // Other open game tabs also save before reloading when the update activates.
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    if (refreshing) return;
+    refreshing = true;
+    save();
+    location.reload();
+  });
+  navigator.serviceWorker.register('./sw.js', { updateViaCache: 'none' }).then(reg => {
+    const announce = () => {
+      waitingWorker = reg.waiting;
+      showUpdate();
+    };
+    announce();
+    reg.addEventListener('updatefound', () => {
+      reg.installing?.addEventListener('statechange', event => {
+        if (event.target.state === 'installed' && navigator.serviceWorker.controller) announce();
+      });
+    });
+    // Check while a playtest stays open, and whenever the player returns to it.
+    const check = () => { if (!document.hidden) reg.update().catch(() => {}); };
+    setInterval(check, 60000);
+    document.addEventListener('visibilitychange', check);
+    new MutationObserver(showUpdate).observe($('dialog-content'), { childList: true });
+    check();
+  }).catch(() => toast('Offline installation is unavailable. The game still works while this page is open.'));
 }
+
 function frame(now) {
   const dt=lastFrame?Math.min((now-lastFrame)/1000,.1):0;lastFrame=now;
   if(game&&!paused&&!dialog.open&&!document.hidden){
