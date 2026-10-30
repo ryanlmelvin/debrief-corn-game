@@ -87,10 +87,25 @@ const encounterLabels = {
   'future-call:record': 'Record the future interview.',
   'future-call:compare': 'Compare with your first tape.'
 };
-const encounterAlt={radio:'A scratched field radio half buried in wet soil between corn rows.',tracks:'Two trails of boot prints lead toward pale roots and a dirty survey ribbon.',lantern:'An oil lantern lights a corn row with an indistinct human shape beyond it.'};
+const encounterAlt={
+  radio:'A scratched field radio half buried in wet soil between corn rows.',
+  tracks:'Two trails of boot prints lead toward pale roots and a dirty survey ribbon.',
+  'unattended-lamp':'An unattended oil lantern hangs above an open supply tin beside the corn path.',
+  'extra-step':'A fresh footprint fills with rippling water just behind a stopped work boot.',
+  'second-call':'A field radio and its loose microphone lie in a dry cracked furrow over old boot prints.',
+  'moved-crossing':'The corn path divides into two dark openings, with boot prints leading into both.',
+  lantern:'An oil lantern lights a corn row with an indistinct human shape beyond it.',
+  'two-towers':'Two tower lights shine above the corn; a wooden ladder is visible beneath one.',
+  'future-call':'A half-buried field radio faces a small tape recorder on a canvas pouch in a muddy corn furrow.',
+  'root-knot':'Pale roots weave around a hollow boot-shaped space across the muddy furrow.',
+  'your-outline':'A figure faces away beyond a lantern, wearing an olive coat with a pale repair on its sleeve.',
+  'last-follower':'Corn leans toward the watchtower ladder beside a field radio clipped to the observer’s belt.'
+};
+// Keep each scene's defining detail in the wide photo band.
+const encounterFocus={radio:59,tracks:68,'unattended-lamp':63,'extra-step':60,'second-call':56,'moved-crossing':57,lantern:40,'two-towers':29,'future-call':53,'root-knot':53,'your-outline':35,'last-follower':39};
 export function encounterMarkup(game) {
   const e=currentEncounter(game);if(!e)return '';
   const pending=game.fieldEvents.pending,chosen=e.choices.find(c=>c.id===pending.choice);
   const effect=delta=>delta>0?`+${delta} exposure${game.exposure+delta>=100?' · reaches 100':''}`:delta<0?`−${-delta} exposure`:'0 exposure';
-  return `<article class="encounter-sheet"><div class="encounter-image"><img src="./assets/encounter-${e.art}.webp" alt="${encounterAlt[e.art]}" width="1536" height="1024"></div><div class="encounter-copy"><button id="dialog-update" class="secondary" data-update hidden>Update ready. Download?</button><p class="eyebrow">EXPOSURE ${Math.floor(game.exposure)} / 100</p><h2 id="dialog-title" tabindex="-1">${escape(e.title)}</h2><p class="encounter-story">${escape(chosen?chosen.result:e.text)}</p>${chosen?`<div class="encounter-outcome"><button class="primary" data-action="encounter-continue">${game.fieldEvents.journey?'Continue →':'Return →'}</button>${game.fieldEvents.journey?'<button class="secondary" data-action="encounter-map">Map</button>':''}</div>`:`<div class="encounter-choices">${e.choices.map(c=>`<button class="choice" data-action="encounter-choice" data-value="${c.id}"><span>${escape(encounterLabels[`${e.id}:${c.id}`] || c.label)}</span><small class="${c.delta>0?'encounter-cost':''}">${effect(c.delta)}</small></button>`).join('')}</div>`}</div></article>`;
+  return `<article class="encounter-sheet${e.art==='unattended-lamp'?' encounter-portrait':''}"><div class="encounter-image" style="--encounter-focus:${encounterFocus[e.art]}%"><img src="./assets/encounter-${e.art}.webp" alt="${encounterAlt[e.art]}" width="1536" height="1024"></div><div class="encounter-copy"><button id="dialog-update" class="secondary" data-update hidden>Update ready. Download?</button><p class="eyebrow">EXPOSURE ${Math.floor(game.exposure)} / 100</p><h2 id="dialog-title" tabindex="-1">${escape(e.title)}</h2><p class="encounter-story">${escape(chosen?chosen.result:e.text)}</p>${chosen?`<div class="encounter-outcome"><button class="primary" data-action="encounter-continue">${game.fieldEvents.journey?'Continue →':'Return →'}</button>${game.fieldEvents.journey?'<button class="secondary" data-action="encounter-map">Map</button>':''}</div>`:`<div class="encounter-choices">${e.choices.map(c=>`<button class="choice" data-action="encounter-choice" data-value="${c.id}"><span>${escape(encounterLabels[`${e.id}:${c.id}`] || c.label)}</span><small class="${c.delta>0?'encounter-cost':''}">${effect(c.delta)}</small></button>`).join('')}</div>`}</div></article>`;
 }

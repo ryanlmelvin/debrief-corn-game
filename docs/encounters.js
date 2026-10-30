@@ -16,28 +16,28 @@ export const ENCOUNTERS=[
       choice('mark','Tie survey twine around a stalk.',2,'You knot a piece of survey twine around a corn stalk at knee height and keep the rest. You will recognize this crossing if you come back.','twine'),
       choice('follow','Follow the prints one row over.',4,'You follow the second trail of boot prints to a dry patch of soil. Your next footprint is already there, pressed into earth that has not been wet.','followed-tracks')
     ]},
-  {id:'unattended-lamp',night:0,step:16,art:'lantern',title:'A light off the path.',
+  {id:'unattended-lamp',night:0,step:16,art:'unattended-lamp',title:'A light off the path.',
     text:'You spot a hanging lantern swinging beyond the next row. No wind reaches you. Beneath it, an open supply tin catches the light. Something metal rolls once inside.',
     report:'An unattended lantern was moving in still air beside an old supply tin.',choices:[
       choice('pass','Pass without leaving the path.',0,'The lantern stops as soon as you pass it. Your shadow takes another step.'),
       choice('search','Search the tin beneath the light.',5,'You find an old survey compass inside the supply tin beneath the lantern. Its needle points toward the tower. For a moment, all the leaves point that way too. You pocket it.','compass'),
       choice('wait','Wait and watch the lantern.',-2,'You slow your breathing. The hanging lantern swings in time with your breaths. You hold your breath. The lantern stops.','listened')
     ]},
-  {id:'extra-step',night:0,step:23,art:'tracks',title:'One more footstep.',
+  {id:'extra-step',night:0,step:23,art:'extra-step',title:'One more footstep.',
     text:'You hear footsteps behind you as the tower light comes into view between the rows. You stop walking. One more footstep presses into the mud behind you. Then the field is quiet.',
     report:'When I stopped between the rows, I heard another footstep stop behind me.',choices:[
       choice('forward','Keep your eyes on the tower.',0,'You walk toward the ladder. The footsteps behind you match your pace again.'),
       choice('listen','Wait without turning.',-2,'The mud settles. Water drains into a footprint beside your boot. You wait until your hands stop shaking.','listened'),
       choice('turn','Turn the light behind you.',4,'Your light finds only a bent corn stalk behind you. The stalk straightens very slowly, as though someone has just let go of it.','looked-back')
     ]},
-  {id:'second-call',night:1,step:3,art:'radio',title:'It remembers the conversation.',
+  {id:'second-call',night:1,step:3,art:'second-call',title:'It remembers the conversation.',
     text:s=>has(s,'answered-radio')?'You find the half-buried radio in the same furrow as last night. It repeats the question you asked last time, in your voice: “Where am I?” This time another voice answers from inside the corn.':'You find the half-buried radio again, this time in a dry furrow. It plays the sound of your boots leaving it behind. Then you hear those boots coming back.',
     report:'The field radio played sounds from my previous investigation.',choices:[
       choice('disconnect','Disconnect the loose microphone.',0,'You unplug the microphone from the half-buried radio. The sound of footsteps continues through the empty connector.'),
       choice('mislead','Give it a false direction.',3,'You tell the half-buried radio you are heading west. A whole row bends westward. You go the other way.','false-direction'),
       choice('compare','Play your first recording beside it.',-3,'You play your first recording beside the half-buried radio. The recorded voice and the radio voice cancel into a thin whistle. For a few seconds the field sounds like an ordinary field. You use the silence to get your bearings.','verified-voice','recording')
     ]},
-  {id:'moved-crossing',night:1,step:9,art:'tracks',title:'The crossing has moved.',
+  {id:'moved-crossing',night:1,step:9,art:'moved-crossing',title:'The crossing has moved.',
     text:s=>has(s,'twine')?'You reach a crossing between the corn rows. The survey twine you tied last night hangs from a stalk. But this crossing should be two rows farther west. The cut end of the twine is growing pale roots.':'You reach two crossings between the corn rows, although your map shows only one. Your boot prints lead into both crossings. No prints come out.',
     report:'The crossings did not match the survey map, although my tracks led into both of them.',choices:[
       choice('map','Use the tower light as your bearing.',0,'You pick out the tower through the stalks. It takes a while to find a line that holds still.'),
@@ -51,35 +51,35 @@ export const ENCOUNTERS=[
       choice('ask','Ask who sent the relief.',4,'The figure beside the lantern gives your name. Then the name of the person who trained you. You have never spoken that name here.','named'),
       choice('hand','Offer a hand to pull it free.',7,'The figure beside the lantern closes a cold hand around your fingers. Its boots stay in the soil. When you let go, your palm smells of wet grain.','touched')
     ]},
-  {id:'two-towers',night:1,step:23,art:'lantern',title:'Two lights above the rows.',
+  {id:'two-towers',night:1,step:23,art:'two-towers',title:'Two lights above the rows.',
     text:'You see two tower lights through the crop, although there should only be one watchtower. From one comes the radio call you expected. From the other comes the sound of someone climbing your ladder.',
     report:'On my return I saw two tower lights and heard someone climbing an unseen ladder.',choices:[
       choice('visible','Use the visible ladder to get your bearings.',0,'As you look for the watchtower ladder, one of the two tower lights goes out. The remaining light is above the ladder. You hold on to that direction and keep walking.'),
       choice('other','Take a few steps toward the second light.',5,'As you approach the second tower light, the sound of someone climbing a ladder stops. High in the crop, something knocks twice against wood that is not there.','second-tower'),
       choice('listen','Extinguish your light and listen.',-2,'In darkness, you can hear the real tower cable tapping its post. You have heard it every shift. You follow that familiar sound.','listened')
     ]},
-  {id:'future-call',night:2,step:3,art:'radio',title:'Tomorrow’s interview.',
+  {id:'future-call',night:2,step:3,art:'future-call',title:'Tomorrow’s interview.',
     text:s=>has(s,'false-direction')?'You hear the half-buried radio describing a search party going west, the false direction you gave it last night. Then your supervisor asks what you saw tonight. A voice like yours begins to answer before you have reached the first landmark.':'You hear a recording of the interview room coming from the half-buried radio. Your supervisor asks what you saw tonight. A voice like yours answers, “Nothing outside the expected growth pattern.”',
     report:'Before the investigation was finished, the radio played a debrief about this same night.',choices:[
       choice('stop','Break off the transmission.',0,'The recorded interview from the half-buried radio stops. For a moment, you can still hear the supervisor breathing.'),
       choice('record','Record the interview that has not happened.',4,'You record the interview playing from the half-buried radio. On playback, the voice that sounds like yours asks why the interview-room door is locked.','future-recording'),
       choice('compare','Compare it with the first night’s tape.',-3,'Under the first night’s recording and the recorded interview is the same small click. The sound of your thumb releasing the switch, a second before you release it. You keep your hand away from the radio.','verified-future','recording')
     ]},
-  {id:'root-knot',night:2,step:9,art:'tracks',title:'The path has a pulse.',
+  {id:'root-knot',night:2,step:9,art:'root-knot',title:'The path has a pulse.',
     text:'You find a knot of pale roots across the furrow where the second trail of boot prints used to be. The smallest threads tighten, then loosen. They have wound themselves around the shape of an empty shoe.',
     report:'Roots across the path tightened around the shape of an empty shoe.',choices:[
       choice('around','Step around without touching the roots.',0,'The pale roots loosen as your shadow passes over the knot. You keep walking.'),
       choice('lift','Lift the knot with a fallen stalk.',5,'You lift the knot of roots with the fallen stalk. The roots hold the shape of an empty shoe. Beneath the roots is a print from the sole of your own boot.','lifted-roots'),
       choice('twine','Lay your survey twine across the knot.',-3,'The root tips follow your survey twine away from your boots. You leave it stretched across the furrow and take the clear ground.','led-roots','twine')
     ]},
-  {id:'your-outline',night:2,step:16,art:'lantern',title:'Your coat. Your height.',
+  {id:'your-outline',night:2,step:16,art:'your-outline',title:'Your coat. Your height.',
     text:s=>has(s,'touched')?'You see the figure you tried to pull free of the soil last night. It stands behind the lantern and holds up a hand. Your palm aches where the figure gripped it. The figure is wearing a coat identical to yours.':'You see a figure with your height and build standing beyond the lantern, facing away. The figure wears a coat identical to yours, down to the pale repair on the sleeve. Its shoulders rise when you breathe.',
     report:'A figure in the field wore a coat with the same repair as mine and moved with my breathing.',choices:[
       choice('ground','Keep the beam on the ground and pass.',0,'You watch your boots until the lantern is behind you. There are only two feet in the light.'),
       choice('name','Call your own name.',4,'The figure in the matching coat turns its head a little too far. From behind you, your voice says, “Here.”','called-name'),
       choice('stand','Stand beside the outline.',7,'You stand beside the figure in the matching coat. For one breath, you cannot tell which shadow is yours. You step away. One of the shadows stays.','stood-beside')
     ]},
-  {id:'last-follower',night:2,step:23,art:'radio',title:'Something wants to come back.',
+  {id:'last-follower',night:2,step:23,art:'last-follower',title:'Something wants to come back.',
     text:s=>has(s,'looked-back')?'As you approach the watchtower, you see a corn stalk bend behind you, like the stalk you caught straightening when you turned your light on the first night. Your radio says, very quietly, “Hold the door.”':'As you approach the watchtower, the radio on your belt speaks without static. “Hold the door.” Behind you, the dry leaves start moving against the wind.',
     report:'Near the tower, the radio asked me to hold the door while the crop moved toward me.',choices:[
       choice('climb','Keep walking without answering.',0,'You keep both hands free and your eyes on the next crossing. The radio repeats “Hold the door” in a more familiar voice.'),

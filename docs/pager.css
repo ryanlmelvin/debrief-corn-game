@@ -228,6 +228,19 @@
   #paper-dialog .decision-page .note { font-size: 15px; line-height: 1.4; }
   #paper-dialog .decision-page .choice { font-size: 14px; }
 }
+/* Encounter photographs are wide scenes: retain both paths, lights and props. */
+#paper-dialog .pager-art.encounter-image img { object-position: center var(--encounter-focus, 54%); }
+@media(min-width: 900px) and (min-height: 550px) {
+  #paper-dialog .encounter-portrait .pager-art img { object-position: 38% center; }
+  #paper-dialog[data-kind="encounter"].paged-dialog .paged-sheet.pager-has-art:not(.decision-condensed):not(.encounter-portrait) {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto clamp(150px, 32dvh, 260px) minmax(0, 1fr) var(--pager-footer-height, 0px);
+  }
+  #paper-dialog[data-kind="encounter"] .pager-has-art:not(.decision-condensed):not(.encounter-portrait) > .pager-heading { grid-column: 1; grid-row: 1; }
+  #paper-dialog[data-kind="encounter"].paged-dialog .paged-sheet:not(.decision-condensed):not(.encounter-portrait) > .pager-art { grid-column: 1; grid-row: 2; }
+  #paper-dialog[data-kind="encounter"] .pager-has-art:not(.decision-condensed):not(.encounter-portrait) > .pager-body { grid-column: 1; grid-row: 3; }
+  #paper-dialog[data-kind="encounter"] .pager-has-art:not(.decision-condensed):not(.encounter-portrait) > .pager-nav { grid-column: 1; grid-row: 4; }
+}
 /* Short portraits trade the photo band for enough room to make a choice. */
 @media(max-height: 650px) and (max-width: 539px) {
   #paper-dialog.paged-dialog .decision-sheet.pager-has-art { grid-template-rows: auto minmax(0,1fr) var(--pager-footer-height,0px); }
