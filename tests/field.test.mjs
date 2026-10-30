@@ -9,13 +9,13 @@ import { FieldMap } from '../docs/field-ui.js';
 import { currentEncounter } from '../docs/encounters.js';
 function settle(s){if(s.fieldEvents.pending){chooseFieldEncounter(s,currentEncounter(s).choices[0].id);continueFieldEncounter(s);}}
 
-const field=(mode='standard')=>({...createGame(mode,42),phase:'field',entered:true});
+const field=(mode='story')=>({...createGame(mode,42),phase:'field',entered:true});
 const site=id=>FIELD_SITES.find(p=>p.id===id);
 function walk(s,route) { for(const p of route.steps){assert.equal(move(s,p.x-s.player.x,p.y-s.player.y),true);settle(s);} }
 function controller(selected='corner',style='quiet') { return Object.assign(Object.create(FieldMap.prototype),{selected,style,travel:null,lastKey:''}); }
 
 test('every route preview matches actual cardinal movement and exposure in both modes',()=>{
-  for(const mode of ['standard','story'])for(const start of FIELD_SITES)for(const destination of FIELD_SITES)for(const style of ['quiet','direct']) {
+  for(const mode of ['story','hard'])for(const start of FIELD_SITES)for(const destination of FIELD_SITES)for(const style of ['quiet','direct']) {
     const s={...field(mode),player:{x:start.x,y:start.y}},before=serialize(s),route=planFieldRoute(s,destination,style);
     assert.equal(serialize(s),before,'planning must not mutate the save');
     walk(s,route);assert.deepEqual(s.player,{x:destination.x,y:destination.y});
@@ -32,7 +32,7 @@ test('careful routes cost no more than shortcuts from every map square',()=>{
   assert.ok(fieldStepCost(s,1,4)<fieldStepCost(s,4,4));
 });
 test('all site orders remain survivable across three nights with the suggested careful routes',()=>{
-  for(const mode of ['standard','story'])for(const order of [['pump','corner','drain'],['pump','drain','corner'],['corner','pump','drain'],['corner','drain','pump'],['drain','pump','corner'],['drain','corner','pump']]) {
+  for(const mode of ['story','hard'])for(const order of [['pump','corner','drain'],['pump','drain','corner'],['corner','pump','drain'],['corner','drain','pump'],['drain','pump','corner'],['drain','corner','pump']]) {
     const s=field(mode);
     for(let night=0;night<3;night++) {
       for(const id of [...order,'tower']) { walk(s,planFieldRoute(s,site(id)));if(id!=='tower')assert.ok(inspect(s)); }

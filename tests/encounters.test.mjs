@@ -5,7 +5,7 @@ import { ENCOUNTERS, currentEncounter, encounterAfterStep, freshFieldEvents } fr
 import { FieldMap } from '../docs/field-ui.js';
 import { planFieldRoute } from '../docs/field.js';
 import { encounterMarkup, notebookMarkup } from '../docs/art.js';
-const field=()=>({...createGame('standard',42),phase:'field',entered:true,departure:'chosen'});
+const field=()=>({...createGame('story',42),phase:'field',entered:true,departure:'chosen'});
 function trigger(s,id){const event=ENCOUNTERS.find(e=>e.id===id);s.shift=event.night;s.fieldSteps=event.step;s.player={x:4,y:4};s.fieldEvents.seen=ENCOUNTERS.filter(e=>e.night<s.shift||(e.night===s.shift&&e.step<event.step)).map(e=>e.id);assert.equal(encounterAfterStep(s),true);return currentEncounter(s);}
 
 test('a real walk stops for an encounter, blocks movement, and resumes at the same position after reload',()=>{
@@ -75,7 +75,7 @@ test('the notebook and debrief reveal only encounters actually resolved by the p
 });
 
 test('complete campaigns encounter all twelve beats without repeats, in both walking styles and intensities',()=>{
-  for(const mode of ['standard','story'])for(const style of ['quiet','direct']){
+  for(const mode of ['story','hard'])for(const style of ['quiet','direct']){
     const s=field();s.mode=mode;
     for(let night=0;night<3;night++){
       for(const id of ['pump','corner','drain','tower']){

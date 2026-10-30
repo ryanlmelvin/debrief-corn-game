@@ -16,7 +16,7 @@ npm start
 
 Open **http://localhost:4317**. To use another port: `PORT=4321 npm start`.
 
-The game lasts roughly 8–15 minutes, depending on reading and exploration. **Story** intensity slows moving crops and reduces the exposure cost of walking.
+The game lasts roughly 8–15 minutes, depending on reading and exploration. **Story** is the default intensity and uses the former Standard balance. **Hard** makes crops 40% faster, shortens spawn intervals by 25%, and raises walking exposure by about 30%. The former easy Story setting has been removed. Existing Story and Standard saves continue as the new Story mode with their progress intact.
 
 | Action | Mouse or touch | Keyboard |
 | --- | --- | --- |

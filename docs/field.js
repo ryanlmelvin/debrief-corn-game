@@ -12,7 +12,7 @@ export function onFieldPath(x,y) {
   }));
 }
 export function fieldStepCost(s,x,y) {
-  return (s.mode==='story'?.75:1.15)*(onFieldPath(x,y)?.55:1);
+  return (s.mode==='hard'?1.5:1.15)*(onFieldPath(x,y)?.55:1);
 }
 // Quiet routes minimize exposure. Shortcuts take a direct staircase through corn.
 export function planFieldRoute(s,destination,style='quiet') {
