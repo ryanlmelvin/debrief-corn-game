@@ -1,5 +1,5 @@
 import { stepGuide, turnGuide, inspectGuide, spareGuide, fireGuide, focusGuide, nearbyGuideSite, projectGuide } from './guide.js';
-import { createGame, startShift, advance, reload, shoot, focusNext, enterField, move, inspect, nearbySite, investigationComplete, beginDebrief, getQuestion, getEnding, answer, serialize, restore, BRIEFINGS, EVIDENCE, ENDINGS, DATES, REPORT_DATES, SHIFT_LENGTH } from './engine.js';
+import { createGame, startShift, advance, reload, shoot, focusNext, enterField, move, inspect, nearbySite, investigationUrge, investigationComplete, beginDebrief, getQuestion, getEnding, answer, serialize, restore, BRIEFINGS, EVIDENCE, ENDINGS, DATES, REPORT_DATES, SHIFT_LENGTH } from './engine.js';
 import { Renderer } from './renderer.js';
 
 const $ = id => document.getElementById(id);
@@ -89,6 +89,11 @@ function updateUI(force=false) {
   $('objective').textContent=field?(site?.label||'Find your way through.'):'Watch the corn.';
   $('objective-detail').textContent=field?(investigationComplete(game)?'Return to the watchtower.':'Follow the unread markers.'):'Shoot any that try to escape.';
   $('stats').innerHTML=field?stat('EXPOSURE',Math.floor(game.exposure),' / 100',game.exposure,game.exposure>=70)+stat('SEARCHED',['corner','pump','drain'].filter(id=>game.inspected.includes(id)).length,'/ 3'):stat('RELIEF IN',Math.max(0,Math.ceil(SHIFT_LENGTH-game.time)),'sec',(SHIFT_LENGTH-game.time)/SHIFT_LENGTH*100)+stat('BREACHES',game.breaches,'/ 6',game.breaches/6*100,game.breaches>=3);
+  const urge=investigationUrge(game);
+  $('investigate-urge').hidden=!active||urge<=0||paused;
+  $('investigate-urge').style.setProperty('--urge-opacity',String(.04+urge*.9));
+  $('investigate-urge').style.setProperty('--urge-size',`${26+urge*15}px`);
+  $('investigate-urge').style.setProperty('--urge-weight',String(400+Math.floor(urge*3)*100));
   $('tower-hud').hidden=!active;
   $('hud-reload').disabled=paused||game.reload>0||game.rounds===6||game.reserve===0;
   $('hud-reload').textContent=game.reload>0?'↻ Reloading…':'↻ Reload';

@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { createGame,startShift,advance,shoot,reload,enterField,move,inspect,beginDebrief,answer,getQuestion,restore,serialize,SHIFT_LENGTH,focusNext,ENDINGS,EVIDENCE } from '../docs/engine.js';
+import { createGame,startShift,advance,shoot,reload,enterField,move,inspect,beginDebrief,answer,getQuestion,restore,serialize,SHIFT_LENGTH,focusNext,ENDINGS,EVIDENCE,investigationUrge } from '../docs/engine.js';
 
 const watch=mode=>{const s=createGame(mode,42);startShift(s);return s;};
 function safeWatch(s){while(s.phase==='tower'){advance(s,.25);for(const t of [...s.targets]){if(t.kind!=='corn')continue;if(!s.rounds){reload(s);break;}shoot(s,t.x,t.y-34);}if(s.rounds<2)reload(s);}}
@@ -165,4 +165,16 @@ test('required nightly routes remain survivable in both modes, while detours can
     assert.equal(s.phase,'ending');assert.notEqual(s.ending,'assimilation');
   }
   const s=watch();safeWatch(s);s.exposure=99;move(s,1,0);assert.equal(s.ending,'assimilation');
+});
+
+
+test('investigation compulsion grows only after the sighting and clears on departure',()=>{
+  const s=watch();
+  s.time=30;assert.equal(investigationUrge(s),0);
+  s.incident=true;s.time=12;assert.equal(investigationUrge(s),0);
+  s.time=19;const first=investigationUrge(s);assert.ok(first>0&&first<.1);
+  s.time=35;assert.ok(investigationUrge(s)>first);
+  s.time=54;assert.equal(investigationUrge(s),1);
+  assert.equal(investigationUrge(restore(serialize(s))),1);
+  enterField(s);assert.equal(investigationUrge(s),0);
 });

@@ -82,8 +82,12 @@ export function advance(s, dt) {
     }
     s.targets = s.targets.filter(t => !t.gone);
     if (s.breaches >= 6) finish(s, 'breach');
-    else if (s.time >= SHIFT_LENGTH) { s.phase = 'decision'; addLog(s, 'Relief has arrived. You head into the field.', 'story'); enterField(s); }
+    else if (s.time >= SHIFT_LENGTH) { s.phase = 'decision'; addLog(s, 'Relief calls up from below. You are already on the ladder.', 'story'); enterField(s); }
   }
+}
+export function investigationUrge(s) {
+  if (s.phase !== 'tower' || !s.incident) return 0;
+  return Math.max(0, Math.min(1, (s.time - 18) / (SHIFT_LENGTH - 19)));
 }
 export function reload(s) {
   if (s.phase !== 'tower' || s.reload > 0 || s.rounds === 6 || s.reserve <= 0) return false;
