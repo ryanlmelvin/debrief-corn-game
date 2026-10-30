@@ -61,6 +61,10 @@ The manifest and service worker make the game installable in compatible browsers
 
 Progress is saved locally, including the current watch, investigation, and interview question. Saves stay on that browser and device; clearing website data removes them. The game handles blocked storage by showing a message and continuing in memory. The final transcript can be downloaded as a text file.
 
+**Installing from Safari:** iOS/iPadOS 17.2+ and Safari’s Add to Dock copy cookies into a newly installed app, but not local storage. Debrief prepares a compressed snapshot of the current shift and complete Records archive in short-lived, project-scoped cookies. An empty installed app restores that snapshot once; existing app progress always takes precedence. Browser and app progress are independent after installation. The cookie snapshot is capped at 6,000 characters to avoid oversized request headers; if a full archive cannot fit or cookies are blocked, the installation guide directs the player to manual transfer without dropping records.
+
+**Recover progress in an existing installation:** update both Safari and the app, then choose **KIT → Move saved progress** in Safari and **Copy progress** (or **Save backup**). Open the same menu in the installed app, paste the code (or **Open backup**), and confirm **Restore progress**. This carries the shift, collected endings, and transcripts. Restore combines ending collections and retains the latest 30 assignments, with a confirmation before replacing the current shift. Backup files also work across devices. Keep the browser copy until the transfer is complete.
+
 When changing any shipped asset, update `VERSION` in `docs/sw.js`. New versions wait for existing game tabs to close, avoiding mixed versions during an active shift. Caches and saves are scoped by project path so other GitHub Pages apps on the same origin are left alone. See [MDN’s service worker guide](https://developer.mozilla.org/en-US/docs/Web/Progressive_web_apps/Tutorials/CycleTracker/Service_workers).
 
 ## Development and checks
@@ -80,6 +84,7 @@ The game-rule tests cover ammunition, shooting, civilian encounters, timing, con
 | `docs/renderer.js` | Layered canvas landscape, illustrated actors, root motion and field survey |
 | `docs/watch-story.js` | Nightly sightings, crop anatomy, and retrieval-team light timing |
 | `docs/app.js` | Controls, paper documents, audio, saving, installation |
+| `docs/progress.js` | Validated save transfers and Safari installation handoff |
 | `docs/style.css` / `docs/mobile.css` | Responsive interface, viewport layout, and touch controls |
 | `docs/pager.js` / `docs/pager.css` | Measured, accessible document pages without scrolling |
 | `docs/sw.js` | Versioned offline cache |

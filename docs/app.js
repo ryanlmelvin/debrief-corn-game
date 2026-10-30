@@ -14,6 +14,7 @@ import { pressureWordMarkup } from './pressure-word.js';
 import { DialogPager } from './pager.js';
 import { endingShareData, shareEnding } from './sharing.js';
 import { decisionQuestion } from './decision-copy.js';
+import { InstallHandoff, recoverInstallHandoff, progressSnapshot, encodeProgress, decodeProgress, storeProgress, MAX_PROGRESS_BYTES } from './progress.js';
 
 const $ = id => document.getElementById(id);
 const canvas=$('field'), renderer=new Renderer(canvas), dialog=$('paper-dialog');
@@ -27,10 +28,16 @@ menu.addEventListener('toggle',()=>{syncAudio();if(menuOpen())save();});
 menu.addEventListener('click',event=>{if(event.target.closest('button')&&!event.target.closest('[popovertarget]'))menu.hidePopover();});
 const HISTORY_KEY=`debrief-history-v1:${new URL('.',location.href).pathname}`;
 const SAVE_KEY=`debrief-save-v1:${new URL('.',location.href).pathname}`;
+const progressKeys={save:SAVE_KEY,history:HISTORY_KEY};
+const progressPath=new URL('.',location.href).pathname;
+const isInstalled = () => window.matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
+const installHandoff=new InstallHandoff(document,progressPath,isInstalled);
 let game=null, paused=false, modalKind='', lastModalKey='', lastControlsKey='', lastLog='', lastFrame=0, lastSave=0, lastUI=0, toastTimer, installPrompt=null;
 let audioContext=null, soundscape=null, soundEnabled=false, storageWarned=false;
 const soundEvents=new SoundEvents();
 const esc = value => String(value).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+let carriedProgress=false;
+try { if(isInstalled())carriedProgress=await recoverInstallHandoff(document,progressPath,localStorage,progressKeys); } catch {}
 function readSave() { try { return restore(localStorage.getItem(SAVE_KEY)); } catch { return null; } }
 let history={ collected: [], runs: [] };
 try { const stored=JSON.parse(localStorage.getItem(HISTORY_KEY)); if(stored && Array.isArray(stored.collected) && Array.isArray(stored.runs)){history.collected=stored.collected.filter(id=>Object.hasOwn(ENDINGS,id));history.runs=stored.runs.filter(r=>r&&typeof r.id==='string'&&Object.hasOwn(ENDINGS,r.ending)&&Array.isArray(r.reports)).slice(0,30);} } catch {}
@@ -51,6 +58,7 @@ function archiveRun(){
   history.runs=history.runs.slice(0,30);
   try{localStorage.setItem(HISTORY_KEY,JSON.stringify(history));}catch{toast('Records are available for this session. Your browser could not save them.');}
   updateHistoryCount();
+  installHandoff.update(game||readSave(),history);
 }
 function showRecords() {
   archiveRun();
@@ -61,9 +69,11 @@ function showRecords() {
 $('records').addEventListener('click',showRecords);
 let saved=readSave();
 $('resume').hidden=!saved;
+installHandoff.update(saved,history);
+if(carriedProgress)toast('Your browser progress is ready. Continue your shift or open Records.');
 function save() {
   if(!game)return;
-  try { localStorage.setItem(SAVE_KEY,serialize(game));saved=game;$('save-status').textContent='PROGRESS SAVED ON THIS DEVICE'; }
+  try { localStorage.setItem(SAVE_KEY,serialize(game));saved=game;$('save-status').textContent='PROGRESS SAVED ON THIS DEVICE';installHandoff.update(game,history); }
   catch { $('save-status').textContent='SAVING UNAVAILABLE';if(!storageWarned){toast('Your browser is blocking local saves. Keep this tab open to retain your progress.');storageWarned=true;} }
 }
 function toast(message) { $('toast').textContent=message;$('toast').hidden=false;clearTimeout(toastTimer);toastTimer=setTimeout(()=>$('toast').hidden=true,5000); }
@@ -463,7 +473,66 @@ $('sound').addEventListener('click',async()=>{
 function shotSound(hit) {
   if(soundEnabled)soundscape?.shot(hit);
 }
-const isInstalled = () => window.matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
+function showProgressTransfer() {
+  save();archiveRun();
+  showModal('progress',paper('Move saved progress.',`
+    <p class="small">Carry your current shift, collected endings, and transcripts between the browser and installed app.</p>
+    <p class="small">In the browser with your progress, copy it or save a backup. Then open the app’s <b>KIT → Move saved progress</b> and paste the code or open that backup.</p>
+    <div class="paper-actions"><button id="copy-progress" class="secondary" disabled>Copy progress</button><button id="download-progress" class="secondary" disabled>Save backup ↓</button></div>
+    <p id="progress-export-status" class="small" role="status">Preparing progress…</p>
+    <div class="paper-actions"><div class="progress-entry"><label for="progress-code">Progress code</label><textarea id="progress-code" rows="3" spellcheck="false" autocapitalize="off" autocomplete="off" placeholder="Paste the code from your browser here"></textarea></div>
+    <button id="restore-progress" class="primary">Restore progress ↗</button><button id="open-progress" class="secondary">Open backup</button>
+    <p id="progress-import-status" class="small" role="status"></p></div>
+    <input id="progress-file" type="file" accept=".txt,text/plain" hidden>`, 'SAVED PROGRESS'));
+  const copy=$('copy-progress'),download=$('download-progress'),input=$('progress-code'),file=$('progress-file');
+  const exportStatus=$('progress-export-status'),importStatus=$('progress-import-status');
+  let code='';
+  try {
+    const snapshot=progressSnapshot(game||readSave(),history);
+    encodeProgress(snapshot).then(value=>{
+      if(!copy.isConnected)return;
+      code=value;copy.disabled=false;download.disabled=false;
+      exportStatus.textContent='Ready to copy or save. Your original progress stays here.';
+    }).catch(()=>{exportStatus.textContent='Progress could not be prepared. Close this window and try again.';});
+  } catch {exportStatus.textContent='No saved progress here yet. Bring it over from your browser below.';}
+  copy.addEventListener('click',async()=>{
+    try {await navigator.clipboard.writeText(code);exportStatus.textContent='Copied. Open the other app or browser, choose Move saved progress, and paste the code.';}
+    catch {input.value=code;pager.refresh();pager.go(pager.pages.findIndex(page=>page.contains(input)));input.focus();input.select();exportStatus.textContent='Select and copy the code below, or use Save backup.';}
+  });
+  download.addEventListener('click',()=>{
+    const url=URL.createObjectURL(new Blob([code],{type:'text/plain;charset=utf-8'}));
+    const link=document.createElement('a');link.href=url;link.download='debrief-progress.txt';link.click();
+    setTimeout(()=>URL.revokeObjectURL(url),1000);
+  });
+  const review=async value=>{
+    importStatus.textContent='Checking progress…';
+    try {
+      const snapshot=await decodeProgress(value);
+      if(!importStatus.isConnected)return;
+      const summary=snapshot.save?`Shift ${snapshot.save.shift+1} of 3 · ${snapshot.save.mode==='hard'?'Hard':'Story'}`:'Completed records';
+      const replacement=snapshot.save && (game||readSave())?'This replaces the current shift in this app. ':'';
+      showModal('progress-confirm',paper('Restore this progress?',`<p>${esc(summary)}<br>${snapshot.history.collected.length} endings · ${snapshot.history.runs.length} completed assignments</p><p class="small">${replacement}Collected endings are combined. The latest 30 completed assignments are kept.</p><p id="progress-restore-status" class="small" role="status"></p><div class="paper-actions"><button id="confirm-progress" class="primary">Restore progress ↗</button><button id="cancel-progress" class="secondary">Cancel</button></div>`, 'SAVED PROGRESS'));
+      $('cancel-progress').addEventListener('click',showProgressTransfer);
+      $('confirm-progress').addEventListener('click',()=>{
+        try {
+          history=storeProgress(localStorage,progressKeys,snapshot,history);
+          updateHistoryCount();saved=readSave();$('resume').hidden=!saved;
+          if(snapshot.save){game=null;begin('story',true);}else closeModal();
+          installHandoff.update(game||saved,history);
+          toast('Progress restored. Your endings and records are ready.');
+        } catch {$('progress-restore-status').textContent='This browser could not save the transfer. Your existing progress has been kept. Try allowing site storage.';}
+      });
+    } catch {if(importStatus.isConnected)importStatus.textContent='That progress could not be read. Copy the full code again, or open a Debrief progress backup.';}
+  };
+  $('restore-progress').addEventListener('click',()=>review(input.value));
+  $('open-progress').addEventListener('click',()=>file.click());
+  file.addEventListener('change',async()=>{
+    const backup=file.files[0];if(!backup)return;
+    if(backup.size>MAX_PROGRESS_BYTES*2){importStatus.textContent='That file is too large. Choose a Debrief progress backup.';return;}
+    try {await review(await backup.text());}catch {importStatus.textContent='That backup could not be opened. Try choosing it again.';}
+  });
+}
+$('move-progress').addEventListener('click',showProgressTransfer);
 function refreshInstallGuide() {
   if(modalKind !== 'install' || !dialog.open)return;
   const button=$('install-now');
@@ -474,13 +543,15 @@ function showInstallGuide() {
   save();
   showModal('install',paper('Install on device.',`
     <p class="small" id="install-status" role="status"></p>
+    <p class="small" id="install-progress-status" role="status">Preparing your progress for installation…</p>
     <button class="primary" id="install-now" hidden>Install now ↗</button>
+    <button class="secondary" id="install-transfer">Move saved progress</button>
     <ul class="small">
       <li><b>iPhone / iPad:</b> Open this page in Safari, open Share (sometimes inside the page menu), choose Add to Home Screen, enable Open as Web App if offered, then tap Add.</li>
       <li><b>Android:</b> Open the browser menu and choose Install app or Add to Home screen, then confirm.</li>
       <li><b>Computer:</b> Look for the install icon in the address bar or Install app in the browser menu. In Safari on Mac, use File → Add to Dock. If unavailable, try a browser that supports installation.</li>
     </ul>
-    <p class="small">Open the new icon once online to prepare for offline play. Browsers and installed apps may keep separate saves.</p>
+    <p class="small">Open the new icon once online to prepare for offline play. Installation carries progress on supported browsers. After installation, browser and app saves may advance separately. For an app already installed, or if progress is missing, use Move saved progress.</p>
     <h3>Protect saves</h3>
     <p class="small">Keep saves during automatic browser cleanup.</p>
     <button id="protect-storage" class="secondary">Request persistent storage</button>
@@ -488,6 +559,13 @@ function showInstallGuide() {
     <p class="note"><b>Installation is not a backup.</b> Clearing this site’s data deletes saves even with storage protection. Private browsing may discard them when closed.</p>
     <button class="primary" data-action="close">Done ↗</button>`, 'DEVICE SETUP'));
   refreshInstallGuide();
+  $('install-transfer').addEventListener('click',showProgressTransfer);
+  const progressStatus=$('install-progress-status');
+  if(isInstalled())progressStatus.textContent='Missing browser progress? Use Move saved progress in both places to bring it here.';
+  else installHandoff.update(game||readSave(),history).then(ready=>{
+    if(!progressStatus.isConnected)return;
+    progressStatus.textContent=ready?'Your progress is prepared for installation. Recent Safari versions carry it into the new app; if it is missing, use Move saved progress.':'Use Move saved progress to keep a copy before installing. This browser could not prepare an automatic transfer.';
+  });
   const status=$('storage-status'), protect=$('protect-storage');
   if(!navigator.storage?.persist || !navigator.storage?.persisted){
     status.textContent='This browser cannot request persistent storage. You can still play and save, but automatic cleanup may remove data.';

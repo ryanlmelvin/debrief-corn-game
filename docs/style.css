@@ -167,3 +167,5 @@ body[data-phase="field"] .viewport{background:#16221c}
 
 /* Bring the empty-rifle action into the player’s view. */
 .playing .tower-hud #hud-reload.needs-reload{position:fixed;left:50%;top:50%;right:auto;bottom:auto;transform:translate(-50%,-50%);min-width:140px;min-height:56px;font-size:16px;z-index:4}
+
+.progress-entry{margin:16px 0}.progress-entry label{display:block;font-size:11px;margin-bottom:8px}.progress-entry textarea{display:block;box-sizing:border-box;width:100%;max-width:100%;min-height:82px;resize:vertical;padding:10px;border:1px solid #8e987a;background:#e6e2c855;color:#263023;font:16px monospace;overflow-wrap:anywhere}
