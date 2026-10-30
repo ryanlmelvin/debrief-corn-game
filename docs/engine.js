@@ -9,15 +9,15 @@ export const COMPULSION_NOTICE = 'You could not resist the urge to investigate a
 export const DATES = ['SEPTEMBER 30', 'OCTOBER 14', 'OCTOBER 29'];
 export const REPORT_DATES = ['OCTOBER 01', 'OCTOBER 15', 'OCTOBER 30'];
 export const EVIDENCE = {
-  dress: { title: 'White fabric', code: 'EXHIBIT 01', text: 'A strip of white cotton caught on a stalk. The tear is fresh. The stalk has grown through the weave.', where: 'The northeast corner' },
-  ledger: { title: 'Application record', code: 'EXHIBIT 02', text: 'The same treatment, season after season. Each entry calls for a little more. Beneath the last row of figures: “Response below the root line. Do not amend the public log.”', where: 'An abandoned pump house' },
-  roots: { title: 'Connected roots', code: 'EXHIBIT 03', text: 'Pale threads run from root to root. When your light crosses them, the entire row leans away. The soil beyond the fence moves a moment later.', where: 'A drainage channel' },
-  badge: { title: 'Recovery team badge', code: 'EXHIBIT 04', text: 'The photograph is intact. The name has been worn smooth. Something has threaded itself through the clip, into the shape of a small ear.', where: 'The northeast corner' },
-  sample: { title: 'Sealed sample', code: 'EXHIBIT 05', text: 'A glass vial beside an empty treatment drum. The sample label says BEFORE APPLICATION. Inside, one white filament turns slowly against the glass.', where: 'The pump house' },
-  teeth: { title: 'An ear of corn', code: 'EXHIBIT 06', text: 'At first you count kernels. Then you notice their roots. All of them are teeth. A few are loose. You put the ear down.', where: 'The northeast corner' },
-  water: { title: 'Water sample', code: 'EXHIBIT 08', text: 'A film gathers against the current. You break it with a twig. The two halves drift back together.', where: 'The drainage channel' },
-  glove: { title: 'Work glove', code: 'EXHIBIT 09', text: 'A glove lies beneath the pump tap. The fingers are packed with damp soil. The inside is still warm.', where: 'The pump house' },
-  map: { title: 'Drainage survey', code: 'EXHIBIT 07', text: 'Old field boundaries, a creek, the next farm. Someone has drawn a ring around this station. The water does not respect it.', where: 'The drainage channel' }
+  dress: { title: 'White fabric', code: 'EXHIBIT 01', text: 'You find a strip of white cotton fabric caught on a stalk. The tear is fresh. The stalk has grown through the weave.', where: 'The northeast corner' },
+  ledger: { title: 'Application record', code: 'EXHIBIT 02', text: 'You find an application record for the crop treatment. The record lists the same treatment, season after season. Each entry calls for a little more. Beneath the last row of figures: “Response below the root line. Do not amend the public log.”', where: 'An abandoned pump house' },
+  roots: { title: 'Connected roots', code: 'EXHIBIT 03', text: 'You find connected roots in the drainage channel. Pale threads run from root to root. When your light crosses them, the entire row leans away. The soil beyond the fence moves a moment later.', where: 'A drainage channel' },
+  badge: { title: 'Recovery team badge', code: 'EXHIBIT 04', text: 'You find a recovery team badge. The photograph on the badge is intact. The name has been worn smooth. Something has threaded itself through the badge clip, into the shape of a small ear.', where: 'The northeast corner' },
+  sample: { title: 'Sealed sample', code: 'EXHIBIT 05', text: 'You find a sealed sample in a glass vial beside an empty treatment drum. The sample label says BEFORE APPLICATION. Inside, one white filament turns slowly against the glass.', where: 'The pump house' },
+  teeth: { title: 'An ear of corn', code: 'EXHIBIT 06', text: 'You find an ear of corn. At first you count what look like kernels. Then you notice their roots. Each supposed kernel is a tooth. A few teeth are loose. You put the ear down.', where: 'The northeast corner' },
+  water: { title: 'Water sample', code: 'EXHIBIT 08', text: 'You stop to take a water sample from the drainage channel. A film on the water gathers against the current. You break it with a twig. The two halves drift back together.', where: 'The drainage channel' },
+  glove: { title: 'Work glove', code: 'EXHIBIT 09', text: 'You find a work glove beneath the pump tap. The fingers are packed with damp soil. The inside is still warm.', where: 'The pump house' },
+  map: { title: 'Drainage survey', code: 'EXHIBIT 07', text: 'You find a drainage survey showing old field boundaries, a creek, and the next farm. Someone has drawn a ring around this station. The water flows beyond the marked boundary.', where: 'The drainage channel' }
 };
 const WATCH_ORDERS = ['Watch the corn. Shoot any that try to escape.', 'Remain in the watchtower.', 'Do not consume the crop.', 'Remember any irregularities for your debrief at the end of the night.'];
 export const BRIEFINGS = [
