@@ -1,11 +1,11 @@
 // Bump this version whenever a shipped asset changes. An active game keeps its
 // current worker; the new version activates after all old game tabs close.
-const VERSION = 'debrief-v21';
+const VERSION = 'debrief-v22';
 const DEVELOPMENT = ['localhost', '127.0.0.1', '[::1]'].includes(self.location.hostname);
 const SCOPE = new URL('./', self.location.href).pathname;
 const CACHE_PREFIX = `debrief:${SCOPE}:`;
 const CACHE = CACHE_PREFIX + VERSION;
-const FILES = ['./','./index.html','./style.css','./app.js','./engine.js','./guide.js','./renderer.js','./manifest.webmanifest','./icons/icon.svg','./icons/icon-192.png','./icons/icon-512.png'];
+const FILES = ['./','./index.html','./style.css','./app.js','./engine.js','./field.js','./field-ui.js','./guide.js','./renderer.js','./manifest.webmanifest','./icons/icon.svg','./icons/icon-192.png','./icons/icon-512.png'];
 self.addEventListener('install',event=>event.waitUntil((async()=>{
   const cache=await caches.open(CACHE);
   // A new worker must not populate its new cache with an older HTTP-cached build.

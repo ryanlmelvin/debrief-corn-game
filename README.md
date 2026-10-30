@@ -22,11 +22,11 @@ The game lasts roughly 5–10 minutes, depending on reading and exploration. **S
 | --- | --- | --- |
 | Fire | Click or tap a moving crop | X selects a crop; Space fires |
 | Reload | Reload button | R |
-| Walk | Direction buttons or a neighboring map tile | Arrow keys or WASD |
-| Inspect | Inspect button or current tile | E |
+| Travel | Tap a landmark, choose a route, then Walk & investigate | Tab between destinations; arrows/WASD for individual steps |
+| Inspect | Opens automatically on arrival | E |
 | Pause | Pause button | P or Escape |
 
-White figures are not targets. Six total perimeter breaches end the assignment. Leaving the tower early allows currently loose crops to escape. Investigations cost exposure with each step; return to the tower before reaching 100. Debrief answers and retained exhibits affect the final disposition.
+White figures are not targets. Six total perimeter breaches end the assignment. Leaving the tower early allows currently loose crops to escape. Investigations offer slower, lower-exposure paths or fast shortcuts through the rows. The map previews exposure before departure; walking can be stopped at any time. Each discovery opens on arrival, and the map suggests the next unread location. Inspect all three sites, then return to the tower before reaching 100 exposure. Debrief answers and retained exhibits affect the final disposition.
 
 ## Publish on GitHub Pages
 
@@ -63,6 +63,7 @@ The game-rule tests cover ammunition, shooting, civilian encounters, timing, con
 | File | Purpose |
 | --- | --- |
 | `docs/engine.js` | Game rules, branching narrative, save validation |
+| `docs/field.js` / `docs/field-ui.js` | Route planning, exposure previews, responsive touch investigation map |
 | `docs/renderer.js` | Procedural canvas landscape, moving targets, field survey |
 | `docs/app.js` | Controls, paper documents, audio, saving, installation |
 | `docs/style.css` | Responsive interface and typography |
@@ -93,4 +94,4 @@ If an older offline installation keeps showing outdated interviews, open [Update
 
 The **Records** archive keeps discovered endings and the last 30 completed assignments, including interview answers, on this browser and device. Updating or starting a new assignment preserves the archive. Earlier runs completed before this feature cannot be reconstructed; a saved ending is added when resumed.
 
-Every map landmark now has a different exhibit each night. Gold page markers show unread locations; a check marks a completed inspection for that night. Choosing to lead the final recovery team opens a first-person field walk. Use W/S or Up/Down to walk, A/D or Left/Right to turn, and E to examine. The later rifle controls support pointer aiming, X to select a visible figure, and Space to fire; on-screen controls also support touch. The guide outcome reflects whether the player fires or lets the team leave.
+Every map landmark now has a different exhibit each night. Gold markers show unread locations; a check marks a completed inspection for that night. Choosing to lead the final recovery team opens a first-person field walk. Use W/S or Up/Down to walk, A/D or Left/Right to turn, and E to examine. The later rifle controls support pointer aiming, X to select a visible figure, and Space to fire; on-screen controls also support touch. The guide outcome reflects whether the player fires or lets the team leave.

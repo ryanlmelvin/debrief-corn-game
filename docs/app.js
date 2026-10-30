@@ -1,9 +1,11 @@
 import { stepGuide, turnGuide, inspectGuide, spareGuide, fireGuide, focusGuide, nearbyGuideSite, projectGuide } from './guide.js';
 import { createGame, startShift, advance, reload, shoot, focusNext, enterField, move, inspect, canEatCrop, eatCrop, nearbySite, investigationUrge, investigationComplete, beginDebrief, getQuestion, getEnding, answer, serialize, restore, BRIEFINGS, EVIDENCE, ENDINGS, DATES, REPORT_DATES, SHIFT_LENGTH } from './engine.js';
 import { Renderer } from './renderer.js';
+import { FieldMap } from './field-ui.js';
 
 const $ = id => document.getElementById(id);
 const canvas=$('field'), renderer=new Renderer(canvas), dialog=$('paper-dialog');
+const fieldMap=new FieldMap($('field-exploration'));
 const menu=$('game-menu');
 const menuOpen=()=>menu.matches(':popover-open');
 menu.addEventListener('toggle',()=>{syncAudio();if(menuOpen())save();});
@@ -52,11 +54,12 @@ function showModal(kind,html) {
   $('dialog-title')?.focus({preventScroll:true});
   syncAudio();
 }
-function closeModal() {dialog.close();modalKind='';syncAudio();canvas.focus({preventScroll:true});}
+function closeModal() {dialog.close();modalKind='';syncAudio();(game?.phase==='field'?$('field-exploration').querySelector('.field-go'):canvas).focus({preventScroll:true});}
 function begin(mode,fromSave=false) {
   game=fromSave?readSave():createGame(mode);
   if(!game){toast('The saved shift could not be read. You can start a new one.');return;}
   paused=false;lastModalKey='';lastControlsKey='';lastLog='';
+  fieldMap.reset();
   $('notebook').hidden=false;$('menu-radio').hidden=false;
   $('welcome').hidden=true;$('sidebar').hidden=false;$('pause').hidden=false;document.body.classList.add('playing');
   if(dialog.open)closeModal();updateUI(true);save();
@@ -106,7 +109,7 @@ function updateUI(force=false) {
   $('hud-reload').disabled=paused||game.reload>0||game.rounds===6||game.reserve===0;
   $('hud-reload').textContent=game.reload>0?'↻ Reloading…':'↻ Reload';
   $('hud-reload').setAttribute('aria-label',`Reload rifle. ${game.rounds} rounds loaded, ${game.reserve} in reserve.`);
-  $('controls').hidden=active;
+  $('controls').hidden=active||field;
   $('evidence-count').textContent=String(game.evidence.length).padStart(2,'0');
   $('control-hint').textContent=field?'ARROWS / WASD TO MOVE · E TO INSPECT':active?'CLICK / TAP FIRE · R RELOAD':'STATION 04';
   canvas.setAttribute('aria-label',field?`Field survey. Your position is column ${game.player.x+1}, row ${game.player.y+1}. ${site?site.label+'. ':''}Gold page markers show tonight’s unread discoveries. Check marks show searched locations. Use arrow keys or WASD to move. E to inspect. Watchtower is column 2 row 8; pump house column 4 row 4; drainage channel column 8 row 6; northeast corner column 10 row 2.`:'Watchtower shooting gallery. Click moving corn to fire. X selects a crop. Space fires. R reloads.');
@@ -132,6 +135,8 @@ function updateUI(force=false) {
   if(field)$('scene-caption').textContent='';
   $('pause-layer').hidden=!paused;
   $('pause').textContent=paused?'Resume':'Pause';
+  fieldMap.render(game,paused);
+  canvas.hidden=field;
   if (phase === 'guide') updateGuideUI();
   sceneDialog();
 }
@@ -151,6 +156,21 @@ function updateGuideUI() {
   if(paused)$('controls').querySelectorAll('button').forEach(button=>button.disabled=true);
 }
 function act(action,value) {
+  if(action.startsWith('field-')) {
+    if(!game||game.phase!=='field'||paused||dialog.open||menuOpen())return;
+    if(action==='field-select')fieldMap.choose(game,value);
+    if(action==='field-style'&&['quiet','direct'].includes(value)&&!fieldMap.travel)fieldMap.style=value;
+    if(action==='field-stop')fieldMap.stop();
+    if(action==='field-go') {
+      const site=nearbySite(game);
+      if(site?.id===fieldMap.selected) {
+        if(site.id==='tower'){act('debrief');return;}
+        act(canEatCrop(game)?'corn':'inspect');return;
+      }
+      fieldMap.start(game);
+    }
+    fieldMap.render(game,paused);save();return;
+  }
   if(action==='records'){$('records').click();return;}
   if(action==='guide-step')stepGuide(game,Number(value));
   if(action==='guide-turn')turnGuide(game,Number(value));
@@ -164,7 +184,7 @@ function act(action,value) {
   if(action==='reload')reload(game);
   if(action==='focus'){const p=focusNext(game);if(p)renderer.pointer=p;else toast('No moving crops in view.');canvas.focus({preventScroll:true});}
   if(action==='confirm-enter'){closeModal();enterField(game);canvas.focus({preventScroll:true});}
-  if(action==='move'){const [dx,dy]=value.split(',').map(Number);move(game,dx,dy);}
+  if(action==='move'){fieldMap.stop();const [dx,dy]=value.split(',').map(Number);move(game,dx,dy);}
   if(action==='corn' && canEatCrop(game))showModal('corn',paper('Something warm.',`<p>On a camping stove beside the treatment drums, ears of corn roll gently in a pot. A clean plate waits beside butter and a shaker of salt. The smell is sweet enough to make your stomach ache. You cannot remember when you last ate.</p><p>A notice above the stove reads: DO NOT CONSUME THE CROP.</p><div class="paper-actions"><button class="primary" data-action="eat-crop">Butter an ear. Take a bite.</button><button class="secondary" data-action="close">Leave it untouched.</button></div>`,'PUMP HOUSE'));
   if(action==='eat-crop' && eatCrop(game))closeModal();
   if(action==='inspect'){
@@ -202,12 +222,6 @@ canvas.addEventListener('pointerdown',event=>{
     const p=renderer.coords(event);renderer.pointer=p;
     fire(p,event.pointerType==='touch'?22/Math.max(.1,renderer.view.scale):0);
   }
-  else if(game.phase==='field') {
-    const p=renderer.coords(event),x=Math.floor((p.x-125)/58),y=Math.floor((p.y-74)/58);
-    if(x===game.player.x&&y===game.player.y)act('inspect');
-    else if(Math.abs(x-game.player.x)+Math.abs(y-game.player.y)===1)act('move',`${x-game.player.x},${y-game.player.y}`);
-    else toast('Use the arrows to walk, or tap a neighboring square.');
-  }
 });
 function fire(p,padding=0) {const result=game.phase==='guide'?fireGuide(game,p.x,p.y):shoot(game,p.x,p.y,padding);if(!['blocked','empty'].includes(result))shotSound(result==='hit');else if(result==='empty')toast('Rifle empty. Press R or tap Reload.');updateUI();save();}
 document.addEventListener('keydown',event=>{
@@ -229,7 +243,7 @@ document.addEventListener('keydown',event=>{
   if(game.phase==='field'){
     const directions={arrowup:'0,-1',w:'0,-1',arrowdown:'0,1',s:'0,1',arrowleft:'-1,0',a:'-1,0',arrowright:'1,0',d:'1,0'};
     if(directions[k]){event.preventDefault();act('move',directions[k]);}
-    if(k==='e'){event.preventDefault();act('inspect');}
+    if(k==='e'){event.preventDefault();fieldMap.stop();act(nearbySite(game)?.id==='tower'?'debrief':'inspect');}
   }
 });
 document.addEventListener('visibilitychange',()=>{if(document.hidden){save();if(game&&!dialog.open)togglePause(true);audioContext?.suspend();}else syncAudio();});
@@ -380,11 +394,17 @@ function frame(now) {
   const dt=lastFrame?Math.min((now-lastFrame)/1000,.1):0;lastFrame=now;
   if(game&&!paused&&!dialog.open&&!menuOpen()&&!document.hidden){
     advance(game,dt);
+    if(game.phase==='field')fieldMap.tick(game,dt,(dx,dy)=>move(game,dx,dy),()=>{
+      const site=nearbySite(game);
+      if(site?.id==='tower'&&investigationComplete(game))act('debrief');
+      else if(site&&site.id!=='tower'&&!game.inspected.includes(site.id))act('inspect');
+      else {updateUI(true);save();}
+    });
     const focused=game.targets.find(t=>t.id===game.focused);if(focused)renderer.pointer={x:focused.x,y:focused.y-34};
     if(now-lastUI>100){updateUI();lastUI=now;}
     if(now-lastSave>1200){save();lastSave=now;}
   }
-  renderer.draw(game,now,!game);
+  if(game?.phase!=='field')renderer.draw(game,now,!game);
   requestAnimationFrame(frame);
 }
 requestAnimationFrame(frame);

@@ -1,4 +1,5 @@
 import { startGuide, advanceGuide, guideDisposition } from './guide.js';
+import { fieldStepCost } from './field.js';
 // All simulation and story state lives here. Rendering and storage are separate.
 export const SAVE_VERSION = 1;
 export const SHIFT_LENGTH = 55;
@@ -130,7 +131,7 @@ export function enterField(s) {
   if (s.breaches >= 6) { finish(s, 'breach'); return true; }
   s.phase = 'field'; s.entered = true;
   s.searched.push(`shift-${s.shift}`);
-  addLog(s, 'You leave the tower. Every step into the rows raises exposure.', 'story');
+  addLog(s, 'Choose a landmark. Follow the paths for lower exposure, or cut through the rows.', 'story');
   return true;
 }
 export const FIELD_SITES = [
@@ -146,7 +147,7 @@ export function move(s, dx, dy) {
   if (x < 0 || x > 10 || y < 0 || y > 8) return false;
   s.player = { x, y }; s.fieldSteps++;
   const key = `${x},${y}`; if (!s.visited.includes(key)) s.visited.push(key);
-  s.exposure = Math.min(100, s.exposure + (s.mode === 'story' ? 0.75 : 1.15));
+  s.exposure = Math.min(100, s.exposure + fieldStepCost(s,x,y));
   if (s.fieldSteps === 5) addLog(s, 'The rows close behind you. Nothing here smells like rain.', 'story');
   if (s.exposure >= 70 && !s.inspected.includes('warning')) { s.inspected.push('warning'); addLog(s, 'Your hands are cold. Return before exposure reaches 100.', 'alert'); }
   if (s.exposure >= 100) finish(s, 'assimilation');

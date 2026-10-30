@@ -29,7 +29,7 @@ test('story mode lowers crop speed and exploration costs',()=>{const a=watch('st
 test('debrief reports reflect actual findings',()=>{const s=watch();safeWatch(s);s.phase='debrief';answer(s,'truth');assert.match(getQuestion(s).options[0].label,/did not recover/);s.evidence.push('dress');assert.match(getQuestion(s).options[0].label,/white fabric/i);});
 test('invalid or locked responses cannot advance a debrief',()=>{const s=createGame();s.phase='debrief';s.shift=2;s.question=2;assert.equal(answer(s,'bogus'),false);assert.equal(answer(s,'expose'),false);assert.equal(s.question,2);});
 test('evidence ending requires both quantity and treatment evidence',()=>{const s=createGame();s.phase='debrief';s.shift=2;s.question=2;s.evidence=['dress','badge','teeth'];assert.equal(answer(s,'expose'),false);s.evidence.push('ledger');assert.equal(answer(s,'expose'),true);assert.equal(s.ending,'witness');});
-test('a full investigation route reaches the witness ending with all nine exhibits',()=>{const s=watch();for(let i=0;i<3;i++){safeWatch(s);investigateAll(s);assert.equal(s.fieldSteps,28);assert.equal(beginDebrief(s),true);answer(s,'truth');answer(s,'evidence');answer(s,i===2?'expose':'question');if(s.phase==='debrief'&&s.question===3)answer(s,'return');if(s.phase==='briefing')startShift(s);}assert.equal(s.ending,'witness');assert.equal(s.evidence.length,9);assert.ok(Math.abs(s.exposure-72.6)<.001);});
+test('a full investigation route reaches the witness ending with all nine exhibits',()=>{const s=watch();for(let i=0;i<3;i++){safeWatch(s);investigateAll(s);assert.equal(s.fieldSteps,28);assert.equal(beginDebrief(s),true);answer(s,'truth');answer(s,'evidence');answer(s,i===2?'expose':'question');if(s.phase==='debrief'&&s.question===3)answer(s,'return');if(s.phase==='briefing')startShift(s);}assert.equal(s.ending,'witness');assert.equal(s.evidence.length,9);assert.ok(Math.abs(s.exposure-53.97)<.001);});
 test('final choices and prior testimony reach distinct endings',()=>{for(const [choice,honesty,ending]of[['sign',0,'compliance'],['sign',3,'dissent']]){const s=createGame();Object.assign(s,{phase:'debrief',shift:2,question:2,honesty});answer(s,choice);assert.equal(s.ending,ending);}assert.equal(Object.keys(ENDINGS).length,7);});
 test('save and restore preserve a live shift without losing targets',()=>{const s=watch();advance(s,13);assert.deepEqual(restore(serialize(s)),s);});
 test('corrupt, outdated and structurally invalid saves are rejected',()=>{for(const raw of ['nope','null','{}','{"version":99}'])assert.equal(restore(raw),null);for(const patch of [{shift:8},{targets:[{}]},{player:{x:99,y:0}},{evidence:['unknown']},{phase:'ending',ending:'bogus'},{rounds:-3}])assert.equal(restore(JSON.stringify({...createGame(),...patch})),null);});
@@ -164,7 +164,7 @@ test('required nightly routes remain survivable in both modes, while detours can
     for(let night=0;night<3;night++){safeWatch(s);investigateAll(s);assert.equal(s.phase,'field');report(s,'truth');if(s.phase==='briefing')startShift(s);}
     assert.equal(s.phase,'ending');assert.notEqual(s.ending,'assimilation');
   }
-  const s=watch();safeWatch(s);s.exposure=99;move(s,1,0);assert.equal(s.ending,'assimilation');
+  const s=watch();safeWatch(s);s.exposure=99.5;move(s,1,0);assert.equal(s.ending,'assimilation');
 });
 
 
