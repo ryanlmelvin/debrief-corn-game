@@ -164,3 +164,6 @@ body[data-phase="field"] .viewport{background:#16221c}
 @media(prefers-reduced-motion:reduce){.tower-hud button.needs-reload{animation:none;border-color:#d6af69;box-shadow:0 0 0 2px #d6af6933}}
 
 .share-link{width:100%;min-width:0;padding:12px;border:1px solid #737a63;background:#eee9cf;color:#232b21;font:12px ui-monospace,monospace}.share-link:focus-visible{outline:2px solid #344330;outline-offset:2px}
+
+/* Bring the empty-rifle action into the player’s view. */
+.playing .tower-hud #hud-reload.needs-reload{position:fixed;left:50%;top:50%;right:auto;bottom:auto;transform:translate(-50%,-50%);min-width:140px;min-height:56px;font-size:16px;z-index:4}
