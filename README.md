@@ -89,3 +89,8 @@ The original short story **Debrief** by Ryan L. Melvin is a separate work, is no
 Keep manuscript files outside this repository. Publish only the game adaptation; do not add the original story, excerpts supplied separately, or manuscript attachments.
 
 If an older offline installation keeps showing outdated interviews, open [Update Debrief](https://ryanlmelvin.github.io/debrief-corn-game/update.html) and select **Load latest game**. This activates the published version without clearing saved progress.
+
+
+The **Records** archive keeps discovered endings and the last 30 completed assignments, including interview answers, on this browser and device. Updating or starting a new assignment preserves the archive. Earlier runs completed before this feature cannot be reconstructed; a saved ending is added when resumed.
+
+Every map landmark now has a different exhibit each night. Gold page markers show unread locations; a check marks a completed inspection for that night. Choosing to lead the final recovery team opens a first-person field walk. Use W/S or Up/Down to walk, A/D or Left/Right to turn, and E to examine. The later rifle controls support pointer aiming, X to select a visible figure, and Space to fire; on-screen controls also support touch. The guide outcome reflects whether the player fires or lets the team leave.

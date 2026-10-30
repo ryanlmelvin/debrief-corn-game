@@ -18,3 +18,5 @@
   .sidebar .radio #radio-log{max-height:130px}
   .sidebar .notebook-button{grid-column:3;align-self:end}
 }
+
+.radio summary{cursor:pointer}.ending-collection{list-style:none;padding:0;display:grid;grid-template-columns:1fr 1fr;gap:8px}.ending-slot{padding:12px;border:1px solid #8e967b;color:#737a63;font-size:12px}.ending-slot span{margin-right:8px}.ending-slot.collected{background:#344330;color:#eee9cf}.past-run{border-top:1px solid #9aa185;padding:16px 0}.past-run summary{cursor:pointer;font-size:13px}.masthead nav{flex-wrap:wrap}

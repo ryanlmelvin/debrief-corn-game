@@ -1,3 +1,4 @@
+import { guideWall, GUIDE_SITES, projectGuide } from './guide.js';
 import { FIELD_SITES } from './engine.js';
 
 const W = 960, H = 600;
@@ -72,6 +73,7 @@ export class Renderer {
   }
   draw(s,now,title=false) {
     const c=this.c; c.clearRect(0,0,W,H);
+    if(s?.phase==='guide') { this.drawGuide(s); return; }
     if(s?.phase==='field') { this.drawMap(s); return; }
     c.drawImage(this.background,0,0);
     const t=this.reduced?0:now/1000;
@@ -102,6 +104,7 @@ export class Renderer {
       if(s.lastShot && s.time-s.lastShot.time<.16) {
         const p=s.lastShot;c.strokeStyle='#d8ba75';c.beginPath();c.arc(p.x,p.y,20+(s.time-p.time)*80,0,Math.PI*2);c.stroke();
       }
+      if(s.shift>0 && s.time>35 && s.time<44){c.save();c.globalAlpha=this.reduced ? .6 :Math.sin((s.time-35)/9*Math.PI)*.6;c.fillStyle=s.shift===2?'#b56554':'#bcc09a';c.font='17px Georgia';c.textAlign='center';c.fillText('Watch the corn. Shoot any that try to escape.',480,110);c.restore();}
       c.fillStyle='#ddd5ad';c.font='11px monospace';c.fillText(s.reload?'RELOADING':`${String(s.rounds).padStart(2,'0')} / ${String(s.reserve).padStart(2,'0')}   .22 RIFLE`,47,582);
       c.textAlign='right';c.fillText('PERIMETER  /  KEEP CLEAR',913,582);
     }
@@ -137,11 +140,64 @@ export class Renderer {
       c.strokeStyle='#c6b789';c.strokeRect(x-16,y-16,32,32);
       c.font='10px monospace';c.textAlign='center';c.fillStyle='#e0d8b7';c.fillText(site.label.toUpperCase(),x,y-25);
       if(s.inspected.includes(site.id)){ c.font='14px monospace';c.fillText('✓',x,y+5); }
+      else if(site.id!=='tower'){
+        // An unread page appears anew each night; inspection replaces it with a check.
+        c.fillStyle='#dfc77d';c.fillRect(x+12,y-17,13,17);c.fillStyle='#283728';c.beginPath();c.moveTo(x+21,y-17);c.lineTo(x+25,y-13);c.lineTo(x+21,y-13);c.fill();
+        c.strokeStyle='#dfc77d66';c.strokeRect(x-21,y-21,42,42);
+      }
     });
     const px=x0+s.player.x*cell+cell/2,py=y0+s.player.y*cell+cell/2;
     c.strokeStyle='#ddd9a67a';c.lineWidth=1;c.beginPath();c.arc(px,py,22,0,Math.PI*2);c.stroke();
     c.fillStyle='#f3e3aa';c.beginPath();c.moveTo(px,py-10);c.lineTo(px+7,py+7);c.lineTo(px,py+3);c.lineTo(px-7,py+7);c.fill();
-    c.fillStyle='#9fa888';c.font='11px monospace';c.textAlign='left';c.fillText('EACH STEP INCREASES EXPOSURE. RETURN TO THE WATCHTOWER TO LEAVE.',42,576);
+    c.fillStyle='#9fa888';c.font='11px monospace';c.textAlign='left';c.fillStyle='#dfc77d';c.fillRect(42,563,10,14);c.fillText('UNREAD',61,576);c.fillStyle='#9fa888';c.fillText('✓  SEARCHED',155,576);
+  }
+  drawGuide(s) {
+    const c=this.c,g=s.guide;
+    c.save();
+    const sky=c.createLinearGradient(0,0,0,300);sky.addColorStop(0,'#080f0e');sky.addColorStop(1,'#394338');c.fillStyle=sky;c.fillRect(0,0,W,300);
+    const soil=c.createLinearGradient(0,300,0,H);soil.addColorStop(0,'#2d3324');soil.addColorStop(1,'#111b15');c.fillStyle=soil;c.fillRect(0,300,W,300);
+    // Ray-cast corn rows give the walk depth without changing the tower landscape.
+    for(let x=0;x<W;x+=4){
+      const offset=Math.atan((x-480)/640),angle=g.angle+offset;
+      let d=.05;
+      while(d<18&&!guideWall(g.x+Math.cos(angle)*d,g.y+Math.sin(angle)*d))d+=.045;
+      const depth=Math.max(.15,d*Math.cos(offset)),height=Math.min(900,620/depth);
+      const wx=g.x+Math.cos(angle)*d,wy=g.y+Math.sin(angle)*d;
+      const grain=(Math.sin(wx*41)+Math.cos(wy*43))*.5;
+      const light=Math.max(12,66-depth*5+grain*9);
+      c.fillStyle=`rgb(${light*.85},${light},${light*.57})`;c.fillRect(x,300-height/2,4,height);
+      if(Math.floor((wx+wy)*12)%3===0){c.fillStyle='#a4a56b18';c.fillRect(x,300-height*.45,2,height*.85);}
+      if(x%16===0){for(let leaf=0;leaf<4;leaf++){const yy=300-height*.3+leaf*height*.17,span=Math.min(42,height*.12),side=leaf%2?1:-1;c.fillStyle='#81935c20';c.beginPath();c.moveTo(x,yy);c.quadraticCurveTo(x+side*span,yy-span*.9,x+side*span,yy-span*.3);c.quadraticCurveTo(x+side*span*.3,yy,x,yy+5);c.fill();}}
+    }
+    const site=GUIDE_SITES[g.clues.length];
+    if(site){const p=projectGuide(g,site);if(p){const size=Math.max(6,50/Math.max(1,p.distance));c.fillStyle='#aaa27c';
+      if(site.id==='radio'){c.fillRect(p.x-size/2,p.y-size*.6,size,size*.6);line(c,p.x+size*.25,p.y-size*.6,p.x+size*.4,p.y-size*1.3,'#b5ba98',2);c.fillStyle='#1a251d';c.fillRect(p.x-size*.3,p.y-size*.4,size*.5,size*.15);}
+      else{for(let i=0;i<(site.id==='corner'?6:2);i++){c.beginPath();c.ellipse(p.x+(i%2?size*.3:-size*.3),p.y-i*size*.15,size*.15,size*.3,.3,0,Math.PI*2);c.fill();}}
+    }}
+    for(const person of [...g.team].sort((a,b)=>Math.hypot(b.x-g.x,b.y-g.y)-Math.hypot(a.x-g.x,a.y-g.y))){
+      const p=projectGuide(g,person);if(!p||person.status==='escaped')continue;
+      if(person.status==='shot'){c.fillStyle='#8b8461';c.fillRect(p.x-p.width*.6,p.y-4,p.width*1.2,5);continue;}
+      c.fillStyle='#aaa993';c.fillRect(p.x-p.width*.24,p.y-p.height*.75,p.width*.48,p.height*.48);
+      c.beginPath();c.arc(p.x,p.y-p.height*.86,p.width*.23,0,Math.PI*2);c.fill();
+      line(c,p.x-p.width*.12,p.y-p.height*.28,p.x-p.width*.24,p.y,'#777d69',Math.max(2,p.width*.13));
+      line(c,p.x+p.width*.12,p.y-p.height*.28,p.x+p.width*.24,p.y,'#777d69',Math.max(2,p.width*.13));
+      c.fillStyle='#e2cea0';c.fillRect(p.x+p.width*.42,p.y-p.height*.5,Math.max(3,p.width*.13),Math.max(4,p.height*.09));
+    }
+    const vignette=c.createRadialGradient(480,320,40,480,320,480);vignette.addColorStop(0,'#02080500');vignette.addColorStop(.65,'#02080560');vignette.addColorStop(1,'#020805f2');c.fillStyle=vignette;c.fillRect(0,0,W,H);
+    c.fillStyle='#afba98';c.font='11px monospace';c.textAlign='left';
+    const compass=['E','S','W','N'][((Math.round(g.angle/(Math.PI/2))%4)+4)%4];
+    c.fillText(`RECOVERY DETAIL  /  ${compass}`,35,36);
+    if(g.stage==='escape'){
+      const p=this.pointer;c.strokeStyle='#d6cfad';c.lineWidth=1;c.beginPath();c.arc(p.x,p.y,10,0,Math.PI*2);c.stroke();
+      // Slow fades, with a steady equivalent for reduced-motion preferences.
+      c.globalAlpha=this.reduced ? .8 :Math.max(0,Math.sin(g.time*.55-.8))*.85;
+      c.fillStyle='#c65b4f';c.font='22px Georgia';c.textAlign='center';c.fillText('shoot any that try to escape.',480,112);c.globalAlpha=1;
+      c.fillStyle='#191f18';c.beginPath();c.moveTo(620,600);c.lineTo(493,401);c.lineTo(483,401);c.lineTo(535,600);c.fill();
+    }
+    c.fillStyle='#d4d2b7';c.font='15px Georgia';c.textAlign='center';
+    const words=g.message.split(' ');let row='',y=533;
+    for(const word of words){if(c.measureText(row+word).width>730){c.fillText(row,480,y);y+=22;row='';}row+=word+' ';}c.fillText(row,480,y);
+    c.restore();
   }
   coords(event) {
     const r=this.canvas.getBoundingClientRect(),scale=Math.min(r.width/W,r.height/H);

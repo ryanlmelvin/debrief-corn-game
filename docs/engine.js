@@ -1,3 +1,4 @@
+import { startGuide, advanceGuide, guideDisposition } from './guide.js';
 // All simulation and story state lives here. Rendering and storage are separate.
 export const SAVE_VERSION = 1;
 export const SHIFT_LENGTH = 55;
@@ -9,17 +10,20 @@ export const EVIDENCE = {
   roots: { title: 'Connected roots', code: 'EXHIBIT 03', text: 'Pale threads run from root to root. When your light crosses them, the entire row leans away. The soil beyond the fence moves a moment later.', where: 'A drainage channel' },
   badge: { title: 'Recovery team badge', code: 'EXHIBIT 04', text: 'The photograph is intact. The name has been worn smooth. Something has threaded itself through the clip, into the shape of a small ear.', where: 'The northeast corner' },
   sample: { title: 'Sealed sample', code: 'EXHIBIT 05', text: 'A glass vial beside an empty treatment drum. The sample label says BEFORE APPLICATION. Inside, one white filament turns slowly against the glass.', where: 'The pump house' },
-  teeth: { title: 'An ear of corn', code: 'EXHIBIT 06', text: 'At first you count kernels. Then you notice their roots. All of them are teeth. They are arranged with the care of something learning.', where: 'The northeast corner' },
+  teeth: { title: 'An ear of corn', code: 'EXHIBIT 06', text: 'At first you count kernels. Then you notice their roots. All of them are teeth. A few are loose. You put the ear down.', where: 'The northeast corner' },
+  water: { title: 'Water sample', code: 'EXHIBIT 08', text: 'A film gathers against the current. You break it with a twig. The two halves drift back together.', where: 'The drainage channel' },
+  glove: { title: 'Work glove', code: 'EXHIBIT 09', text: 'A glove lies beneath the pump tap. The fingers are packed with damp soil. The inside is still warm.', where: 'The pump house' },
   map: { title: 'Drainage survey', code: 'EXHIBIT 07', text: 'Old field boundaries, a creek, the next farm. Someone has drawn a ring around this station. The water does not respect it.', where: 'The drainage channel' }
 };
+const WATCH_ORDERS = ['Watch the corn. Shoot any that try to escape.', 'Remain in the watchtower.', 'Remember any irregularities for your debrief at the end of the night.'];
 export const BRIEFINGS = [
-  { title: 'Watch the corn grow.', text: 'Your post overlooks an experimental crop outside a small Illinois town. The night shift is quiet. Usually.', orders: ['Shoot any corn that attempts to leave the field.', 'Do not fire on human figures.', 'Remain in the watchtower. Record irregularities.'], note: 'The handbook has no procedure for someone entering the field.' },
-  { title: 'Maintain the perimeter.', text: 'A recovery team has been sent to the northeast corner. You have been reassigned to the same post. The previous report has already been corrected.', orders: ['Prevent crop material from crossing the perimeter.', 'Recovery personnel are not targets.', 'Botanical observations belong in the approved vocabulary.'], note: 'A fresh coat of paint covers the old warning on the treatment drums.' },
-  { title: 'Nothing has changed.', text: 'Another team is overdue. The wind has dropped. The rows continue to move. Your supervisor requests a clean report before the end of the month.', orders: ['Contain all mobile specimens.', 'Remain available for debrief.', 'Do not remove samples from the site.'], note: 'The lights on the neighboring farm went out at 18:40.' }
+  { title: 'Watch the corn.', text: 'Your post overlooks an experimental crop outside a small Illinois town. The night shift is quiet. Usually.', orders: WATCH_ORDERS, note: 'Your relief comes at the end of the night.' },
+  { title: 'Watch the corn.', text: 'You have been reassigned to the same post. The previous report has been filed.', orders: WATCH_ORDERS, note: 'The tower key is where you left it.' },
+  { title: 'Watch the corn.', text: 'The wind has dropped. You are due at the tower before dark.', orders: WATCH_ORDERS, note: 'The lights on the neighboring farm went out at 18:40.' }
 ];
 
 export function createGame(mode = 'standard', seed = Date.now()) {
-  const s = { version: SAVE_VERSION, mode, rng: seed >>> 0 || 1, phase: 'briefing', shift: 0, time: 0,
+  const s = { runId: String(seed), version: SAVE_VERSION, mode, rng: seed >>> 0 || 1, phase: 'briefing', shift: 0, time: 0,
     rounds: 6, reserve: 24, reload: 0, kills: 0, shots: 0, breaches: 0, exposure: 0,
     trust: 0, honesty: 0, evidence: [], reports: [], log: [], targets: [], nextSpawn: 3, nextId: 1,
     incident: false, entered: false, searched: [], question: 0, ending: null, lastShot: null,
@@ -31,7 +35,7 @@ export function addLog(s, message, tone = 'normal') { s.log.unshift({ message, t
 export function startShift(s) {
   if (s.phase !== 'briefing') return false;
   Object.assign(s, { phase: 'tower', time: 0, rounds: 6, reserve: 24, reload: 0, targets: [], nextSpawn: 3,
-    incident: false, entered: false, question: 0, player: { x: 1, y: 7 }, visited: ['1,7'], fieldSteps: 0, inspected: [], focused: null, lastShot: null });
+    incident: false, incidentPrompted: false, entered: false, question: 0, player: { x: 1, y: 7 }, visited: ['1,7'], fieldSteps: 0, inspected: [], focused: null, lastShot: null });
   addLog(s, `Station 04. Shift ${s.shift + 1}. Perimeter check complete.`);
   return true;
 }
@@ -44,6 +48,7 @@ function spawn(s) {
   addLog(s, 'Movement in the rows. Confirm your target.', 'alert');
 }
 export function advance(s, dt) {
+  if (s.phase === 'guide') { advanceGuide(s, dt); return; }
   if (s.phase !== 'tower' || !Number.isFinite(dt) || dt <= 0) return;
   // Small fixed steps keep large elapsed times from skipping spawns or perimeter checks.
   let remaining = Math.min(dt, SHIFT_LENGTH);
@@ -148,7 +153,7 @@ export function inspect(s) {
   const site = nearbySite(s);
   if (!site || site.id === 'tower' || s.inspected.includes(site.id)) return null;
   s.inspected.push(site.id);
-  const id = site.id === 'corner' ? ['dress', 'badge', 'teeth'][s.shift] : site.id === 'pump' ? (s.shift === 0 ? 'ledger' : 'sample') : (s.shift < 2 ? 'roots' : 'map');
+  const id = site.id === 'corner' ? ['dress', 'badge', 'teeth'][s.shift] : site.id === 'pump' ? ['ledger', 'sample', 'glove'][s.shift] : ['roots', 'water', 'map'][s.shift];
   if (!s.evidence.includes(id)) s.evidence.push(id);
   addLog(s, 'Private observation saved. Open your notebook to read it.', 'story');
   return id;
@@ -221,14 +226,17 @@ export function answer(s, id) {
   s.reports.push({ shift: s.shift, question: q.prompt, answer: option.label, redacted: ['redact', 'comply', 'sign'].includes(id) });
   if (s.question === 2 && id === 'question' && s.shift < 2) {
     s.reports.at(-1).supervisorReply = s.evidence.some(e => ['ledger', 'sample'].includes(e))
-      ? 'Do you need to know that to do your job? Your assignment is to watch the corn and contain anything that tries to leave. Return to your post.'
-      : 'Closing the field is not your decision. Your assignment is to watch the corn and contain anything that tries to leave. Return to your post.';
+      ? 'Do you need to know that to do your job? Watch the corn. Shoot any that try to escape. Return to your post.'
+      : 'Closing the field is not your decision. Watch the corn. Shoot any that try to escape. Return to your post.';
     s.question = 3;
     return true;
   }
   s.question++;
   if (s.question === 3) {
-    if (s.shift === 2) finish(s, id === 'expose' ? 'witness' : id === 'guide' ? 'guide' : s.honesty >= 2 ? 'dissent' : 'compliance');
+    if (s.shift === 2) {
+      if (id === 'guide') startGuide(s);
+      else finish(s, id === 'expose' ? 'witness' : s.honesty >= 2 ? 'dissent' : 'compliance');
+    }
     else nextShift(s);
   }
   return true;
@@ -244,13 +252,16 @@ export const ENDINGS = {
   breach: { code: '05', title: 'Beyond the perimeter.', stamp: 'CONTAINMENT LOST', text: 'The sixth movement crosses the road. Dispatch tells you to stay on the line. From somewhere beyond the station comes the sound of stalks brushing together. There are no fields on that side.', last: '[static]' },
   assimilation: { code: '06', title: 'Expected growth.', stamp: 'PERSONNEL UNACCOUNTED FOR', text: 'You stop to catch your breath. The rows stop with you. Somewhere a radio calls your number, then calls it again. You understand at last why the field has been so patient.', last: 'Nothing here is wasted.' }
 };
+export function getEnding(s) {
+  return s.ending === 'guide' && s.guide ? { ...ENDINGS.guide, ...guideDisposition(s) } : ENDINGS[s.ending];
+}
 function finish(s, ending) { s.phase = 'ending'; s.ending = ending; s.targets = []; }
 
 export function serialize(s) { return JSON.stringify(s); }
 export function restore(raw) {
   try {
     const s = JSON.parse(raw);
-    if (!s || s.version !== SAVE_VERSION || !['standard','story'].includes(s.mode) || !['briefing','tower','decision','field','debrief','ending'].includes(s.phase)) return null;
+    if (!s || s.version !== SAVE_VERSION || !['standard','story'].includes(s.mode) || !['briefing','tower','decision','field','debrief','guide','ending'].includes(s.phase)) return null;
     if (!Number.isInteger(s.shift) || s.shift < 0 || s.shift > 2 || !Number.isInteger(s.question) || s.question < 0 || s.question > 3) return null;
     for (const key of ['time','rounds','reserve','reload','kills','shots','breaches','exposure','trust','honesty','rng','nextSpawn','nextId','fieldSteps']) if (!Number.isFinite(s[key])) return null;
     if (s.time < 0 || s.time > SHIFT_LENGTH + 1 || s.rounds < 0 || s.rounds > 6 || s.reserve < 0 || s.exposure < 0 || s.exposure > 100) return null;
@@ -261,6 +272,15 @@ export function restore(raw) {
     if (!s.log.every(l => typeof l.message === 'string') || !s.reports.every(r => typeof r.question === 'string' && typeof r.answer === 'string')) return null;
     if (s.phase === 'ending' && !Object.hasOwn(ENDINGS,s.ending)) return null;
     if (s.phase === 'debrief' && s.question === 3 && (s.shift >= 2 || typeof s.reports.at(-1)?.supervisorReply !== 'string')) return null;
+    if (s.phase === 'guide' || s.guide) {
+      const g=s.guide;
+      if (!g || typeof g.message !== 'string' || !['search','escape'].includes(g.stage) || !['x','y','angle','steps','time','fired'].every(k => Number.isFinite(g[k]))) return null;
+      if (g.x<1 || g.x>=12 || g.y<1 || g.y>=12 || g.steps<0 || g.time<0 || g.fired<0 || g.fired>6) return null;
+      if (!Array.isArray(g.clues) || g.clues.length>3 || !g.clues.every((id,i)=>id===['boot','radio','corner'][i])) return null;
+      if (!Array.isArray(g.team) || g.team.length>3 || !g.team.every(t=>Number.isInteger(t.id)&&Number.isFinite(t.x)&&Number.isFinite(t.y)&&Number.isFinite(t.distance)&&['running','shot','escaped'].includes(t.status))) return null;
+      if (g.stage==='escape' && (g.team.length!==3 || g.clues.length!==3)) return null;
+    }
+    if (typeof s.runId !== 'string') s.runId = `legacy-${s.rng}`;
     // Older saves used discovery titles as log receipts, revealing them outside the exhibit.
     const oldReceipts = new Set(Object.values(EVIDENCE).map(e => `${e.title} entered in your private notebook.`));
     s.log = s.log.map(entry => oldReceipts.has(entry.message)
