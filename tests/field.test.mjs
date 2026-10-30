@@ -37,10 +37,10 @@ test('all site orders remain survivable across three nights with the suggested c
     for(let night=0;night<3;night++) {
       for(const id of [...order,'tower']) { walk(s,planFieldRoute(s,site(id)));if(id!=='tower')assert.ok(inspect(s)); }
       assert.equal(s.phase,'field');assert.equal(beginDebrief(s),true);
-      answer(s,'truth');answer(s,'evidence');answer(s,night===2?'expose':'sign');
+      answer(s,'truth');answer(s,'evidence');answer(s,'sign');
       if(night<2){startShift(s);s.phase='field';s.entered=true;}
     }
-    assert.equal(s.ending,'witness');assert.equal(s.evidence.length,9);assert.ok(s.exposure<100);
+    assert.equal(s.ending,'dissent');assert.equal(s.evidence.length,9);assert.ok(s.exposure<100);
   }
 });
 test('travel can stop mid-route, save, resume, and arrive exactly once without teleporting',()=>{

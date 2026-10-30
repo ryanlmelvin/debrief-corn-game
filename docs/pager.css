@@ -287,3 +287,15 @@
   #paper-dialog .decision-sheet > .pager-nav:has(#dialog-update:not([hidden])) { position: absolute; bottom: 10px; left: 16px; width: calc(46.5% - 24px); padding: 0; background: transparent; border: 0; }
   #paper-dialog .decision-sheet:has(#dialog-update:not([hidden])) .decision-context { padding-bottom: 54px; }
 }
+
+/* A live, inspectable tally for ending requirements. */
+#ending-paths { min-height: 44px; color: #e1ddbc; border: 1px solid #788367; padding: 6px 9px; white-space: nowrap; font-size: 11px; }
+.ending-path-checklist { padding-left: 19px; }
+.ending-path-checklist li { padding: 8px 0; border-bottom: 1px dashed #8b9474; font-size: 13px; }
+.ending-path-checklist .small { margin: 4px 0 0; }
+@media (max-width: 380px) {
+  .playing .wordmark { font-size: 12px; letter-spacing: 1px; gap: 5px; }
+  .playing .wordmark svg { width: 13px; }
+  .playing .masthead { gap: 6px; padding-inline: 10px; }
+  #ending-paths { font-size: 10px; padding-inline: 5px; }
+}

@@ -69,7 +69,7 @@ test('the notebook and debrief reveal only encounters actually resolved by the p
   const s=field();assert.doesNotMatch(notebookMarkup(s),/Between the rows/);
   trigger(s,'first-call');assert.doesNotMatch(notebookMarkup(s),/Your voice. From the soil/);
   chooseFieldEncounter(s,'record');continueFieldEncounter(s);
-  const notebook=notebookMarkup(s);assert.match(notebook,/Your voice. From the soil/);assert.match(notebook,/keep a few seconds/);assert.doesNotMatch(notebook,/Tomorrow’s interview/);
+  const notebook=notebookMarkup(s,1);assert.match(notebook,/Your voice. From the soil/);assert.match(notebook,/keep a few seconds/);assert.doesNotMatch(notebook,/Tomorrow’s interview/);
   s.phase='debrief';s.question=1;assert.match(getQuestion(s).options.find(o=>o.id==='field-notes').label,/radio in the soil/);
   answer(s,'field-notes');assert.match(s.reports.at(-1).answer,/radio in the soil/);
 });
@@ -83,9 +83,9 @@ test('complete campaigns encounter all twelve beats without repeats, in both wal
         for(const p of route.steps){assert.equal(move(s,p.x-s.player.x,p.y-s.player.y),true);if(s.fieldEvents.pending){chooseFieldEncounter(s,currentEncounter(s).choices[0].id);continueFieldEncounter(s);}}
         if(id!=='tower')assert.ok(inspect(s));
       }
-      assert.equal(beginDebrief(s),true);answer(s,'truth');answer(s,'field-notes');answer(s,night===2?'expose':'sign');
+      assert.equal(beginDebrief(s),true);answer(s,'truth');answer(s,'field-notes');answer(s,'sign');
       if(night<2){startShift(s);s.phase='field';s.entered=true;}
     }
-    assert.equal(s.ending,'witness');assert.equal(s.fieldEvents.journal.length,12);assert.equal(new Set(s.fieldEvents.journal.map(j=>j.id)).size,12);assert.equal(s.evidence.length,9);assert.ok(restore(serialize(s)));
+    assert.equal(s.ending,'dissent');assert.equal(s.fieldEvents.journal.length,12);assert.equal(new Set(s.fieldEvents.journal.map(j=>j.id)).size,12);assert.equal(s.evidence.length,9);assert.ok(restore(serialize(s)));
   }
 });

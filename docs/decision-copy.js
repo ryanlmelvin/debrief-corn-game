@@ -100,8 +100,7 @@ export function decisionQuestion(game) {
     ...canonical, prompt, context, contextLabel,
     options: canonical.options.map(option => ({
       ...option,
-      label: labels[option.id] || option.label,
-      ...(option.id === 'expose' ? { detail: 'Needs 3 exhibits incl. Application record or Sealed sample.' } : {})
+      label: labels[option.id] || option.label
     }))
   };
 }

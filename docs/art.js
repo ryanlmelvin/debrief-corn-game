@@ -1,3 +1,4 @@
+import { CASE_TASKS, CASE_PLAN, caseProgress } from './evidence-case.js';
 import { EVIDENCE } from './engine.js';
 import { currentEncounter, encounterById } from './encounters.js';
 
@@ -64,20 +65,24 @@ export function landmarkDrawing(id) {
 }
 
 export function notebookMarkup(game, requestedPage = 0) {
-  const pages = [...game.evidence];
+  const pages = ['case', ...game.evidence];
   if(game.fieldEvents.journal.length)pages.push('encounters');
   if (game.reports.length) pages.push('testimony');
   if (!pages.length) pages.push('empty');
   const page = Math.max(0, Math.min(pages.length - 1, Number(requestedPage) || 0)), id = pages[page];
   let content;
-  if (id === 'empty') content = `${scenePlate('tower')}`;
+  if (id === 'case') {
+    const progress = caseProgress(game);
+    content = `<h3>An outside case.</h3><p>${CASE_PLAN}</p><ol>${CASE_TASKS.map(t => `<li>${game.caseFile.secured.includes(t.id) ? '✓ Prepared' : game.evidence.includes(t.id) ? 'Ready to prepare' : `From night ${t.night + 1}`} — ${escape(t.title)} · +${t.cost} exposure</li>`).join('')}</ol><p><b>${Math.min(2,progress.reports)} / 2 physical findings on record.</b> Report the physical exhibit from the corner. Encounter stories do not establish the physical evidence.</p><p class="pencil-note">Skipped a preparation? Return to its site on any later night. You can recover from one missed report. Rest removes only 12 exposure between nights; optional investigations spend the same reserve.</p>`;
+  }
+  else if (id === 'empty') content = `${scenePlate('tower')}`;
   else if (id === 'testimony') content = `<h3>What went on record.</h3><div class="notebook-testimony">${game.reports.map(r => `<section><p class="eyebrow">SHIFT 0${r.shift + 1}</p><h4>${escape(r.question)}</h4><p>${r.redacted ? '<span class="withheld-note">Observation withheld</span> ' : ''}${escape(r.answer)}</p>${r.supervisorReply ? `<p class="pencil-note">Supervisor: ${escape(r.supervisorReply)}</p>` : ''}</section>`).join('')}</div>`;
   else if(id==='encounters')content=`<h3>Between the rows.</h3><div class="notebook-encounters">${game.fieldEvents.journal.map(j=>{const e=encounterById(j.id),c=e.choices.find(c=>c.id===j.choice);return `<section><p class="eyebrow">NIGHT 0${e.night+1} · CROSSING ${j.x+1}, ${j.y+1}</p><h4>${escape(e.title)}</h4><p>${escape(e.report)}</p><p class="pencil-note">${escape(c.label)} ${escape(c.result)}</p></section>`;}).join('')}</div>`;
   else {
     const e = EVIDENCE[id];
     content = `<p class="eyebrow">${escape(e.code)} / ${escape(e.where)}</p><h3>${escape(e.title)}</h3>${evidenceMount(id)}<p class="handwritten-observation">${escape(e.text)}</p>`;
   }
-  return `<article class="field-notebook"><header class="notebook-header"><div><h2 id="dialog-title" tabindex="-1">Private notebook.</h2></div><button class="notebook-close" data-action="close" aria-label="Close notebook">×</button></header><button id="dialog-update" class="secondary" data-update hidden>Update ready. Download?</button><div class="notebook-spread"><aside class="notebook-index"><p class="pencil-note">Write it down.<br>Before it changes.</p><nav aria-label="Notebook pages">${pages.map((entry, i) => `<button data-action="notebook-page" data-value="${i}" ${i === page ? 'aria-current="page"' : ''}><span>${String(i + 1).padStart(2, '0')}</span>${entry === 'empty' ? 'Unwritten' : entry === 'testimony' ? 'Previous testimony' : entry === 'encounters' ? 'Between the rows' : escape(EVIDENCE[entry].title)}</button>`).join('')}</nav></aside><section class="notebook-leaf">${content}<footer class="notebook-pagination"><button data-action="notebook-page" data-value="${page - 1}" ${page === 0 ? 'disabled' : ''} aria-label="Previous notebook page">←</button><span>${String(page + 1).padStart(2, '0')} / ${String(pages.length).padStart(2, '0')}</span><button data-action="notebook-page" data-value="${page + 1}" ${page === pages.length - 1 ? 'disabled' : ''} aria-label="Next notebook page">→</button></footer></section></div></article>`;
+  return `<article class="field-notebook"><header class="notebook-header"><div><h2 id="dialog-title" tabindex="-1">Private notebook.</h2></div><button class="notebook-close" data-action="close" aria-label="Close notebook">×</button></header><button id="dialog-update" class="secondary" data-update hidden>Update ready. Download?</button><div class="notebook-spread"><aside class="notebook-index"><p class="pencil-note">Write it down.<br>Before it changes.</p><nav aria-label="Notebook pages">${pages.map((entry, i) => `<button data-action="notebook-page" data-value="${i}" ${i === page ? 'aria-current="page"' : ''}><span>${String(i + 1).padStart(2, '0')}</span>${entry === 'case' ? 'An outside case' : entry === 'empty' ? 'Unwritten' : entry === 'testimony' ? 'Previous testimony' : entry === 'encounters' ? 'Between the rows' : escape(EVIDENCE[entry].title)}</button>`).join('')}</nav></aside><section class="notebook-leaf">${content}<footer class="notebook-pagination"><button data-action="notebook-page" data-value="${page - 1}" ${page === 0 ? 'disabled' : ''} aria-label="Previous notebook page">←</button><span>${String(page + 1).padStart(2, '0')} / ${String(pages.length).padStart(2, '0')}</span><button data-action="notebook-page" data-value="${page + 1}" ${page === pages.length - 1 ? 'disabled' : ''} aria-label="Next notebook page">→</button></footer></section></div></article>`;
 }
 
 // Brief action labels keep the scene and its costs beside every alternative.

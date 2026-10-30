@@ -1,3 +1,4 @@
+import { preparationTasks } from './evidence-case.js';
 import { FIELD_SITES, investigationComplete, nearbySite } from './engine.js';
 import { FIELD_PATHS, fieldStepCost, planFieldRoute } from './field.js';
 import { FIELD_ART, landmarkDrawing } from './art.js';
@@ -57,7 +58,7 @@ export class FieldMap {
     if(!this.selected&&s.fieldEvents.journey){this.selected=s.fieldEvents.journey.destination;this.style=s.fieldEvents.journey.style;}
     if(!this.selected||(s.inspected.includes(this.selected)&&!this.travel&&this.lastInspected!==s.inspected.join(',')))this.selected=this.recommend(s);
     this.lastInspected=s.inspected.join(',');
-    const key=[s.shift,s.player.x,s.player.y,s.exposure,this.lastInspected,this.selected,this.style,!!this.travel,paused,s.fieldEvents.journal.length].join(':');
+    const key=[s.shift,s.player.x,s.player.y,s.exposure,this.lastInspected,this.selected,this.style,!!this.travel,paused,s.fieldEvents.journal.length,s.caseFile.secured.join(',')].join(':');
     if(key===this.lastKey)return;this.lastKey=key;
     const q=id=>this.root.querySelector(`#${id}`), complete=investigationComplete(s),site=FIELD_SITES.find(p=>p.id===this.selected),quiet=this.route(s,'quiet'),direct=this.route(s,'direct'),here=nearbySite(s)?.id===site.id;
     const route=this.travel?{steps:this.travel.steps,exposure:this.travel.steps.reduce((total,p)=>total+fieldStepCost(s,p.x,p.y),0)}:this.route(s);
@@ -69,13 +70,13 @@ export class FieldMap {
     this.root.classList.toggle('field-danger',s.exposure>=70);
     this.root.classList.toggle('is-walking',!!this.travel);
     for(const p of FIELD_SITES) {
-      const done=s.inspected.includes(p.id),button=this.root.querySelector(`[data-value="${p.id}"]`);
+      const done=s.inspected.includes(p.id),prepare=preparationTasks(s,p.id).length>0,button=this.root.querySelector(`[data-value="${p.id}"]`);
       button.classList.toggle('searched',done);button.classList.toggle('selected',p.id===this.selected);
       button.setAttribute('aria-pressed',String(p.id===this.selected));button.disabled=paused||!!this.travel;
-      button.querySelector('small').textContent=p.id==='tower'?'':done?'✓':'◇';
+      button.querySelector('small').textContent=p.id==='tower'?'':prepare?'PREPARE':done?'✓':'◇';
       button.querySelector('small').hidden=p.id==='tower';
       button.querySelector('small').setAttribute('aria-hidden','true');
-      button.setAttribute('aria-label',`${p.label}. ${p.id==='tower'?'Return to tower':done?'Searched':'Unread discovery'}`);
+      button.setAttribute('aria-label',`${p.label}. ${p.id==='tower'?'Return to tower':prepare?'Evidence ready to prepare':done?'Searched':'Unread discovery'}`);
     }
     const player=q('field-player');player.style.left=percent(s.player.x,11);player.style.top=percent(s.player.y,9);
     player.classList.toggle('at-landmark',!!nearbySite(s));
@@ -95,9 +96,10 @@ export class FieldMap {
     q('field-risk').textContent=fatal?'Route blocked: exposure would reach 100.':unsafeReturn?'Too much exposure to make it back.':site.id==='tower'&&!complete?'Search all three sites before debrief.':'';
     q('field-risk').hidden=!q('field-risk').textContent;
     q('field-risk').classList.toggle('risky',fatal||unsafeReturn);
+    const prepare=here&&preparationTasks(s,site.id).length>0;
     const go=this.root.querySelector('.field-go');go.hidden=!!this.travel;
-    go.textContent=here?(site.id==='tower'?(complete?'Debrief ↗':'Choose a landmark'):site.id==='pump'&&s.inspected.includes('pump')?'Follow the cooking smell':'Inspect'):(site.id==='tower'?'Return ↑':'Walk →');
-    go.disabled=paused||fatal||(here&&(site.id==='tower'?!complete:s.inspected.includes(site.id)&&site.id!=='pump'));
+    go.textContent=here?(site.id==='tower'?(complete?'Debrief ↗':'Choose a landmark'):prepare?'Prepare evidence':site.id==='pump'&&s.inspected.includes('pump')?'Follow the cooking smell':'Inspect'):(site.id==='tower'?'Return ↑':'Walk →');
+    go.disabled=paused||fatal||(here&&(site.id==='tower'?!complete:s.inspected.includes(site.id)&&site.id!=='pump'&&!prepare));
     const stop=this.root.querySelector('.field-stop');stop.hidden=!this.travel;stop.disabled=paused;
   }
 }

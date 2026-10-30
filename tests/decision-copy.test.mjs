@@ -128,12 +128,12 @@ test('supervisor followups respect earlier disclosure and treatment objections u
   }
 });
 
-test('final disclosure requires three exhibits including treatment evidence; search experience changes the guide choice', () => {
-  for (const [evidence, disabled] of [[[], true], [['dress', 'badge', 'teeth'], true], [['ledger', 'dress'], true], [['ledger', 'dress', 'roots'], false], [['sample', 'badge', 'water'], false]]) {
-    const game = interview({ shift: 2, question: 2, evidence });
+test('final disclosure uses prepared evidence and retained physical testimony', () => {
+  for (const [secured, reported, disabled] of [[[], [], true], [['ledger','sample','map'], [], true], [['ledger','sample'], [0,1], true], [['ledger','sample','map'], [0], true], [['ledger','sample','map'], [0,2], false]]) {
+    const game = interview({ shift: 2, question: 2, evidence: ['ledger','sample','map'], caseFile: {secured,reported} });
     const question = assertEquivalent(game), expose = choice(question, 'expose');
     assert.equal(expose.disabled, disabled);
-    assert.match(expose.detail, /3 exhibits.*Application record or Sealed sample/);
+    assert.match(expose.detail, /prepared|Case ready/);
     assert.match(choice(question, 'guide').label, /Join the team and search/);
     game.searched.push('shift-1');
     assert.match(choice(decisionQuestion(game), 'guide').label, /Lead the team/);

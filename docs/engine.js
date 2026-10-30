@@ -1,5 +1,6 @@
 import { SIGHTING_TIME, sightingPeople, watchNight, personExitTime, observedSighting } from './watch-story.js';
 import { startGuide, advanceGuide, guideDisposition } from './guide.js';
+import { freshCaseFile, preparationTasks, caseProgress, caseDetail, migrateCaseFile, validCaseFile } from './evidence-case.js';
 import { fieldStepCost } from './field.js';
 import { freshFieldEvents, encounterAfterStep, resolveEncounter, dismissEncounter, migrateFieldEvents, validFieldEvents, encounterById } from './encounters.js';
 // All simulation and story state lives here. Rendering and storage are separate.
@@ -31,7 +32,7 @@ export function createGame(mode = 'story', seed = Date.now()) {
     rounds: 6, reserve: 24, reload: 0, kills: 0, shots: 0, breaches: 0, exposure: 0,
     trust: 0, honesty: 0, evidence: [], reports: [], log: [], targets: [], nextSpawn: 3, nextId: 1,
     incident: false, lightsOut: [], entered: false, departure: null, compulsionNotice: false, searched: [], question: 0, ending: null, lastShot: null,
-    player: { x: 1, y: 7 }, visited: ['1,7'], fieldSteps: 0, inspected: [], focused: null, fieldEvents: freshFieldEvents() };
+    player: { x: 1, y: 7 }, visited: ['1,7'], fieldSteps: 0, inspected: [], focused: null, fieldEvents: freshFieldEvents(), caseFile: freshCaseFile() };
   return s;
 }
 function random(s) { s.rng = (Math.imul(1664525, s.rng) + 1013904223) >>> 0; return s.rng / 4294967296; }
@@ -190,6 +191,15 @@ export function inspect(s) {
   addLog(s, 'Private observation saved. Open your notebook to read it.', 'story');
   return id;
 }
+export function prepareEvidence(s, id) {
+  const task = preparationTasks(s, nearbySite(s)?.id).find(t => t.id === id);
+  if (!task) return false;
+  s.exposure = Math.min(100, s.exposure + task.cost);
+  s.caseFile.secured.push(id);
+  addLog(s, `${task.short} prepared for the outside case. +${task.cost} exposure.`, 'story');
+  if (s.exposure >= 100) finish(s, 'assimilation');
+  return true;
+}
 export function canEatCrop(s) {
   return s.phase === 'field' && !s.fieldEvents.pending && nearbySite(s)?.id === 'pump' && s.inspected.includes('pump');
 }
@@ -237,9 +247,9 @@ export function getQuestion(s) {
     return { prompt: `${followup} ${background}`,
       context: found ? `From your notebook: ${EVIDENCE[latest].text}` : s.entered ? 'The notebook has no entry for the northeast corner.' : 'From the tower, you could not see what happened between the rows.',
       options: [
-        { id: 'evidence', label: found ? ['I found white fabric in the corner. A stalk had grown through it.', 'I found a recovery team badge. Something shaped like an ear of corn was growing through the clip.', 'I found an ear of corn with teeth where the kernels should be.'][s.shift] : s.entered ? 'I cannot say what happened there. I did not recover anything from the corner.' : 'I cannot say. I did not reach the corner.', honesty: 1, trust: found ? -1 : 0 },
-        ...(fieldNote?[{id:'field-notes',label:encounterById(fieldNote.id).report,honesty:1,trust:-1}]:[]),
-        { id: 'redact', label: 'Nothing outside the expected growth pattern.', honesty: -1, trust: 1 }
+        { id: 'evidence', detail: found ? 'Adds this night’s physical finding to the outside case.' : 'No physical finding to put on record.', label: found ? ['I found white fabric in the corner. A stalk had grown through it.', 'I found a recovery team badge. Something shaped like an ear of corn was growing through the clip.', 'I found an ear of corn with teeth where the kernels should be.'][s.shift] : s.entered ? 'I cannot say what happened there. I did not recover anything from the corner.' : 'I cannot say. I did not reach the corner.', honesty: 1, trust: found ? -1 : 0 },
+        ...(fieldNote?[{id:'field-notes',detail:'For the outside case, report the physical exhibit instead.',label:encounterById(fieldNote.id).report,honesty:1,trust:-1}]:[]),
+        { id: 'redact', detail: 'Leaves this night’s physical finding off the record.', label: 'Nothing outside the expected growth pattern.', honesty: -1, trust: 1 }
       ] };
   }
   const response = correctedObservation
@@ -254,7 +264,7 @@ export function getQuestion(s) {
     ]
   };
   return { prompt: `${response} I am authorizing another search of the northeast corner. Will you assist the team, or sign the report and return to your post?`, context: 'He unfolds a field map over the report. Three names are penciled along its edge.', options: [
-    { id: 'expose', label: 'No more teams. I will take my evidence outside the department.', detail: 'Requires 3 exhibits, including the application record or sealed sample.', disabled: s.evidence.length < 3 || !s.evidence.some(e => ['ledger', 'sample'].includes(e)) },
+    { id: 'expose', label: 'No more teams. I will take my evidence outside the department.', detail: caseDetail(s), disabled: !caseProgress(s).ready },
     { id: 'guide', label: s.searched.some(place => /^shift-/.test(place)) ? 'I have been inside the field. I will lead the team to the northeast corner.' : 'I will go in with the team and help search the northeast corner.' },
     { id: 'sign', label: 'I will sign the report and return to the watchtower.' }
   ] };
@@ -269,6 +279,7 @@ export function answer(s, id) {
   }
   const q = getQuestion(s), option = q.options.find(o => o.id === id && !o.disabled);
   if (!option) return false;
+  if (s.question === 1 && id === 'evidence' && s.evidence.includes(['dress', 'badge', 'teeth'][s.shift]) && !s.caseFile.reported.includes(s.shift)) s.caseFile.reported.push(s.shift);
   s.honesty += option.honesty || 0; s.trust += option.trust || 0;
   s.reports.push({ shift: s.shift, question: q.prompt, answer: option.label, redacted: ['redact', 'comply', 'sign'].includes(id) });
   if (s.question === 2 && id === 'question' && s.shift < 2) {
@@ -330,6 +341,8 @@ export function restore(raw) {
       s.version = SAVE_VERSION;
     }
     if (!s.log.every(l => typeof l.message === 'string') || !s.reports.every(r => typeof r.question === 'string' && typeof r.answer === 'string')) return null;
+    migrateCaseFile(s);
+    if (!validCaseFile(s)) return null;
     if (s.phase === 'ending' && !Object.hasOwn(ENDINGS,s.ending)) return null;
     if (s.phase === 'debrief' && s.question === 3 && (s.shift >= 2 || typeof s.reports.at(-1)?.supervisorReply !== 'string')) return null;
     if (s.phase === 'guide' || s.guide) {
