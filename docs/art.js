@@ -12,6 +12,12 @@ export const FIELD_ART = {
   hazmat: { file: 'field-hazmat', alt: 'A second recovery team in pale hooded hazmat suits and dark respirators enters the corn, each carrying a light.' },
   sighting: { file: 'field-sighting', alt: 'A distant pale human figure disappears between corn rows, seen from the watchtower.' },
   stove: { file: 'pump-stove', alt: 'Corn steams on a camping stove beside a clean plate, butter and salt in the dirty pump shed.' },
+  'pump-drips': { file: 'pump-drips', alt: 'A dry, stained metal basin beneath a rusted tap and an overhead pipe in the dim pump house.' },
+  'pump-glass': { file: 'pump-glass', alt: 'Five finger-shaped marks clear the mist inside a pressure gauge with no needle.' },
+  'pump-ledger': { file: 'pump-ledger', alt: 'An open ledger on a pump-house shelf bears a damp hand-shaped mark on an otherwise blank page.' },
+  'pump-keys': { file: 'pump-keys', alt: 'Two old keys hang from one hook, casting three key-shaped shadows on the pump-house wall.' },
+  'pump-thread': { file: 'pump-thread', alt: 'Thin pale roots coil like thread around a dry, rusted valve wheel and its iron pipe.' },
+  'pump-window': { file: 'pump-window', alt: 'A dusty pump-house window shows corn hanging upside down above a strip of dark sky.' },
   debrief: { file: 'debrief-desk', alt: 'A reel-to-reel recorder and blank report sheets on a worn desk under lamplight.' },
   ...Object.fromEntries(Object.values(ENDING_SHARES).filter(card => card.art.startsWith('ending-')).map(card => [card.art, { file: card.art, alt: card.alt }]))
 };

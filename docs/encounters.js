@@ -1,4 +1,5 @@
 import { ENCOUNTER_FLAVORS } from './encounter-flavors.js';
+import { storyDraw } from './story-random.js';
 import { ENCOUNTER_DETOURS } from './encounter-detours.js';
 import { neededEncounterIds } from './ending-paths.js';
 // Original field encounters for the game adaptation. No source manuscript text.
@@ -91,14 +92,6 @@ export const ENCOUNTERS=[
     ]}
 ];
 export const encounterById=id=>ENCOUNTERS.find(e=>e.id===id);
-// A separate, stateless draw keeps story variety independent of tower difficulty.
-function storyDraw(seed, key) {
-  let value=2166136261;
-  for(const character of `${seed}:${key}`)value=Math.imul(value^character.charCodeAt(0),16777619);
-  value=Math.imul(value^(value>>>16),0x85ebca6b);
-  value=Math.imul(value^(value>>>13),0xc2b2ae35);
-  return (value^(value>>>16))>>>0;
-}
 export function freshFieldEvents(seed){
   const events={seen:[],journal:[],flags:[],pending:null,journey:null};
   // Missing plans are intentionally the original game, including older saves.

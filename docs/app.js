@@ -1,7 +1,7 @@
 import './image-viewer.js';
 import { watchNight, sightingPromptReady } from './watch-story.js';
 import { guideTravel, guideRouteStatus, inspectGuide, spareGuide, fireGuide, focusGuide, nearbyGuideSite, guideDebrief, answerGuideDebrief, isGuideAftermath } from './guide.js';
-import { createGame, startShift, advance, reload, shoot, focusNext, enterField, move, inspect, canEatCrop, eatCrop, nearbySite, investigationPressure, investigationComplete, beginDebrief, chooseFieldEncounter, continueFieldEncounter, getQuestion, getEnding, endingId, answer, serialize, restore, BRIEFINGS, EVIDENCE, ENDINGS, DATES, REPORT_DATES, SHIFT_LENGTH, COMPULSION_NOTICE } from './engine.js';
+import { createGame, startShift, advance, reload, shoot, focusNext, enterField, move, inspect, currentSiteScene, eatCrop, nearbySite, investigationPressure, investigationComplete, beginDebrief, chooseFieldEncounter, continueFieldEncounter, getQuestion, getEnding, endingId, answer, serialize, restore, BRIEFINGS, EVIDENCE, ENDINGS, DATES, REPORT_DATES, SHIFT_LENGTH, COMPULSION_NOTICE } from './engine.js';
 import { Renderer, visibleGuideTarget } from './renderer.js';
 import { FieldMap } from './field-ui.js';
 import { dialogArtwork, evidenceMount, notebookMarkup, encounterMarkup, interviewRecord } from './art.js';
@@ -213,7 +213,8 @@ function updateUI(force=false) {
       html='<div class="dpad" aria-label="Walk through the field"><button class="up" data-action="move" data-value="0,-1" aria-label="Move north">↑</button><button class="left" data-action="move" data-value="-1,0" aria-label="Move west">←</button><button class="down" data-action="move" data-value="0,1" aria-label="Move south">↓</button><button class="right" data-action="move" data-value="1,0" aria-label="Move east">→</button></div>';
       if(site?.id==='tower'){if(investigationComplete(game))html+='<button class="primary" data-action="debrief">Return / submit report ↗</button>';}
       else if(site)html+=`<button class="primary" data-action="inspect" ${game.inspected.includes(site.id)?'disabled':''}>${game.inspected.includes(site.id)?'Location searched':'Inspect '+site.label.toLowerCase()}</button>`;
-      if(canEatCrop(game))html+='<button data-action="corn">Follow the cooking smell</button>';
+      const scene=currentSiteScene(game);
+      if(scene)html+=`<button data-action="site-scene">${esc(scene.label)}</button>`;
       else if(!site)html+='<small>Walk to a marked location to inspect it. Each move costs exposure.</small>';
     }
     $('controls').innerHTML=html;
@@ -326,7 +327,7 @@ function act(action,value) {
       const site=nearbySite(game);
       if(site?.id===fieldMap.selected) {
         if(site.id==='tower'){act('debrief');return;}
-        act(canEatCrop(game)?'corn':'inspect');return;
+        act(currentSiteScene(game)?'site-scene':'inspect');return;
       }
       fieldMap.start(game);
     }
@@ -359,11 +360,14 @@ function act(action,value) {
   if(action==='focus'){const p=focusNext(game);if(p)renderer.pointer=p;else toast('No moving crops in view.');canvas.focus({preventScroll:true});}
   if(action==='confirm-enter'&&game?.phase==='tower'&&!paused){closeModal();enterField(game);}
   if(action==='move'){fieldMap.stop(game);const [dx,dy]=value.split(',').map(Number);move(game,dx,dy);}
-  if(action==='corn' && canEatCrop(game))showModal('corn',paper('Something warm.',`<p>Corn boils on a stove beside the treatment drums. Butter, salt, and a clean plate wait. The sweet smell makes your stomach ache. You cannot remember when you last ate.</p><p>A notice above the stove reads: DO NOT CONSUME THE CROP.</p><div class="paper-actions"><button class="primary" data-action="eat-crop">Butter an ear. Take a bite.</button><button class="secondary" data-action="close">Leave it untouched.</button></div>`,'PUMP HOUSE'));
+  if(action==='site-scene') {
+    const scene=currentSiteScene(game);
+    if(scene)showModal(scene.id==='cooking'?'corn':'site-encounter',paper(esc(scene.title),`<p>${esc(scene.text)}</p>${scene.note?`<p>${esc(scene.note)}</p>`:''}<div class="paper-actions">${scene.action?`<button class="primary" data-action="${esc(scene.action)}">${esc(scene.actionLabel)}</button>`:''}<button class="secondary" data-action="close">${esc(scene.closeLabel)}</button></div>`,nearbySite(game).label.toUpperCase()),scene.art);
+  }
   if(action==='eat-crop' && eatCrop(game))closeModal();
   if(action==='inspect'){
     const id=inspect(game);
-    if(id){const e=EVIDENCE[id];showModal('evidence',paper(e.title,`<p class="eyebrow">${e.code} / ${e.where.toUpperCase()}</p>${evidenceMount(id)}<p>${e.text}</p>${canEatCrop(game)?'<p>A sweet cooking smell drifts from behind the treatment drums.</p><button class="primary" data-action="corn">Follow the cooking smell</button>':''}<button class="primary" data-action="close">Close notebook ↗</button>`,'PRIVATE OBSERVATION'));}
+    if(id){const e=EVIDENCE[id],scene=currentSiteScene(game);showModal('evidence',paper(e.title,`<p class="eyebrow">${e.code} / ${e.where.toUpperCase()}</p>${evidenceMount(id)}<p>${e.text}</p>${scene?`<p>${esc(scene.cue)}</p><button class="primary" data-action="site-scene">${esc(scene.label)}</button>`:''}<button class="primary" data-action="close">Close notebook ↗</button>`,'PRIVATE OBSERVATION'));}
   }
   if(action==='debrief')beginDebrief(game);
   if(action==='restart'){closeModal();begin(game.mode);return;}
@@ -432,7 +436,7 @@ document.addEventListener('keydown',event=>{
   if(game.phase==='field'){
     const directions={arrowup:'0,-1',w:'0,-1',arrowdown:'0,1',s:'0,1',arrowleft:'-1,0',a:'-1,0',arrowright:'1,0',d:'1,0'};
     if(directions[k]){event.preventDefault();act('move',directions[k]);}
-    if(k==='e'){event.preventDefault();fieldMap.stop(game);act(nearbySite(game)?.id==='tower'?'debrief':'inspect');}
+    if(k==='e'){event.preventDefault();fieldMap.stop(game);act(nearbySite(game)?.id==='tower'?'debrief':currentSiteScene(game)?'site-scene':'inspect');}
   }
 });
 document.addEventListener('visibilitychange',()=>{if(document.hidden){save();if(game&&!dialog.open)togglePause(true);}syncAudio();});

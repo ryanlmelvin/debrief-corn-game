@@ -1,4 +1,4 @@
-import { FIELD_SITES, investigationComplete, nearbySite } from './engine.js';
+import { FIELD_SITES, investigationComplete, nearbySite, currentSiteScene } from './engine.js';
 import { FIELD_PATHS, fieldStepCost, planFieldRoute } from './field.js';
 import { FIELD_ART, landmarkDrawing } from './art.js';
 import { watchSummary } from './watch-play.js';
@@ -90,7 +90,8 @@ export class FieldMap {
     const photo=q('field-route-photo'),art=FIELD_ART[site.id];
     photo.hidden=site.id!=='tower'&&!s.inspected.includes(site.id);
     if(!photo.hidden){const src=`./assets/${art.file}.webp`;if(photo.getAttribute('src')!==src)photo.setAttribute('src',src);photo.alt=art.alt;}
-    q('field-route-note').textContent=this.travel?['The rows close behind your light.','Footsteps keep time on the other side of the row.','Your breathing comes back through the radio.'][s.shift]:here&&site.id==='pump'&&s.inspected.includes('pump')?'A sweet cooking smell drifts from behind the treatment drums.':descriptions[site.id];
+    const scene=here?currentSiteScene(s):null;
+    q('field-route-note').textContent=this.travel?['The rows close behind your light.','Footsteps keep time on the other side of the row.','Your breathing comes back through the radio.'][s.shift]:scene?scene.cue:descriptions[site.id];
     q('field-quiet-cost').textContent=`+${cost(quiet.exposure)} exposure`;
     q('field-direct-cost').textContent=`+${cost(direct.exposure)} exposure`;
     this.root.querySelectorAll('[data-action="field-style"]').forEach(b=>{b.setAttribute('aria-pressed',String(b.dataset.value===this.style));b.disabled=paused||!!this.travel;});
@@ -99,8 +100,8 @@ export class FieldMap {
     q('field-risk').hidden=!q('field-risk').textContent;
     q('field-risk').classList.toggle('risky',fatal||unsafeReturn);
     const go=this.root.querySelector('.field-go');go.hidden=!!this.travel;
-    go.textContent=here?(site.id==='tower'?(complete?'Debrief ↗':'Choose a landmark'):site.id==='pump'&&s.inspected.includes('pump')?'Follow the cooking smell':'Inspect'):(site.id==='tower'?'Return ↑':'Walk →');
-    go.disabled=paused||fatal||(here&&(site.id==='tower'?!complete:s.inspected.includes(site.id)&&site.id!=='pump'));
+    go.textContent=here?(site.id==='tower'?(complete?'Debrief ↗':'Choose a landmark'):scene?scene.label:s.inspected.includes(site.id)?'Location searched':'Inspect'):(site.id==='tower'?'Return ↑':'Walk →');
+    go.disabled=paused||fatal||(here&&(site.id==='tower'?!complete:s.inspected.includes(site.id)&&!scene));
     const stop=this.root.querySelector('.field-stop');stop.hidden=!this.travel;stop.disabled=paused;
   }
 }

@@ -37,6 +37,8 @@ People are not targets, whether they wear a white dress or recovery equipment. S
 
 Walking between locations brings twelve illustrated encounters across three nights. New games vary their timing and select from three versions of each recurring scene, with matching existing illustrations. Later incidents also respond to your choices: once an ending is out of reach, an encounter reserved for it can give way to an unrelated event. Ten replacement scenes cover abandoned equipment, strange water, survey marks, and other disturbances. Any encounter still needed by a possible ending stays available. The walk pauses for a choice. You can always move on without extra exposure; investigating can cost exposure, uncover an aid, or change an encounter on a later night. Your choices go into the notebook, mark the map, and can become testimony in the debrief. Mid-encounter saves preserve the chosen scene, response, and destination, including after an update or progress transfer. The notebook and debrief remember the version you actually saw. Games started before this change keep their original encounters; start a new game for the new variety.
 
+Each new game schedules the cooking smell on exactly one of the three nights. Inspecting the pump house that night offers the meal; the other two nights draw different optional scenes from a pool of six, each with its own custom illustration. There are 90 possible three-night arrangements, and an atmospheric scene cannot repeat within one game. Ignoring the smell does not cause it to return on a later night. You can revisit that night’s scene from the map or with **E** while at the inspected pump house. The saved schedule survives updates and progress transfers. Older saves keep a currently offered meal and avoid repeating an earlier offer.
+
 At the last debrief, **I need to do something first** opens five more ways out: hand your post to your double, bring a witness, rescue the person at the lantern, accept a promotion, or return to the second tower. Earlier encounters and reports unlock them. Each route has three scenes, a choice to leave before committing, its own illustration, and a share card. The replacement can hear the truth about relief; the rescue costs your recordings. Every scene saves automatically.
 
 ## Publish on GitHub Pages
@@ -89,6 +91,7 @@ The game-rule tests cover ammunition, shooting, civilian encounters, timing, con
 | `docs/field.js` / `docs/field-ui.js` | Route planning, exposure previews, responsive touch investigation map |
 | `docs/encounters.js` | Encounter timing, selection, choices, consequences, and saved field notes |
 | `docs/encounter-flavors.js` / `docs/encounter-detours.js` | Authored scene variants and replacements for closed leads |
+| `docs/site-encounters.js` / `docs/story-random.js` | Per-game landmark scene schedules and independent story randomness |
 | `docs/ending-paths.js` | Shared ending prerequisites, availability, and protection of still-possible leads |
 | `docs/alternate-endings.js` / `docs/resolution-ui.js` | Five final-night routes, choices, requirements, and saved scenes |
 | `docs/renderer.js` | Layered canvas landscape, illustrated actors, root motion and field survey |
@@ -104,6 +107,8 @@ The game-rule tests cover ammunition, shooting, civilian encounters, timing, con
 ### Adding endings and encounter variety
 
 Declare each ending’s prerequisites in `docs/ending-paths.js`. `endingPathRequirements` drives the final requirement display and gates; `neededEncounterIds` uses the same declarations to protect unfinished leads. The supported rules describe encounter answers, evidence with a discovery night, and report choices with their available questions and shifts. Item dependencies are discovered from canonical encounter choices’ `requires` and `flag` fields, so a new ending that needs a later tape comparison also protects its earlier recording opportunity automatically.
+
+Landmark scene guarantees are declared separately in `SITE_POOLS` in `docs/site-encounters.js`: each site specifies its number of nights, required scenes, and alternatives. The selector fills and shuffles the schedule once; validation checks the same registry. `currentSiteScene` drives the evidence prompt, map button, keyboard action, and meal eligibility together.
 
 An unmet requirement remains possible until its opportunity has passed or a conflicting answer has been made. The director selects replacement content only when no possible ending still needs that encounter. Add replacement pools in `docs/encounter-detours.js`; these scenes keep their scheduling slot, but their distinct response IDs cannot earn the original lead’s ending credit. Calming replacements preserve the slot’s best exposure reduction. Add cosmetic versions in `docs/encounter-flavors.js` without changing canonical choice mechanics.
 

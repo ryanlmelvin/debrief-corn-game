@@ -199,6 +199,9 @@ test('investigation compulsion grows only after the sighting and clears on depar
 
 test('boiling corn requires inspecting the pump house and eating reaches a saved distinct ending',()=>{
   const s=watch('story');
+  // This fixture exercises the meal itself; its night is randomized in real runs.
+  const cooking=s.siteStories.pump.indexOf('cooking');
+  [s.siteStories.pump[0],s.siteStories.pump[cooking]]=[s.siteStories.pump[cooking],s.siteStories.pump[0]];
   assert.equal(eatCrop(s),false);
   safeWatch(s);walkTo(s,3,3);
   assert.equal(canEatCrop(s),false);inspect(s);

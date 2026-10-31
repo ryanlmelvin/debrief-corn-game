@@ -4,6 +4,7 @@ import { ENDING_SHARES } from './sharing.js';
 import { ALTERNATE_ENDINGS, startResolution, validResolution, resolutionEnding } from './alternate-endings.js';
 import { witnessRequirements, canTakeEvidenceOutside, retirePreparations } from './ending-requirements.js';
 import { fieldStepCost } from './field.js';
+import { freshSiteStories, siteScene, migrateSiteStories, validSiteStories } from './site-encounters.js';
 import { freshFieldEvents, encounterAfterStep, resolveEncounter, dismissEncounter, migrateFieldEvents, validFieldEvents, encounterById, encounterForState } from './encounters.js';
 import { RELOAD_DURATION, RELOAD_WINDOW_MIN, RELOAD_WINDOW_MAX, FLARE_DURATION, FLARE_SLOWDOWN, CROP_VARIANTS, freshWatch, watchFeedback, migrateWatch, validWatch } from './watch-play.js';
 // All simulation and story state lives here. Rendering and storage are separate.
@@ -35,7 +36,7 @@ export function createGame(mode = 'story', seed = Date.now()) {
     rounds: 6, reserve: 24, reload: 0, kills: 0, shots: 0, breaches: 0, exposure: 0,
     trust: 0, honesty: 0, evidence: [], reports: [], log: [], targets: [], nextSpawn: 3, nextId: 1,
     incident: false, lightsOut: [], entered: false, departure: null, compulsionNotice: false, searched: [], question: 0, ending: null, lastShot: null,
-    player: { x: 1, y: 7 }, visited: ['1,7'], fieldSteps: 0, inspected: [], focused: null, fieldEvents: freshFieldEvents(seed), watch: freshWatch() };
+    player: { x: 1, y: 7 }, visited: ['1,7'], fieldSteps: 0, inspected: [], focused: null, fieldEvents: freshFieldEvents(seed), siteStories: freshSiteStories(seed), watch: freshWatch() };
   return s;
 }
 function random(s) { s.rng = (Math.imul(1664525, s.rng) + 1013904223) >>> 0; return s.rng / 4294967296; }
@@ -255,9 +256,12 @@ export function inspect(s) {
   addLog(s, 'Private observation saved. Open your notebook to read it.', 'story');
   return id;
 }
-export function canEatCrop(s) {
-  return s.phase === 'field' && !s.fieldEvents.pending && nearbySite(s)?.id === 'pump' && s.inspected.includes('pump');
+export function currentSiteScene(s) {
+  if(s.phase!=='field'||s.fieldEvents.pending)return null;
+  const site=nearbySite(s);
+  return site&&s.inspected.includes(site.id)?siteScene(s,site.id):null;
 }
+export function canEatCrop(s) { return currentSiteScene(s)?.id==='cooking'; }
 export function eatCrop(s) {
   if (!canEatCrop(s)) return false;
   addLog(s, 'You eat an ear from the pot in the pump house.', 'story');
@@ -399,6 +403,8 @@ export function restore(raw) {
     if (!s.player || !Number.isInteger(s.player.x) || !Number.isInteger(s.player.y) || s.player.x < 0 || s.player.x > 10 || s.player.y < 0 || s.player.y > 8) return null;
     migrateFieldEvents(s);
     if(!validFieldEvents(s))return null;
+    migrateSiteStories(s);
+    if(!validSiteStories(s))return null;
     if (!s.targets.every(t => Number.isFinite(t.x) && Number.isFinite(t.y) && Number.isFinite(t.speed) && Number.isFinite(t.wobble) && [-1,1].includes(t.direction) && ['corn','person'].includes(t.kind))) return null;
     if (!s.targets.every(t=>(t.role===undefined||['dress','retrieval'].includes(t.role))&&(t.member===undefined||(Number.isInteger(t.member)&&t.member>=0&&t.member<3)))) return null;
     migrateWatch(s);
