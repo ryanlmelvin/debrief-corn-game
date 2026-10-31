@@ -7,6 +7,14 @@
 .rogue-heading{display:flex;justify-content:space-between;align-items:center;gap:18px;padding-bottom:15px;border-bottom:1px solid #a1a88666}
 .rogue-eyebrow{margin:0 0 8px;color:#bec6a8;font-size:10px;line-height:1.5;letter-spacing:1.7px}
 .rogue-heading h2,.rogue-scene h2{font:400 clamp(25px,3.4vw,40px)/1.1 Georgia,serif;color:#eee9cf;margin:0;letter-spacing:-.6px}
+.rogue-escape-word{display:block;pointer-events:none;--growth:1;width:100%;filter:drop-shadow(0 2px 3px #07110b)}
+.rogue-escape-word svg{display:block;width:100%;height:auto;overflow:visible}
+.rogue-escape-word .root-impression{opacity:0;transition:none}
+.rogue-escape-word .root-filament{stroke-dashoffset:0;transition:none}
+.rogue-escape-word .root-hit-target{pointer-events:none}
+.rogue-root-heading .rogue-heading-copy{flex:1;min-width:0}
+.rogue-heading .rogue-root-title{width:240px;max-width:100%;margin:-5px auto -6px;line-height:0}
+.rogue-scene-copy>.rogue-escape-word{width:min(340px,100%);margin:0 auto -8px}
 .rogue-condition{margin:0;flex-shrink:0;text-align:right;font-size:12px;line-height:1.5;color:#e0d1a1}
 .rogue-condition span{display:block;font-size:9px;letter-spacing:1.5px;color:#b0bb98}
 .rogue-condition b{font-size:17px;font-weight:400}
@@ -22,8 +30,12 @@
 .rogue-lane-label{fill:#c7caa7;font: .14px ui-monospace,monospace;letter-spacing:.015px}
 .rogue-lane-arrow{fill:#a5a67b;font: .32px ui-monospace,monospace;opacity:.65}
 .rogue-you{fill:#f2e3b4;font: .15px ui-monospace,monospace;letter-spacing:.03px;paint-order:stroke;stroke:#17251c;stroke-width:.025px}
-.rogue-corn-body{filter:drop-shadow(0 .025px .03px #000b)}
-#rogue-corn.rogue-immune .rogue-corn-body{opacity:.6;filter:drop-shadow(0 0 .08px #e7d793)}
+.rogue-corn-body{overflow:hidden}
+.rogue-hit-marker{fill:#101a1533;stroke:#efdeb0;stroke-width:.032;stroke-dasharray:.12 .04}
+#rogue-corn.rogue-immune .rogue-corn-body{opacity:.65}
+#rogue-corn.rogue-immune .rogue-hit-marker{stroke:#fff5d7;stroke-width:.06}
+.rogue-road-game .rogue-lane-arrow{fill:#cecdb6;opacity:.45}
+.rogue-road-game .rogue-crossing{filter:drop-shadow(0 8px 18px #0007)}
 .rogue-dpad{display:grid;grid-template-columns:repeat(3,52px);grid-template-rows:repeat(2,48px);gap:6px;justify-content:center;align-self:center;margin-top:4px}
 .rogue-dpad button{background:#2a3928;color:#ece4be;border-color:#8c9871;font-size:25px;line-height:1;padding:0}
 .rogue-dpad button:hover:not(:disabled),.rogue-dpad button:active{background:#3b4c30;border-color:#d8bb7b}
@@ -80,6 +92,7 @@
  .field-protocol{padding:6px 8px;font-size:9px}
  #rogue-play{padding:72px 16px max(14px,env(safe-area-inset-bottom));}
  .rogue-game{gap:15px}.rogue-heading{gap:12px;padding-bottom:11px}.rogue-heading h2{font-size:27px;max-width:15ch}.rogue-eyebrow{font-size:8px;letter-spacing:1px;margin-bottom:6px}.rogue-condition b{font-size:14px}.rogue-condition span{font-size:8px}
+ .rogue-heading .rogue-root-title{width:210px;max-width:100%}.rogue-scene-copy>.rogue-escape-word{width:min(290px,100%)}
  .rogue-play-layout{grid-template-columns:1fr;grid-template-rows:minmax(0,1fr) auto;gap:14px}.rogue-control-panel{gap:10px}.rogue-goal{font-size:22px}.rogue-tip{font-size:11px;line-height:1.5}.rogue-message{font-size:14px;min-height:0}
  .rogue-corn-game .rogue-control-panel{display:grid;grid-template-columns:minmax(0,1fr) 160px;gap:7px 14px;align-items:start}.rogue-corn-game .rogue-dpad{grid-column:2;grid-row:1/4;grid-template-columns:repeat(3,46px);grid-template-rows:repeat(2,46px);gap:5px;margin:0}.rogue-corn-game .rogue-key-hint{grid-column:1/-1;text-align:center}.rogue-corn-game .rogue-message{font-size:13px}
  .rogue-radio-console{padding:20px;align-self:center}.rogue-speaker{height:60px}.rogue-bands{padding:24px 0 20px}.rogue-dial{height:100px}.rogue-radio-face{font-size:7px;gap:12px}
@@ -87,10 +100,12 @@
  .rogue-scene{position:relative;display:block;max-width:560px}.rogue-scene-art{position:absolute;inset:0 0 30%;height:auto;max-height:none;opacity:.3;mask-image:linear-gradient(#000,transparent 90%);border:0}.rogue-corn-portrait{right:6%;left:auto;bottom:8%;width:28%;opacity:.6}.rogue-scene-copy{position:relative;height:100%;display:flex;flex-direction:column;justify-content:center;padding:4px 4px 8px}.rogue-scene h2{font-size:40px;max-width:13ch;margin-bottom:20px}.rogue-scene-text{font-size:17px;line-height:1.6}.rogue-scene-choices{margin-top:20px;gap:12px}.rogue-scene-choices button{padding:15px}
 }
 @media(max-width:440px) and (max-height:740px){
+ .rogue-heading .rogue-root-title{width:180px}.rogue-scene-copy>.rogue-escape-word{width:230px;max-width:100%;margin-top:-4px;margin-bottom:-6px}
  #rogue-play{padding-top:65px}.rogue-game{gap:10px}.rogue-heading{padding-bottom:9px}.rogue-heading h2{font-size:23px}.rogue-eyebrow{font-size:7px}.rogue-condition b{font-size:12px}.rogue-play-layout{gap:10px}.rogue-goal{font-size:19px}.rogue-tip{font-size:10px}.rogue-control-panel{gap:8px}.rogue-corn-game .rogue-control-panel{gap:6px 10px}.rogue-corn-game .rogue-message{font-size:12px}.rogue-key-hint{font-size:7px}.rogue-radio-face{display:none}.rogue-bands{padding:5px 0 20px}.rogue-radio-console{padding:18px}.rogue-dial{height:80px}.rogue-scene h2{font-size:33px;margin-bottom:15px}.rogue-scene-text{font-size:15px;line-height:1.5}.rogue-scene-text p{margin-bottom:12px}.rogue-scene-choices{gap:9px;margin-top:14px}.rogue-scene-choices button{padding:12px}
 }
 @media(max-width:440px){.field-heading{flex-wrap:wrap;gap:6px}.field-protocol{min-height:38px}.field-heading #field-watch-record{display:none}.field-heading .field-exposure{margin-left:auto}.field-heading>.eyebrow{font-size:8px;letter-spacing:0}}
 @media(max-height:500px) and (min-width:480px){
+ .rogue-heading .rogue-root-title{width:138px;margin-top:-5px;margin-bottom:-8px}.rogue-scene-copy>.rogue-escape-word{width:145px;margin-top:-8px;margin-bottom:-7px}
  .field-protocol{font-size:8px;padding:4px 7px;min-height:34px}
  #rogue-play{padding:59px 16px 10px}.rogue-game{gap:8px}.rogue-heading{padding-bottom:7px}.rogue-eyebrow{font-size:7px;margin-bottom:3px}.rogue-heading h2{font-size:23px;max-width:none}.rogue-condition{font-size:10px}.rogue-condition b{font-size:13px}.rogue-condition span{font-size:7px}
  .rogue-play-layout{grid-template-columns:minmax(0,1fr) 200px;grid-template-rows:minmax(0,1fr);gap:18px;align-items:center}.rogue-control-panel{gap:8px}.rogue-goal{font-size:18px}.rogue-tip{font-size:10px;line-height:1.45}.rogue-message{font-size:12px;min-height:0;padding-left:8px}.rogue-key-hint{font-size:7px;line-height:1.4}.rogue-crossing{max-height:100%}

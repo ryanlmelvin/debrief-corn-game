@@ -1,8 +1,8 @@
 // Deliberately broken protocol: self-contained simulations, safe to save mid-step.
 const ROUTES = ['corn', 'broadcast', 'flood'];
-const NEW_ENDINGS = ['corn_escape', 'corn_uprising', 'radio_ghost', 'field_voice', 'flood'];
+const NEW_ENDINGS = ['corn_escape', 'corn_uprising', 'radio_ghost', 'field_voice', 'flood', 'corn_contained', 'roadkill'];
 const RESULT = {
-  corn: ['corn_escape', 'corn_uprising', 'assimilation'],
+  corn: ['corn_escape', 'corn_uprising', 'assimilation', 'corn_contained', 'roadkill'],
   broadcast: ['radio_ghost', 'field_voice', 'assimilation'],
   flood: ['flood', 'breach']
 };
@@ -49,7 +49,7 @@ export function startRogue(s, route) {
   s.rogue = { route, stage: 'intro', time: 0, hits: 0, message: '', outcome: null };
   if (route === 'corn') {
     s.exposure = 100;
-    Object.assign(s.rogue, { x: 5, y: 8, crossing: 0, refuge: 8, moveReadyAt: 0, immuneUntil: 0 });
+    Object.assign(s.rogue, { x: 5, y: 8, crossing: 0, patternVersion: 2, lastHit: null, refuge: 8, moveReadyAt: 0, immuneUntil: 0 });
   } else if (route === 'broadcast') {
     Object.assign(s.rogue, { locks: 0, lockReadyAt: 0 });
   } else {
@@ -66,8 +66,8 @@ export function getRogueScene(s) {
   if (s.phase !== 'rogue' || !r) return null;
   if (r.stage === 'intro') {
     if (r.route === 'corn') return {
-      title: 'You are the movement.',
-      text: 'Your fingers split into leaves. Above the rows, a familiar rifle turns toward you. This time, you are what tries to escape.',
+      title: 'How long were you out?',
+      text: 'You wake between the rows, not knowing how long you were out. Your fingers have split into leaves. You feel an overwhelming urge to escape.',
       options: [{ id: 'begin', label: 'Run for the road.' }, { id: 'root', label: 'Stay. Put down roots.', detail: 'End this assignment here.' }]
     };
     if (r.route === 'broadcast') return {
@@ -83,8 +83,8 @@ export function getRogueScene(s) {
   }
   if (r.stage === 'choice' && r.route === 'corn') return {
     title: 'The fence is behind you.',
-    text: 'Beyond the road, the soil is soft and unclaimed. Behind you, every row has turned toward the gate. The latch is within reach of the leaves that used to be your hand.',
-    options: [{ id: 'escape', label: 'Keep moving. Find new soil.' }, { id: 'gate', label: 'Open the gate for everyone.' }]
+    text: r.patternVersion === 2 ? 'Beyond the road, the soil is soft and unclaimed. Across the road, the gate is still shut. Behind it every row waits for you.' : 'Beyond the road, the soil is soft and unclaimed. Behind you, every row has turned toward the gate. The latch is within reach of the leaves that used to be your hand.',
+    options: [{ id: 'escape', label: 'Keep moving. Find new soil.' }, { id: 'gate', label: r.patternVersion === 2 ? 'Go back. Open the gate for everyone.' : 'Open the gate for everyone.' }]
   };
   if (r.stage === 'choice' && r.route === 'broadcast') return {
     title: 'All stations, go ahead.',
@@ -113,7 +113,7 @@ export function chooseRogue(s, id) {
     if (id === 'root') { end(s, 'assimilation', id, option.label); return true; }
     record(s, id, scene.title, option.label);
     r.stage = 'play';
-    r.message = r.route === 'corn' ? 'The guard has your rifle.' : r.route === 'broadcast' ? 'Your breathing answers from every receiver.' : 'The pipes are warm beneath your hands.';
+    r.message = r.route === 'corn' ? (r.patternVersion === 2 ? "The guard has your rifle and switched it to full auto. Bet you didn't know you could do that, huh?" : 'The guard has your rifle.') : r.route === 'broadcast' ? 'Your breathing answers from every receiver.' : 'The pipes are warm beneath your hands.';
     return true;
   }
   if (r.stage === 'choice') {
@@ -157,7 +157,7 @@ export function chooseRogue(s, id) {
   return false;
 }
 
-export function cornBullets(s) {
+function legacyCornBullets(s) {
   const r = s.rogue;
   if (!r || r.route !== 'corn') return [];
   const bullets = [];
@@ -173,13 +173,62 @@ export function cornBullets(s) {
   return bullets;
 }
 
+// Coordinates and dimensions use board cells, including fractional lane positions.
+// IDs remain stable as a volley crosses the board, so rendering needs no random state.
+export function cornHazards(s) {
+  const r = s.rogue;
+  if (!r || r.route !== 'corn') return [];
+  if ((r.patternVersion ?? 1) === 1) return legacyCornBullets(s).map((bullet, i) => ({ ...bullet, id: `legacy-${i}`, kind: 'bullet', width: .52, height: .12 }));
+  const hazards = [];
+  for (const [lane, row] of LANES.entries()) {
+    const direction = lane % 2 ? -1 : 1;
+    if (r.crossing === 2) {
+      const period = lane % 2 ? 17 : 15;
+      const width = [1.4, 1.8, 2.2, 1.6, 2, 1.5][lane];
+      const speed = [1.45, 2, 1.65, 2.15, 1.5, 1.85][lane] * (s.mode === 'hard' ? 1.16 : 1);
+      const offsets = lane % 2 ? [0, 5.7, 11.4] : [0, 7.5];
+      for (const [index, offset] of offsets.entries()) {
+        const progress = mod(r.time * speed + lane * 2.11 + offset, period);
+        const x = direction > 0 ? progress - 2 : 12 - progress;
+        if (x + width / 2 >= -.5 && x - width / 2 <= 10.5) hazards.push({ id: `traffic-${lane}-${index}`, x, y: row, direction, kind: 'car', width, height: .64 });
+      }
+    } else {
+      // Tight groups alternate with wide gaps; the second field adds a fourth round.
+      const count = r.crossing === 0 ? 3 : 4;
+      const period = r.crossing === 0 ? 13.5 : 15;
+      const speed = (3.1 + lane % 3 * .28) * (1 + r.crossing * .12) * (s.mode === 'hard' ? 1.16 : 1);
+      for (let group = 0; group < 2; group++) for (let shot = 0; shot < count; shot++) {
+        const progress = mod(r.time * speed + lane * 1.73 + group * period / 2 + shot * .84 + r.crossing * 2.4, period);
+        const x = direction > 0 ? progress - 1.5 : 11.5 - progress;
+        const y = row + Math.sin(progress * .72 + lane + shot * .4) * .22;
+        if (x >= -.6 && x <= 10.6) hazards.push({ id: `volley-${r.crossing}-${lane}-${group}-${shot}`, x, y, direction, kind: 'bullet', width: .46, height: .12 });
+      }
+    }
+  }
+  return hazards;
+}
+
+// Retained for callers interested only in rifle rounds (the road contains none).
+export function cornBullets(s) {
+  return cornHazards(s).filter(hazard => hazard.kind === 'bullet').map(({ x, y, direction }) => ({ x, y, direction }));
+}
+
 function checkCorn(s) {
   const r = s.rogue;
-  if (r.time < r.immuneUntil || !cornBullets(s).some(bullet => bullet.y === r.y && Math.abs(bullet.x - r.x) < .46)) return;
+  if (r.time < r.immuneUntil || [0, 4, 8].includes(r.y)) return;
+  const hazard = cornHazards(s).find(hazard => r.patternVersion === 1
+    ? hazard.y === r.y && Math.abs(hazard.x - r.x) < .46
+    : Math.abs(hazard.x - r.x) < hazard.width / 2 + .2 && Math.abs(hazard.y - r.y) < hazard.height / 2 + .2);
+  if (!hazard) return;
   r.hits++;
-  if (r.hits === 3) { end(s, 'assimilation', 'rooted', 'The rifle found me. I could not keep moving.'); return; }
+  r.lastHit = hazard.kind;
+  if (r.hits === 3) {
+    const ending = r.patternVersion === 2 ? (hazard.kind === 'car' ? 'roadkill' : 'corn_contained') : 'assimilation';
+    end(s, ending, 'rooted', hazard.kind === 'car' ? 'The headlights found me. I could not cross the road.' : 'The rifle found me. I could not keep moving.');
+    return;
+  }
   r.x = 5; r.y = r.refuge; r.immuneUntil = r.time + 1.25; r.moveReadyAt = r.time + .20;
-  r.message = `A layer of husk tears away. ${3 - r.hits} left. Back to cover.`;
+  r.message = hazard.kind === 'car' ? `A wheel tears through the husk. ${3 - r.hits} left.` : `A layer of husk tears away. ${3 - r.hits} left. Back to cover.`;
 }
 
 export function moveRogue(s, dx, dy) {
@@ -188,13 +237,13 @@ export function moveRogue(s, dx, dy) {
   const x = r.x + dx, y = r.y + dy;
   if (x < 0 || x > 10 || y < 0 || y > 8) return false;
   r.x = x; r.y = y; r.moveReadyAt = r.time + .20;
-  if (y === 4) { r.refuge = 4; r.message = 'Halfway. The ditch hides you. Wait for a gap.'; }
+  if (y === 4) { r.refuge = 4; r.message = r.patternVersion === 2 && r.crossing === 2 ? 'The median grass bends around you.' : 'Halfway. The ditch hides you. Wait for a gap.'; }
   if (y === 0) {
     if (r.crossing === 2) r.stage = 'choice';
     else {
       r.crossing++;
       r.x = 5; r.y = 8; r.refuge = 8; r.immuneUntil = r.time + .9;
-      r.message = r.crossing === 1 ? 'Another fence. Another rifle. The road is farther than it looked.' : 'The last fence. Beyond it, no rows at all.';
+      r.message = r.crossing === 1 ? 'Another fence. Another rifle. The road is farther than it looked.' : r.patternVersion === 2 ? 'The rifle falls silent. Headlights sweep the road.' : 'The last fence. Beyond it, no rows at all.';
     }
     return true;
   }
@@ -255,7 +304,12 @@ export function validRogue(s) {
   if (!r || typeof r !== 'object' || Array.isArray(r) || !ROUTES.includes(r.route) || !['intro', 'play', 'choice', 'done'].includes(r.stage)) return false;
   // Early preview saves had one crossing. Preserve an already-earned finale.
   if (r.route === 'corn' && r.crossing === undefined) r.crossing = r.stage === 'choice' || ['corn_escape', 'corn_uprising'].includes(r.outcome) ? 2 : 0;
-  const keys = ['route', 'stage', 'time', 'hits', 'message', 'outcome', ...(r.route === 'corn' ? ['x', 'y', 'crossing', 'refuge', 'moveReadyAt', 'immuneUntil'] : r.route === 'broadcast' ? ['locks', 'lockReadyAt'] : ['tiles', 'turns'])];
+  // Do not replace live published volleys with a new pattern during an update.
+  if (r.route === 'corn' && r.patternVersion === undefined) {
+    r.patternVersion = 1;
+    if (r.lastHit === undefined) r.lastHit = r.hits > 0 ? 'bullet' : null;
+  }
+  const keys = ['route', 'stage', 'time', 'hits', 'message', 'outcome', ...(r.route === 'corn' ? ['x', 'y', 'crossing', 'patternVersion', 'lastHit', 'refuge', 'moveReadyAt', 'immuneUntil'] : r.route === 'broadcast' ? ['locks', 'lockReadyAt'] : ['tiles', 'turns'])];
   if (Object.keys(r).some(key => !keys.includes(key)) || !finite(r.time, 0, MAX_TIME) || !integer(r.hits, 0, 3) || typeof r.message !== 'string' || r.message.length > 300) return false;
   if (s.targets.length || s.fieldEvents.pending || s.fieldEvents.journey || s.compulsionNotice) return false;
   if (r.stage === 'done') {
@@ -266,16 +320,19 @@ export function validRogue(s) {
   if (r.stage !== 'intro') {
     const rootedWithoutRunning = r.route === 'corn' && r.outcome === 'assimilation' && r.hits === 0;
     if (r.stage === 'done') {
-      const choice = rootedWithoutRunning ? 'root' : ({ corn_escape: 'escape', corn_uprising: 'gate', radio_ghost: 'warn', field_voice: 'command', flood: 'release', breach: 'rupture' }[r.outcome] || (r.route === 'corn' ? 'rooted' : 'signal-lost'));
+      const choice = rootedWithoutRunning ? 'root' : ({ corn_escape: 'escape', corn_uprising: 'gate', corn_contained: 'rooted', roadkill: 'rooted', radio_ghost: 'warn', field_voice: 'command', flood: 'release', breach: 'rupture' }[r.outcome] || (r.route === 'corn' ? 'rooted' : 'signal-lost'));
       if (!matchesReport(s.reports.at(-1), choice) || !rootedWithoutRunning && !matchesReport(s.reports.at(-2), 'begin')) return false;
     } else if (!matchesReport(s.reports.at(-1), 'begin')) return false;
   }
   if (r.route === 'corn') {
     if (s.exposure !== 100 || !integer(r.x, 0, 10) || !integer(r.y, 0, 8) || !integer(r.crossing, 0, 2) || ![4, 8].includes(r.refuge) || !finite(r.moveReadyAt, 0, r.time + .200001) || !finite(r.immuneUntil, 0, r.time + 1.250001)) return false;
+    if (![1, 2].includes(r.patternVersion) || ![null, 'bullet', 'car'].includes(r.lastHit) || (r.hits === 0 ? r.lastHit !== null : r.lastHit === null) || r.lastHit === 'car' && (r.patternVersion !== 2 || r.crossing !== 2)) return false;
     if (r.stage === 'intro' && (r.x !== 5 || r.y !== 8 || r.crossing !== 0 || r.refuge !== 8 || r.moveReadyAt || r.immuneUntil)) return false;
     if (r.refuge === 8 && r.y <= 4 || r.stage === 'play' && r.y === 0) return false;
     if (r.stage === 'choice' && (r.y !== 0 || r.refuge !== 4 || r.crossing !== 2)) return false;
     if (['corn_escape', 'corn_uprising'].includes(r.outcome) && (r.y !== 0 || r.refuge !== 4 || r.crossing !== 2 || r.hits === 3)) return false;
+    if (['corn_contained', 'roadkill'].includes(r.outcome) && (r.patternVersion !== 2 || r.hits !== 3 || [0, 4, 8].includes(r.y) || r.lastHit !== (r.outcome === 'roadkill' ? 'car' : 'bullet'))) return false;
+    if (r.outcome === 'corn_contained' && r.crossing === 2) return false;
     if (r.outcome === 'assimilation' && r.hits !== 3 && (r.hits !== 0 || r.time !== 0 || r.x !== 5 || r.y !== 8 || r.crossing !== 0 || r.refuge !== 8)) return false;
   } else if (r.route === 'broadcast') {
     if (!integer(r.locks, 0, 3) || !finite(r.lockReadyAt, 0, r.time + .350001)) return false;

@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createGame, advance, move, restore, serialize, getEnding, ENDINGS } from '../docs/engine.js';
-import { rogueOptions, startRogue, chooseRogue, moveRogue, getRogueScene, cornBullets, broadcastCursor, broadcastWindow, floodConnections, validRogue } from '../docs/rogue.js';
+import { rogueOptions, startRogue, chooseRogue, moveRogue, getRogueScene, cornBullets, cornHazards, broadcastCursor, broadcastWindow, floodConnections, validRogue } from '../docs/rogue.js';
 import { encodeProgress, decodeProgress, progressSnapshot } from '../docs/progress.js';
 
 function field(mode = 'story') {
@@ -41,7 +41,7 @@ function solvePipes(s) {
     while (s.rogue.tiles[index] !== rotation) assert.equal(chooseRogue(s, `tile-${index}`), true);
   }
 }
-const CORN_PATHS = {
+const LEGACY_CORN_PATHS = {
   story: [
     [[0,-1],[0,-1],[1,0],[0,-1],[0,-1],[0,0],[0,-1],[0,-1],[0,-1],[0,-1]],
     [[0,-1],[0,-1],[0,-1],[0,-1],[0,-1],[0,-1],[-1,0],[0,-1],[0,-1]],
@@ -53,6 +53,39 @@ const CORN_PATHS = {
     [[0,-1],[0,-1],[0,-1],[0,-1],[-1,0],[0,-1],[0,-1],[0,-1],[0,-1]]
   ]
 };
+
+// Search only through public game actions. The planner cannot ignore collisions or
+// edit player coordinates, health, immunity, projectile positions, or time.
+function findCornRoute(s) {
+  const crossing = s.rogue.crossing, hits = s.rogue.hits;
+  const queue = [{ game: s, path: [] }], seen = new Set();
+  for (let at = 0; at < queue.length; at++) {
+    const { game, path } = queue[at];
+    if (path.length > 100) break;
+    const advanced = { ...game, rogue: { ...game.rogue } };
+    advance(advanced, .21);
+    if (advanced.rogue.hits !== hits) continue;
+    for (const [dx, dy] of [[0,-1],[-1,0],[1,0],[0,0],[0,1]]) {
+      const next = { ...advanced, rogue: { ...advanced.rogue } };
+      if ((dx || dy) && !moveRogue(next, dx, dy)) continue;
+      if (next.rogue.hits !== hits) continue;
+      const route = [...path, [dx, dy]];
+      if (next.rogue.stage === 'choice' || next.rogue.crossing > crossing) return route;
+      const key = `${route.length}:${next.rogue.x}:${next.rogue.y}:${next.rogue.refuge}`;
+      if (!seen.has(key)) { seen.add(key); queue.push({ game: next, path: route }); }
+    }
+  }
+  assert.fail(`No safe ${s.mode} route through crossing ${crossing} at ${s.rogue.time}s`);
+}
+
+function takeCornRoute(s, path, saves = true) {
+  for (const [dx, dy] of path) {
+    advance(s, .21);
+    if (dx || dy) assert.equal(moveRogue(s, dx, dy), true);
+    if (saves) s = roundTrip(s);
+  }
+  return s;
+}
 
 test('reckless opportunities are reachable, location gated, and reject invalid starts', () => {
   const s = field();
@@ -101,12 +134,10 @@ test('voluntary routes can be declined without committing or adding transcript e
 for (const mode of ['story', 'hard']) for (const [choice, ending] of [['escape','corn_escape'], ['gate','corn_uprising']]) {
   test(`corn can complete three ${mode} crossings and choose ${ending}, saving throughout`, () => {
     let s = begin('corn', mode);
-    for (const [crossing, path] of CORN_PATHS[mode].entries()) {
-      for (const [dx,dy] of path) {
-        advance(s, .21);
-        if (dx || dy) assert.equal(moveRogue(s,dx,dy), true);
-        s = roundTrip(s);
-      }
+    for (let crossing = 0; crossing < 3; crossing++) {
+      if (crossing) advance(s, 1); // Verify routes after arrival immunity expires too.
+      const path = findCornRoute(s);
+      s = takeCornRoute(s, path);
       if (crossing < 2) {
         assert.equal(s.rogue.stage,'play'); assert.equal(s.rogue.crossing,crossing+1);
         assert.equal(s.rogue.x,5); assert.equal(s.rogue.y,8); assert.equal(s.rogue.refuge,8);
@@ -128,8 +159,9 @@ for (const mode of ['story', 'hard']) for (const [choice, ending] of [['escape',
   });
 }
 
-test('corn movement rejects diagonal, non-finite and repeated moves; hits return to cover', () => {
+test('corn movement rejects diagonal, non-finite and repeated moves; legacy hits return to cover', () => {
   const s = begin('corn');
+  s.rogue.patternVersion = 1;
   assert.equal(moveRogue(s,1,1),false); assert.equal(moveRogue(s,NaN,0),false);
   assert.equal(moveRogue(s,0,-1),true);
   assert.equal(moveRogue(s,0,-1),false);
@@ -166,11 +198,8 @@ test('corn movement rejects diagonal, non-finite and repeated moves; hits return
 
 test('corn keeps its damage between crossings and can wait safely at either refuge', () => {
   let s=begin('corn');
-  s.rogue.hits=1;
-  for(const [dx,dy] of CORN_PATHS.story[0]) {
-    advance(s,.21);
-    if(dx||dy)moveRogue(s,dx,dy);
-  }
+  s.rogue.hits=1;s.rogue.lastHit='bullet';
+  s=takeCornRoute(s,findCornRoute(s));
   assert.equal(s.rogue.crossing,1);assert.equal(s.rogue.hits,1);assert.equal(s.rogue.refuge,8);
   s=roundTrip(s);
   for(let tick=0;tick<60;tick++)advance(s,1);
@@ -192,6 +221,133 @@ test('early one-crossing preview saves retain progress and earned choices', () =
   Object.assign(earned.rogue,{stage:'choice',x:5,y:0,refuge:4});delete earned.rogue.crossing;
   assert.equal(restore(serialize(earned)).rogue.crossing,2);
 });
+
+test('new corn uses full-auto volleys followed by alternating road traffic, with stable hazard identities', () => {
+  const s=begin('corn');
+  assert.equal(s.rogue.patternVersion,2);
+  assert.equal(s.rogue.message,"The guard has your rifle and switched it to full auto. Bet you didn't know you could do that, huh?");
+  for(const crossing of [0,1,2]) {
+    s.rogue.crossing=crossing;
+    const hazards=cornHazards(s);
+    assert.ok(hazards.length >= (crossing===2?8:20));
+    assert.equal(new Set(hazards.map(h=>h.id)).size,hazards.length);
+    assert.ok(hazards.every(h=>h.kind===(crossing===2?'car':'bullet')));
+    assert.deepEqual(new Set(hazards.map(h=>h.direction)),new Set([-1,1]));
+    for(const h of hazards) {
+      assert.ok(h.width>0 && h.height>0);
+      for(const refuge of [0,4,8]) assert.ok(Math.abs(h.y-refuge)>h.height/2+.2,'the entire refuge remains outside every collision box');
+    }
+    if(crossing<2)assert.ok(hazards.some(h=>!Number.isInteger(h.y)),'rifle rounds have a visible spread within each lane');
+    else {
+      assert.equal(cornBullets(s).length,0,'cars are never rendered or treated as bullets');
+      assert.ok(new Set(hazards.map(h=>h.width)).size>1,'traffic has different vehicle lengths');
+      assert.ok(hazards.every(h=>h.width>1 && Number.isInteger(h.y)));
+    }
+    const later={...s,rogue:{...s.rogue,time:s.rogue.time+.001}};
+    const visible=cornHazards(later);
+    assert.ok(visible.filter(h=>hazards.some(before=>before.id===h.id)).length>=hazards.length-1);
+  }
+});
+
+for(const mode of ['story','hard']) {
+  test(`all three ${mode} stages remain escapable at varied arrival times without damage`, () => {
+    let sideways=0,waits=0;
+    for(const delay of [0,1.37,4.2]) {
+      let s=begin('corn',mode);
+      for(let elapsed=0;elapsed<delay;elapsed+=.01)advance(s,.01);
+      for(let crossing=0;crossing<3;crossing++) {
+        if(crossing)advance(s,1);
+        const path=findCornRoute(s);
+        sideways+=path.filter(([dx])=>dx!==0).length;
+        waits+=path.filter(([dx,dy])=>dx===0&&dy===0).length;
+        s=takeCornRoute(s,path,false);
+        assert.equal(s.rogue.hits,0);roundTrip(s);
+      }
+      assert.equal(s.rogue.stage,'choice');
+    }
+    assert.ok(sideways>0,'following gaps requires real sideways movement');
+    if(mode==='hard')assert.ok(waits>0,'pausing between bursts is a viable part of a safe route');
+  });
+}
+
+test('published corn saves retain their original positions, volleys and all three earned crossings', () => {
+  for(const mode of ['story','hard']) {
+    let s=begin('corn',mode);
+    delete s.rogue.patternVersion;delete s.rogue.lastHit;
+    s=restore(serialize(s));
+    assert.equal(s.rogue.patternVersion,1);assert.equal(s.rogue.lastHit,null);
+    assert.deepEqual(cornBullets(s)[0],{x:5.5,y:1,direction:1});
+    for(const path of LEGACY_CORN_PATHS[mode])s=takeCornRoute(s,path);
+    assert.equal(s.rogue.stage,'choice');assert.equal(s.rogue.hits,0);
+    assert.ok(cornHazards(s).every(h=>h.kind==='bullet'),'the last old crossing must not suddenly become a road');
+    assert.equal(getRogueScene(s).options[1].label,'Open the gate for everyone.');
+    assert.equal(chooseRogue(s,'escape'),true);roundTrip(s);
+  }
+  const hurt=begin('corn');hurt.rogue.hits=1;
+  delete hurt.rogue.patternVersion;delete hurt.rogue.lastHit;
+  const resumed=restore(serialize(hurt));
+  assert.equal(resumed.rogue.lastHit,'bullet');assert.equal(resumed.rogue.hits,1);
+});
+
+function collisionMoment(s, y, minDistance, maxDistance) {
+  s.rogue.x=5;s.rogue.y=y;s.rogue.refuge=y<4?4:8;
+  const startTime=s.rogue.time;
+  for(let tick=0;tick<3000;tick++) {
+    s.rogue.time=startTime+tick*.01;
+    const lane=cornHazards(s).filter(h=>Math.abs(h.y-y)<.3);
+    const clearance=Math.min(...lane.map(h=>Math.abs(h.x-5)-h.width/2));
+    if(clearance>minDistance&&clearance<maxDistance)return;
+  }
+  assert.fail('The moving pattern must leave both clear gaps and collidable bodies.');
+}
+
+test('fractional bullets and car bodies hit the root core, while close misses leave the large leaves unharmed', () => {
+  for(const crossing of [0,1,2])for(const hit of [false,true]) {
+    const s=begin('corn');s.rogue.crossing=crossing;
+    collisionMoment(s,7,hit?.04:.27,hit?.12:.34);
+    advance(s,.001);
+    assert.equal(s.rogue.hits,hit?1:0);
+    assert.equal(s.rogue.lastHit,hit?(crossing===2?'car':'bullet'):null);
+    if(hit)assert.equal(s.rogue.y,8);
+    roundTrip(s);
+  }
+});
+
+for(const [crossing,id,kind,code,stamp] of [[0,'corn_contained','bullet','21','SPECIMEN CONTAINED'],[2,'roadkill','car','22','ROADSIDE SPECIMEN']]) {
+  test(`three ${kind} collisions earn distinct ${id} and survive saves and progress transfer`, async () => {
+    let s=begin('corn');
+    while(s.rogue.crossing<crossing) {
+      s=takeCornRoute(s,findCornRoute(s),false);
+      advance(s,1);
+    }
+    for(let hits=1;hits<=3;hits++) {
+      while(s.rogue.time<s.rogue.immuneUntil)advance(s,.1);
+      collisionMoment(s,7,.04,.12);
+      advance(s,.001);
+      assert.equal(s.rogue.hits,hits);assert.equal(s.rogue.lastHit,kind);
+      if(hits<3) { assert.equal(s.phase,'rogue');assert.equal(s.ending,null); }
+      s=roundTrip(s);
+      const collected=hits===3?[id]:[];
+      const snapshot=progressSnapshot(s,{collected,runs:[]});
+      const imported=await decodeProgress(await encodeProgress(snapshot));
+      assert.deepEqual(imported,snapshot);
+      s=imported.save;
+    }
+    assert.equal(s.phase,'ending');assert.equal(s.ending,id);
+    assert.equal(s.reports.at(-1).answer,kind==='car'?'The headlights found me. I could not cross the road.':'The rifle found me. I could not keep moving.');
+    const ending=getEnding(s);
+    assert.equal(ending.code,code);assert.equal(ending.title,ENDINGS[id].title);assert.equal(ending.stamp,stamp);
+    assert.match(ending.text,kind==='car'?/headlights/:/rifle|guard/);
+    assert.deepEqual(getEnding(roundTrip(s)),ending);
+    for(const patch of [{hits:2},{patternVersion:1},{lastHit:kind==='car'?'bullet':'car'},{y:8},{crossing:kind==='car'?0:2}]) {
+      const forged=structuredClone(s);Object.assign(forged.rogue,patch);
+      assert.equal(restore(serialize(forged)),null,'a death record must match its actual cause and third hit');
+    }
+    // Early local v2 playtests used the old collection entry; keep those readable.
+    const preview=structuredClone(s);preview.ending='assimilation';preview.rogue.outcome='assimilation';
+    assert.ok(restore(serialize(preview)));
+  });
+}
 
 for(const [choice,ending] of [['warn','radio_ghost'],['command','field_voice']]) {
   test(`three tuned carriers can produce ${ending} and preserve a transferred save`, async () => {
@@ -264,7 +420,7 @@ test('older saves remain compatible and forged or out-of-bounds rogue states are
   for(const route of ['corn','broadcast','flood']) {
     const s=begin(route);
     const changes=[{stage:'unknown'},{time:-1},{time:Infinity},{hits:4},{outcome:'corn_escape'},{unexpected:true}];
-    if(route==='corn')changes.push({x:11},{y:-1},{refuge:0},{immuneUntil:500},{moveReadyAt:500});
+    if(route==='corn')changes.push({x:11},{y:-1},{refuge:0},{immuneUntil:500},{moveReadyAt:500},{patternVersion:0},{patternVersion:3},{lastHit:'car'},{lastHit:'unknown'},{hits:1,lastHit:null},{crossing:3});
     if(route==='broadcast')changes.push({locks:4},{locks:3},{lockReadyAt:500});
     if(route==='flood')changes.push({tiles:[0]},{tiles:Array(9).fill(4)},{turns:-1},{stage:'choice'});
     for(const patch of changes) {
@@ -276,7 +432,7 @@ test('older saves remain compatible and forged or out-of-bounds rogue states are
     const wrongCommit=structuredClone(s);wrongCommit.reports.at(-1).rogueRoute='other';assert.equal(restore(serialize(wrongCommit)),null);
     const wrongPhase=structuredClone(s);wrongPhase.phase='field';assert.equal(validRogue(wrongPhase),false);
   }
-  for(const ending of ['corn_escape','corn_uprising','radio_ghost','field_voice','flood']) {
+  for(const ending of ['corn_escape','corn_uprising','radio_ghost','field_voice','flood','corn_contained','roadkill']) {
     const forged=field();forged.phase='ending';forged.ending=ending;assert.equal(restore(serialize(forged)),null);
   }
 });

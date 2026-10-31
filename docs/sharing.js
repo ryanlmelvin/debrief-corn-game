@@ -20,7 +20,9 @@ export const ENDING_SHARES = {
   corn_uprising: { code: '17', line: 'I left the gate open.', art: 'field-sighting', alt: 'Corn stands beyond the watchtower at night.' },
   radio_ghost: { code: '18', line: 'I stayed on the line.', art: 'encounter-radio', alt: 'A field radio waits in the dark.' },
   field_voice: { code: '19', line: 'I gave the field orders.', art: 'ending-transmission', alt: 'A radio in one wooden tower overlooks another light above the corn.' },
-  flood: { code: '20', line: 'I changed the irrigation plan.', art: 'field-corner', alt: 'A fence marks the edge of a dark cornfield.' }
+  flood: { code: '20', line: 'I changed the irrigation plan.', art: 'field-corner', alt: 'A fence marks the edge of a dark cornfield.' },
+  corn_contained: { code: '21', line: 'I became target practice.', art: 'field-sighting', alt: 'Corn stands beyond the watchtower at night.' },
+  roadkill: { code: '22', line: 'I didn’t look both ways.', art: 'field-corner', alt: 'A fence marks the edge of a dark cornfield.' }
 };
 
 export const GUIDE_TEAM_SHARE = ENDING_SHARES.guide_shot;

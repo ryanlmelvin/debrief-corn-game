@@ -68,12 +68,12 @@ test('unavailable or blocked clipboard offers manual copying; invalid endings do
 });
 
 test('share progress counts unique discovered endings including the current ending', () => {
-  assert.equal(endingShareData('consumption', []).text, "I ate the corn.\nI've achieved 1 of 20 endings.");
+  assert.equal(endingShareData('consumption', []).text, "I ate the corn.\nI've achieved 1 of 22 endings.");
   const collected = ['witness', 'witness', 'compliance', 'unknown', '__proto__'];
   const data = endingShareData('consumption', collected);
-  assert.equal(data.text, "I ate the corn.\nI've achieved 3 of 20 endings.");
+  assert.equal(data.text, "I ate the corn.\nI've achieved 3 of 22 endings.");
   assert.equal(collected.length, 5, 'sharing must not change the saved collection');
-  assert.match(endingShareData('witness', Object.keys(ENDINGS)).text, /20 of 20 endings/);
+  assert.match(endingShareData('witness', Object.keys(ENDINGS)).text, /22 of 22 endings/);
   assert.equal(data.url, endingShareData('consumption').url, 'collection progress belongs in the message');
 });
 
@@ -82,14 +82,14 @@ test('native sharing and clipboard fallback both include collection progress', a
   let shared, copied;
   await shareEnding('witness', { share: async data => { shared = data; } }, collected);
   await shareEnding('witness', { clipboard: { writeText: async text => { copied = text; } } }, collected);
-  assert.equal(shared.text, "I kept the receipts.\nI've achieved 3 of 20 endings.");
+  assert.equal(shared.text, "I kept the receipts.\nI've achieved 3 of 22 endings.");
   assert.equal(copied, `${shared.text}\n${shared.url}`);
 });
 
 test('only the full-team outcome gets the sheriff caption and its matching preview', async () => {
   const line = 'I shot the sheriff. And the deputy. And some third guy.';
   const full = endingShareData('guide', ['guide', 'consumption'], 'PERIMETER SECURED');
-  assert.equal(full.text, `${line}\nI've achieved 2 of 20 endings.`);
+  assert.equal(full.text, `${line}\nI've achieved 2 of 22 endings.`);
   assert.equal(full.url, 'https://ryanlmelvin.github.io/debrief-corn-game/share/10/');
   assert.equal(endingShareData('guide', null, 'RECOVERY INCOMPLETE').text, ENDING_SHARES.guide.line);
   assert.equal(endingShareData('guide', null, 'PERSONNEL INCIDENT').text, ENDING_SHARES.guide_arrested.line);
@@ -110,7 +110,7 @@ test('only the full-team outcome gets the sheriff caption and its matching previ
 
 test('an interrupted recovery interview shares its own ending without revealing the recording', () => {
   const data = endingShareData('guide_interrupted', ['guide', 'guide_shot', 'guide_arrested']);
-  assert.equal(data.text, "I went off script.\nI've achieved 4 of 20 endings.");
+  assert.equal(data.text, "I went off script.\nI've achieved 4 of 22 endings.");
   assert.equal(data.url, 'https://ryanlmelvin.github.io/debrief-corn-game/share/09/');
   const page = readFileSync(new URL('../docs/share/09/index.html', import.meta.url), 'utf8');
   assert.doesNotMatch(page, /gunshot|struggle|\[static\]|rifle|interviewer/i);

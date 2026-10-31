@@ -3,6 +3,19 @@ import assert from 'node:assert/strict';
 import vm from 'node:vm';
 import { readFileSync } from 'node:fs';
 import * as engine from '../docs/engine.js';
+import { pressureWordMarkup } from '../docs/pressure-word.js';
+
+test('escape uses the same deterministic root drawing with separate masks from investigate',()=>{
+  const original=pressureWordMarkup(), escape=pressureWordMarkup('escape');
+  assert.equal(escape,pressureWordMarkup('escape'));
+  assert.match(escape,/>escape<\/text>/);
+  assert.match(escape,/class="root-filament"/);
+  assert.match(escape,/mask="url\(#escape-letter-mask\)"/);
+  assert.match(escape,/stroke="url\(#escape-root-ink\)"/);
+  assert.match(original,/mask="url\(#investigate-letter-mask\)"/);
+  assert.match(original,/stroke="url\(#root-ink\)"/);
+  assert.equal(original,pressureWordMarkup('investigate'));
+});
 
 const source=readFileSync(new URL('../docs/app.js',import.meta.url),'utf8');
 function notice() {

@@ -1,12 +1,15 @@
 // A fixed root drawing. Only its revealed length changes with simulation time.
 // Determinism avoids jitter when the watch pauses, resumes, or loads a save.
-export function pressureWordMarkup() {
+export function pressureWordMarkup(requested = 'investigate') {
+  const word = requested === 'escape' ? 'escape' : 'investigate';
+  const width = word === 'escape' ? 720 : 1200;
+  const mask = `${word}-letter-mask`, ink = word === 'escape' ? 'escape-root-ink' : 'root-ink';
   let seed=4107;
   const random=()=>((seed=(Math.imul(seed,1664525)+1013904223)>>>0)/4294967296);
   const paths=[];
   const path=(d,width,start,duration)=>paths.push(`<path class="root-filament" d="${d}" pathLength="1" stroke-width="${width.toFixed(2)}" style="--start:${start.toFixed(3)};--rate:${(1/duration).toFixed(3)}"/>`);
   const n=v=>v.toFixed(1);
-  for(let i=0;i<105;i++){
+  for(let i=0;i<Math.ceil(width/11.5);i++){
     let x=i*11.5+random()*9,y=228;
     const start=random()*.22,duration=.5+random()*.28;
     let d=`M${n(x)} ${y}`;
@@ -21,5 +24,5 @@ export function pressureWordMarkup() {
     }
     path(d,1.3+random()*1.7,start,duration);
   }
-  return `<svg viewBox="0 0 1200 240" aria-hidden="true" focusable="false"><defs><mask id="investigate-letter-mask" maskUnits="userSpaceOnUse" x="0" y="0" width="1200" height="240"><text x="20" y="174" textLength="1160" lengthAdjust="spacingAndGlyphs" font-family="Georgia,serif" font-size="194" font-weight="700" fill="white">investigate</text></mask><linearGradient id="root-ink" x2="0" y2="1"><stop stop-color="#c1c29b"/><stop offset="1" stop-color="#7d8960"/></linearGradient></defs><g mask="url(#investigate-letter-mask)"><rect class="root-impression" width="1200" height="240" fill="#a3ac83"/><g fill="none" stroke="url(#root-ink)" stroke-linecap="round">${paths.join('')}</g></g><text class="root-hit-target" x="20" y="174" textLength="1160" lengthAdjust="spacingAndGlyphs" font-family="Georgia,serif" font-size="194" font-weight="700" fill="transparent">investigate</text></svg>`;
+  return `<svg viewBox="0 0 ${width} 240" aria-hidden="true" focusable="false"><defs><mask id="${mask}" maskUnits="userSpaceOnUse" x="0" y="0" width="${width}" height="240"><text x="20" y="174" textLength="${width - 40}" lengthAdjust="spacingAndGlyphs" font-family="Georgia,serif" font-size="194" font-weight="700" fill="white">${word}</text></mask><linearGradient id="${ink}" x2="0" y2="1"><stop stop-color="#c1c29b"/><stop offset="1" stop-color="#7d8960"/></linearGradient></defs><g mask="url(#${mask})"><rect class="root-impression" width="${width}" height="240" fill="#a3ac83"/><g fill="none" stroke="url(#${ink})" stroke-linecap="round">${paths.join('')}</g></g><text class="root-hit-target" x="20" y="174" textLength="${width - 40}" lengthAdjust="spacingAndGlyphs" font-family="Georgia,serif" font-size="194" font-weight="700" fill="transparent">${word}</text></svg>`;
 }
