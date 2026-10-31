@@ -16,6 +16,7 @@
   <link rel="stylesheet" href="./pager.css">
   <link rel="stylesheet" href="./image-viewer.css">
   <link rel="stylesheet" href="./watch-play.css">
+  <link rel="stylesheet" href="./rogue.css">
   <script type="module" src="./app.js"></script>
 </head>
 <body>
@@ -36,6 +37,7 @@
         <button id="install" class="quiet">Install on device</button>
         <button id="move-progress" class="quiet">Move saved progress</button>
         <button id="assignment" class="quiet" hidden>Current objective</button>
+        <button id="protocol-menu" class="quiet" data-action="rogue-menu" hidden>Break protocol</button>
         <button id="watch-record" class="quiet" data-action="watch-record" hidden>Watch record</button>
         <button id="notebook" class="notebook-button" hidden>Notebook <span id="evidence-count">00</span></button>
         <button id="menu-radio" class="quiet" hidden>Recent events</button>
@@ -48,6 +50,7 @@
         <section class="viewport" aria-label="North field">
           <canvas id="field" width="960" height="600" tabindex="0" aria-label="Watchtower shooting gallery. Click moving corn to fire. Press X to select a crop, Space to fire, R to reload."></canvas>
           <section id="field-exploration" class="field-exploration" aria-label="Field investigation map" hidden></section>
+          <section id="rogue-play" class="rogue-play" aria-label="Beyond protocol" hidden tabindex="-1"></section>
           <div id="welcome" class="welcome">
             <div class="welcome-content">
               <h1>DEBRIEF<span class="title-period">.</span></h1>

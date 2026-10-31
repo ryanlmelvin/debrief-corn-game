@@ -15,7 +15,12 @@ export const ENDING_SHARES = {
   witness_present: { code: '12', line: 'I brought a plus-one.', art: 'ending-witness', alt: 'An empty chair waits across from a running recorder in the interview room.' },
   rescue: { code: '13', line: 'I chose people over paperwork.', art: 'ending-rescue', alt: 'A guard helps an exhausted person out of the corn toward the road.' },
   vacancy: { code: '14', line: 'I became the problem.', art: 'ending-vacancy', alt: 'An uncapped pen and release form wait at an empty supervisor’s chair.' },
-  transmission: { code: '15', line: 'I took my own advice.', art: 'ending-transmission', alt: 'A radio in one wooden tower overlooks another light above the corn.' }
+  transmission: { code: '15', line: 'I took my own advice.', art: 'ending-transmission', alt: 'A radio in one wooden tower overlooks another light above the corn.' },
+  corn_escape: { code: '16', line: 'I was the corn.', art: 'field-corner', alt: 'A fence marks the edge of a dark cornfield.' },
+  corn_uprising: { code: '17', line: 'I left the gate open.', art: 'field-sighting', alt: 'Corn stands beyond the watchtower at night.' },
+  radio_ghost: { code: '18', line: 'I stayed on the line.', art: 'encounter-radio', alt: 'A field radio waits in the dark.' },
+  field_voice: { code: '19', line: 'I gave the field orders.', art: 'ending-transmission', alt: 'A radio in one wooden tower overlooks another light above the corn.' },
+  flood: { code: '20', line: 'I changed the irrigation plan.', art: 'field-corner', alt: 'A fence marks the edge of a dark cornfield.' }
 };
 
 export const GUIDE_TEAM_SHARE = ENDING_SHARES.guide_shot;

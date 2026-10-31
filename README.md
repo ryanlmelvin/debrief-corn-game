@@ -4,7 +4,7 @@ A playable rural horror game based on **Debrief**, the short story by **Ryan L. 
 
 Work three watchtower shifts. Shoot corn that tries to escape, distinguish human figures from moving crops, try to resist an intrusive urge to investigate, and choose what goes into the official debrief. After the sighting, roots gradually fill the stationary word “investigate” across the watchtower view. Holding your post until relief leads straight to the map with a brief notice that you could no longer resist; your later testimony remembers whether you chose to leave or were compelled. Inspect all three locations and return to the tower for debrief; your evidence changes your answers and available endings.
 
-This is a first playable adaptation, with original additional scenes and fifteen endings. The source manuscript has not been copied into the project. The application records and environmental anomalies are fictional story elements.
+This is a first playable adaptation, with original additional scenes and twenty endings. The source manuscript has not been copied into the project. The application records and environmental anomalies are fictional story elements.
 
 ## Play locally
 
@@ -37,6 +37,8 @@ Clean containments build a streak and bonus points. Every five consecutive conta
 | Pause | Pause button | P or Escape |
 
 People are not targets, whether they wear a white dress or recovery equipment. Six total perimeter breaches end the assignment. Leaving the tower early allows currently loose crops to escape. Investigations offer slower, lower-exposure paths or fast shortcuts through the rows. The map previews exposure before departure; walking can be stopped at any time. Each discovery opens on arrival, and the map suggests the next unread location. Inspect all three sites, then return to the tower before reaching 100 exposure. Debrief answers and retained exhibits affect the final disposition. The final refusal shows green and red requirements based on the assignment’s discoveries and choices. No ending checklist or evidence-preparation tasks appear earlier in play.
+
+Want to go off the rails? **Break protocol** on the field map offers three departures from the assignment. At 70 exposure, **Stop resisting** lets you embrace the change; reaching 100 exposure triggers it automatically. You become the corn and cross the shooting gallery from below, dodging bullets through three increasingly dangerous crossings, with cover in each ditch. Reach the road and choose whether to escape alone or open the gate. **Broadcast on every frequency** lets you seize three carrier bands with a timed radio control, then choose what your voice becomes. At the inspected pump house, **Reverse the treatment pumps** opens a rotating-pipe puzzle: connect the inlet to the outlet and release the flow. These routes add five endings. The radio and pump introductions let you back out before committing; transformation at full exposure is permanent. Progress within each sequence survives saving, updating, and transfer.
 
 Walking between locations brings twelve illustrated encounters across three nights. New games vary their timing and select from three versions of each recurring scene, with matching existing illustrations. Later incidents also respond to your choices: once an ending is out of reach, an encounter reserved for it can give way to an unrelated event. Ten replacement scenes cover abandoned equipment, strange water, survey marks, and other disturbances. Any encounter still needed by a possible ending stays available. The walk pauses for a choice. You can always move on without extra exposure; investigating can cost exposure, uncover an aid, or change an encounter on a later night. Your choices go into the notebook, mark the map, and can become testimony in the debrief. Mid-encounter saves preserve the chosen scene, response, and destination, including after an update or progress transfer. The notebook and debrief remember the version you actually saw. Games started before this change keep their original encounters; start a new game for the new variety.
 
@@ -100,6 +102,7 @@ The game-rule tests cover ammunition, shooting, civilian encounters, timing, con
 | `docs/evidence-scenes.js` / `docs/evidence-flavors.js` | Canonical exhibit schedule, saved discovery selection, and authored discovery variants |
 | `docs/ending-paths.js` | Shared ending prerequisites, availability, and protection of still-possible leads |
 | `docs/alternate-endings.js` / `docs/resolution-ui.js` | Five final-night routes, choices, requirements, and saved scenes |
+| `docs/rogue.js` / `docs/rogue-ui.js` / `docs/rogue-endings.js` | Reckless field routes, bullet dodging, radio takeover, pump puzzle, and five outcomes |
 | `docs/renderer.js` | Layered canvas landscape, illustrated actors, root motion and field survey |
 | `docs/watch-story.js` | Nightly sightings, crop anatomy, and retrieval-team light timing |
 | `docs/app.js` | Controls, paper documents, audio, saving, installation |

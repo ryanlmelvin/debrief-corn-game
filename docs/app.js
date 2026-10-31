@@ -16,6 +16,8 @@ import { endingShareData, shareEnding } from './sharing.js';
 import { decisionQuestion } from './decision-copy.js';
 import { chooseResolution } from './alternate-endings.js';
 import { resolutionMarkup } from './resolution-ui.js';
+import { startRogue, chooseRogue, moveRogue } from './rogue.js';
+import { RogueUI, rogueMenuMarkup } from './rogue-ui.js';
 import { InstallHandoff, recoverInstallHandoff, progressSnapshot, encodeProgress, decodeProgress, storeProgress, MAX_PROGRESS_BYTES } from './progress.js';
 
 const $ = id => document.getElementById(id);
@@ -23,6 +25,7 @@ const canvas=$('field'), renderer=new Renderer(canvas), dialog=$('paper-dialog')
 const pager=new DialogPager(dialog);
 let modalReturnFocus=null;
 const fieldMap=new FieldMap($('field-exploration'));
+const rogueUI=new RogueUI($('rogue-play'));
 $('investigate-urge').innerHTML=pressureWordMarkup();
 const menu=$('game-menu');
 const menuOpen=()=>menu.matches(':popover-open');
@@ -140,6 +143,7 @@ function begin(mode,fromSave=false) {
   $('notebook').hidden=false;$('menu-radio').hidden=false;$('assignment').hidden=false;
   $('welcome').hidden=true;$('sidebar').hidden=false;$('pause').hidden=false;document.body.classList.add('playing');
   if(dialog.open)closeModal();updateUI(true);save();
+  if(game.phase==='rogue')$('rogue-play').focus({preventScroll:true});
 }
 function sceneDialog() {
   if(!game)return;
@@ -181,9 +185,10 @@ function updateUI(force=false) {
   if(!game)return;
   document.body.dataset.phase=game.phase;
   const aftermath=isGuideAftermath(game);
-  $('stats').hidden=aftermath||game.phase==='resolution';
+  $('stats').hidden=aftermath||game.phase==='resolution'||game.phase==='rogue';
   $('pause').hidden=game.phase==='ending';
   const phase=game.phase,field=phase==='field',site=nearbySite(game),active=phase==='tower';
+  $('protocol-menu').hidden=!field;
   $('date-label').textContent=`${DATES[game.shift]}, ████`;
   $('station-status').textContent=field?'RADIO SIGNAL WEAK':phase==='ending'?'FILE CLOSED':'PERIMETER ACTIVE';
   $('phase-label').textContent=field?'FIELD INVESTIGATION':phase==='debrief'?'RECORDED INTERVIEW':phase==='resolution'?'AFTER THE WATCH':'WATCHTOWER';
@@ -200,7 +205,7 @@ function updateUI(force=false) {
   }
   $('tower-hud').hidden=!active;
   updateWatchUI(game,paused);
-  $('controls').hidden=active||field;
+  $('controls').hidden=active||field||phase==='rogue';
   $('evidence-count').textContent=String(game.evidence.length).padStart(2,'0');
   $('control-hint').textContent=field?'ARROWS / WASD TO MOVE · E TO INSPECT':active?'CLICK / TAP FIRE · R RELOAD · F FLARE':'STATION 04';
   if(phase!=='guide'&&!aftermath)canvas.setAttribute('aria-label',field?`Field survey. Your position is column ${game.player.x+1}, row ${game.player.y+1}. ${site?site.label+'. ':''}Gold page markers show tonight’s unread discoveries. Check marks show searched locations. Use arrow keys or WASD to move. E to inspect. Watchtower is column 2 row 8; pump house column 4 row 4; drainage channel column 8 row 6; northeast corner column 10 row 2.`:'Watchtower shooting gallery. Click moving corn to fire. X selects a crop. Space fires. R reloads; press again in gold to reload faster. F fires a flare to slow crops. B rings the bell for an optional timed rush.');
@@ -228,7 +233,16 @@ function updateUI(force=false) {
   $('pause-layer').hidden=!paused;
   $('pause').textContent=paused?'Resume':'Pause';
   fieldMap.render(game,paused,dialog.open&&['evidence','site-encounter','corn'].includes(modalKind));
+  rogueUI.render(game,paused||dialog.open||menuOpen());
+  if(phase==='rogue'){
+    $('objective').textContent={corn:'Reach the road.',broadcast:'Find the carrier.',flood:'Reverse the flow.'}[game.rogue.route];
+    $('objective-detail').textContent=game.rogue.message;
+    $('phase-label').textContent='BEYOND PROTOCOL';
+    $('station-status').textContent='SIGNAL LOST';
+  }
   canvas.hidden=field;
+  canvas.setAttribute('aria-hidden',String(phase==='rogue'));
+  canvas.tabIndex=phase==='rogue'?-1:0;
   $('guide-message').hidden=phase!=='guide'||game.guide?.stage==='debrief'||paused;
   if (phase === 'guide') updateGuideUI();
   if(aftermath){
@@ -278,6 +292,23 @@ function updateGuideUI() {
   if(progress)progress.style.width=`${route.progress*100}%`;
 }
 function act(action,value) {
+  if(action==='rogue-menu'){
+    if(!game||game.phase!=='field'||paused||dialog.open||game.fieldEvents.pending)return;
+    fieldMap.stop(game);
+    showModal('rogue-menu',rogueMenuMarkup(game));save();return;
+  }
+  if(action==='rogue-start'){
+    if(!game||game.phase!=='field'||paused||modalKind!=='rogue-menu')return;
+    if(!startRogue(game,value))return;
+    fieldMap.stop(game);closeModal();lastModalKey='';save();updateUI(true);
+    $('rogue-play').focus({preventScroll:true});return;
+  }
+  if(action==='rogue-choice'||action==='rogue-move'){
+    if(!game||game.phase!=='rogue'||paused||dialog.open||menuOpen())return;
+    const changed=action==='rogue-choice'?chooseRogue(game,value):moveRogue(game,...String(value).split(',').map(Number));
+    if(!changed)return;
+    lastModalKey='';save();updateUI(true);return;
+  }
   if(action==='watch-record'){
     if(!game?.watch)return;
     const r=watchRecord(game), active=game.phase==='tower';
@@ -301,7 +332,7 @@ function act(action,value) {
   if(action.startsWith('guide-')&&(!game||game.phase!=='guide'||paused||dialog.open||menuOpen()))return;
   if(action==='encounter-choice') {
     if(!chooseFieldEncounter(game,value))return;
-    if(game.phase==='ending')closeModal();
+    if(game.phase!=='field')closeModal();
     lastModalKey='';save();updateUI(true);return;
   }
   if(action==='encounter-continue'||action==='encounter-map') {
@@ -335,7 +366,7 @@ function act(action,value) {
   }
   if(action==='record-run') {
     const r=history.runs[Number(value)];if(!r)return;
-    showModal('record',paper(esc(r.title),`<p${ENDINGS[r.ending]?.transcript?' class="ending-transcript"':''}>${esc(r.text).replace(/\[redacted\]|██████/g,'<span class="censor-bar" role="img" aria-label="Speaker name redacted"></span>').replaceAll('\n','<br>')}</p>${r.last?`<p class="note">${esc(r.last)}</p>`:''}<div class="transcript">${r.reports.map(t=>`<section><p class="eyebrow">${t.kind==='recovery'?'RECOVERY DEBRIEF':t.kind==='resolution'?'AFTER THE WATCH':`SHIFT ${Number(t.shift)+1}`}</p><p>${esc(t.question)}</p><p><b>YOU</b> ${esc(t.answer)}</p>${t.supervisorReply?`<p class="note">${esc(t.replySpeaker||'SUPERVISOR')}: ${esc(t.supervisorReply)}</p>`:''}</section>`).join('')}</div><div class="paper-actions"><button class="secondary" data-action="share-record" data-value="${Number(value)}">Share ending ↗</button><button class="primary" data-action="records">Back to endings</button><button class="secondary" data-action="close">Close</button></div>`,'ENDING & TRANSCRIPT'),ENDINGS[r.ending]?.art);return;
+    showModal('record',paper(esc(r.title),`<p${ENDINGS[r.ending]?.transcript?' class="ending-transcript"':''}>${esc(r.text).replace(/\[redacted\]|██████/g,'<span class="censor-bar" role="img" aria-label="Speaker name redacted"></span>').replaceAll('\n','<br>')}</p>${r.last?`<p class="note">${esc(r.last)}</p>`:''}<div class="transcript">${r.reports.map(t=>`<section><p class="eyebrow">${t.kind==='rogue'?'BEYOND PROTOCOL':t.kind==='recovery'?'RECOVERY DEBRIEF':t.kind==='resolution'?'AFTER THE WATCH':`SHIFT ${Number(t.shift)+1}`}</p><p>${esc(t.question)}</p><p><b>YOU</b> ${esc(t.answer)}</p>${t.supervisorReply?`<p class="note">${esc(t.replySpeaker||'SUPERVISOR')}: ${esc(t.supervisorReply)}</p>`:''}</section>`).join('')}</div><div class="paper-actions"><button class="secondary" data-action="share-record" data-value="${Number(value)}">Share ending ↗</button><button class="primary" data-action="records">Back to endings</button><button class="secondary" data-action="close">Close</button></div>`,'ENDING & TRANSCRIPT'),ENDINGS[r.ending]?.art);return;
   }
   if(action==='records'){$('records').click();return;}
   if(action==='guide-travel')guideTravel(game);
@@ -384,7 +415,7 @@ $('new-game').addEventListener('click',()=>{
 });
 $('resume').addEventListener('click',()=>begin(null,true));
 function togglePause(force) {if(!game||game.phase==='ending'||dialog.open)return;paused=typeof force==='boolean'?force:!paused;updateUI();save();syncAudio();}
-$('pause').addEventListener('click',()=>togglePause());$('unpause').addEventListener('click',()=>{togglePause(false);canvas.focus({preventScroll:true});});
+$('pause').addEventListener('click',()=>togglePause());$('unpause').addEventListener('click',()=>{togglePause(false);(game?.phase==='rogue'?$('rogue-play'):canvas).focus({preventScroll:true});});
 dialog.addEventListener('cancel',event=>{if(modalKind==='resolution-menu'){event.preventDefault();act('resolution-answer','back');}else if(['briefing','debrief','guide-debrief','resolution','ending','encounter'].includes(modalKind))event.preventDefault();else{event.preventDefault();closeModal();}});
 $('manual').addEventListener('click',()=>showModal('manual',paper('Field manual',`<ol class="orders"><li><span>01</span>Watch the corn. Shoot any that try to escape.</li><li><span>02</span>Remain in the watchtower.</li><li><span>03</span>Do not consume the crop.</li><li><span>04</span>Remember any irregularities for your debrief at the end of the night.</li></ol><p class="watch-tips"><b>Runners</b> move fast. <b>Husks</b> take two hits. Five clean containments earn a replacement flare. Misses and breaches break the chain.</p><p class="small"><b>R / Reload:</b> tap again as the marker reaches gold to finish early. Waiting always completes a normal reload.<br><b>F / Flare:</b> slows all crops for 4.5 seconds. Start with two; earn more through streaks and bell rushes. Carry up to two.<br><b>B / Ring bell:</b> optional risk. Clear three marked crops in ten seconds for +600 points, +6 reserve rounds, and a flare. Any escape or timeout loses the bonus; the crops remain a threat. Two attempts per watch, available until 39 seconds.</p><button class="primary" data-action="close">Close</button>`)));
 
@@ -420,6 +451,15 @@ document.addEventListener('keydown',event=>{
   if(k==='escape'&&$('guide-aftermath').matches(':popover-open')){event.preventDefault();$('guide-aftermath').hidePopover();return;}
   if(k==='p'||k==='escape'){event.preventDefault();togglePause();return;}
   if(paused)return;
+  if(game.phase==='rogue'){
+    const directions={arrowup:'0,-1',w:'0,-1',arrowdown:'0,1',s:'0,1',arrowleft:'-1,0',a:'-1,0',arrowright:'1,0',d:'1,0'};
+    if(game.rogue.route==='corn'&&game.rogue.stage==='play'&&directions[k]){
+      event.preventDefault();act('rogue-move',directions[k]);
+    }else if(game.rogue.route==='broadcast'&&game.rogue.stage==='play'&&k===' '&&(!['BUTTON','A'].includes(event.target.tagName)||event.target.closest('.rogue-lock'))){
+      event.preventDefault();if(!event.repeat)act('rogue-choice','lock');
+    }
+    return;
+  }
   if(game.phase==='tower'){
     if(event.repeat && [' ','r','f','b'].includes(k))return;
     if(k==='x'){event.preventDefault();act('focus');}
@@ -460,7 +500,7 @@ async function shareDisposition(ending,stamp) {
 }
 function exportRecord() {
   const e=getEnding(game);
-  const body=`DEBRIEF — PRIVATE TRANSCRIPT\nBased on the story by Ryan L. Melvin\n\n${e.title}\n${e.stamp}\n\n${e.text}\n${e.last}\n\nTESTIMONY\n\n${game.reports.map(r=>`${r.kind==='recovery'?'RECOVERY DEBRIEF':r.kind==='resolution'?'AFTER THE WATCH':`SHIFT ${r.shift+1}`}\nQ: ${r.question}\nA: ${r.answer}${r.redacted?' [official wording]':''}${r.supervisorReply ? `\n${r.replySpeaker||'SUPERVISOR'}: ${r.supervisorReply}` : ''}`).join('\n\n')}\n\nEXHIBITS\n\n${game.evidence.map(id=>{const found=evidenceForState(game,id);return `${found.title}\n${found.text}`;}).join('\n\n')}`;
+  const body=`DEBRIEF — PRIVATE TRANSCRIPT\nBased on the story by Ryan L. Melvin\n\n${e.title}\n${e.stamp}\n\n${e.text}\n${e.last}\n\nTESTIMONY\n\n${game.reports.map(r=>`${r.kind==='rogue'?'BEYOND PROTOCOL':r.kind==='recovery'?'RECOVERY DEBRIEF':r.kind==='resolution'?'AFTER THE WATCH':`SHIFT ${r.shift+1}`}\nQ: ${r.question}\nA: ${r.answer}${r.redacted?' [official wording]':''}${r.supervisorReply ? `\n${r.replySpeaker||'SUPERVISOR'}: ${r.supervisorReply}` : ''}`).join('\n\n')}\n\nEXHIBITS\n\n${game.evidence.map(id=>{const found=evidenceForState(game,id);return `${found.title}\n${found.text}`;}).join('\n\n')}`;
   const url=URL.createObjectURL(new Blob([body],{type:'text/plain;charset=utf-8'}));const a=document.createElement('a');a.href=url;a.download='debrief-private-transcript.txt';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
 }
 async function initAudio() {
@@ -706,6 +746,7 @@ function frame(now) {
     if(now-lastSave>1200){save();lastSave=now;}
   }
   if(game?.phase!=='field')renderer.draw(game,now,!game);
+  if(game?.phase==='rogue')rogueUI.render(game,paused||dialog.open||menuOpen()||document.hidden);
   requestAnimationFrame(frame);
 }
 requestAnimationFrame(frame);

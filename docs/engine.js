@@ -2,6 +2,8 @@ import { SIGHTING_TIME, sightingPeople, watchNight, personExitTime, observedSigh
 import { startGuide, advanceGuide, guideDisposition, restoreGuideRoute } from './guide.js';
 import { ENDING_SHARES } from './sharing.js';
 import { ALTERNATE_ENDINGS, startResolution, validResolution, resolutionEnding } from './alternate-endings.js';
+import { ROGUE_ENDINGS, rogueEnding } from './rogue-endings.js';
+import { startRogue, advanceRogue, validRogue } from './rogue.js';
 import { witnessRequirements, canTakeEvidenceOutside, retirePreparations } from './ending-requirements.js';
 import { fieldStepCost } from './field.js';
 import { EVIDENCE, evidenceForState, evidenceAtSite, freshEvidenceScenes, migrateEvidenceScenes, validEvidenceScenes } from './evidence-scenes.js';
@@ -110,6 +112,7 @@ export function ringBell(s) {
   return true;
 }
 export function advance(s, dt) {
+  if (s.phase === 'rogue') { advanceRogue(s, dt); return; }
   if (s.phase === 'guide') { advanceGuide(s, dt); return; }
   if (s.phase !== 'tower' || !Number.isFinite(dt) || dt <= 0) return;
   // Small fixed steps keep large elapsed times from skipping spawns or perimeter checks.
@@ -280,15 +283,15 @@ export function move(s, dx, dy) {
   const key = `${x},${y}`; if (!s.visited.includes(key)) s.visited.push(key);
   s.exposure = Math.min(100, s.exposure + fieldStepCost(s,x,y));
   if (s.fieldSteps === 5) addLog(s, 'The rows close behind you. Nothing here smells like rain.', 'story');
-  if (s.exposure >= 70 && !s.inspected.includes('warning')) { s.inspected.push('warning'); addLog(s, 'Your hands are cold. Return before exposure reaches 100.', 'alert'); }
-  if (s.exposure >= 100) finish(s, 'assimilation');
+  if (s.exposure >= 70 && !s.inspected.includes('warning')) { s.inspected.push('warning'); addLog(s, 'Your hands are cold. At 100 exposure, the field will change you.', 'alert'); }
+  if (s.exposure >= 100) startRogue(s, 'corn');
   else if(!nearbySite(s))encounterAfterStep(s);
   return true;
 }
 export function chooseFieldEncounter(s,id) {
   if(!resolveEncounter(s,id))return false;
   addLog(s,'An encounter between the rows is retained in your private notebook.','story');
-  if(s.exposure>=100)finish(s,'assimilation');
+  if(s.exposure>=100)startRogue(s,'corn');
   return true;
 }
 export function continueFieldEncounter(s) { return dismissEncounter(s); }
@@ -420,7 +423,8 @@ export const ENDINGS = {
   dissent: { code: '04', title: 'Unfit for field duty.', stamp: 'TESTIMONY DISPUTED', text: 'Your final report is approved. The earlier objections are attached to your medical evaluation. They take your badge and issue a transfer. From the bus window, field after field passes in the dark.', last: 'You cannot see where this one ends.' },
   breach: { code: '05', title: 'Beyond the perimeter.', stamp: 'CONTAINMENT LOST', text: 'The sixth movement crosses the road. Dispatch tells you to stay on the line. From somewhere beyond the station comes the sound of stalks brushing together. There are no fields on that side.', last: '[static]' },
   assimilation: { code: '06', title: 'Expected growth.', stamp: 'PERSONNEL UNACCOUNTED FOR', text: 'You stop to catch your breath. The rows stop with you. Somewhere a radio calls your number, then calls it again. You understand at last why the field has been so patient.', last: 'Nothing here is wasted.' },
-  ...ALTERNATE_ENDINGS
+  ...ALTERNATE_ENDINGS,
+  ...ROGUE_ENDINGS
 };
 for (const [id, card] of Object.entries(ENDING_SHARES)) ENDINGS[id].title = card.line;
 export function endingId(s) {
@@ -433,7 +437,7 @@ export function endingId(s) {
 }
 export function getEnding(s) {
   if (!Object.hasOwn(ENDINGS,s.ending)) return undefined;
-  return s.ending === 'guide' && s.guide ? { ...ENDINGS[endingId(s)], ...guideDisposition(s), title: ENDINGS[endingId(s)].title } : { ...ENDINGS[s.ending], ...resolutionEnding(s) };
+  return s.ending === 'guide' && s.guide ? { ...ENDINGS[endingId(s)], ...guideDisposition(s), title: ENDINGS[endingId(s)].title } : { ...ENDINGS[s.ending], ...resolutionEnding(s), ...rogueEnding(s) };
 }
 function finish(s, ending) { loseRush(s);s.phase = 'ending'; s.ending = ending; s.targets = [];s.compulsionNotice=false;s.fieldEvents.pending=null;s.fieldEvents.journey=null; }
 
@@ -441,7 +445,7 @@ export function serialize(s) { return JSON.stringify(s); }
 export function restore(raw) {
   try {
     const s = JSON.parse(raw);
-    if (!s || ![1,SAVE_VERSION].includes(s.version) || !(s.version === 1 ? ['standard','story'] : ['story','hard']).includes(s.mode) || !['briefing','tower','decision','field','debrief','resolution','guide','ending'].includes(s.phase)) return null;
+    if (!s || ![1,SAVE_VERSION].includes(s.version) || !(s.version === 1 ? ['standard','story'] : ['story','hard']).includes(s.mode) || !['briefing','tower','decision','field','debrief','resolution','rogue','guide','ending'].includes(s.phase)) return null;
     if (!Number.isInteger(s.shift) || s.shift < 0 || s.shift > 2 || !Number.isInteger(s.question) || s.question < 0 || s.question > 3) return null;
     for (const key of ['time','rounds','reserve','reload','kills','shots','breaches','exposure','trust','honesty','rng','nextSpawn','nextId','fieldSteps']) if (!Number.isFinite(s[key])) return null;
     if (s.time < 0 || s.time > SHIFT_LENGTH + 1 || s.rounds < 0 || s.rounds > 6 || s.reserve < 0 || s.exposure < 0 || s.exposure > 100) return null;
@@ -470,6 +474,7 @@ export function restore(raw) {
     if (!s.log.every(l => typeof l.message === 'string') || !s.reports.every(r => typeof r.question === 'string' && typeof r.answer === 'string')) return null;
     if (!retirePreparations(s)) return null;
     if (!validResolution(s)) return null;
+    if (!validRogue(s)) return null;
     if (s.phase === 'ending' && !Object.hasOwn(ENDINGS,s.ending)) return null;
     if (s.ending === 'guide_interrupted' && (s.phase !== 'ending' || !s.guide)) return null;
     if (s.phase === 'debrief' && s.question === 3 && (s.shift >= 2 || typeof s.reports.at(-1)?.supervisorReply !== 'string')) return null;

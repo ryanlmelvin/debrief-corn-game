@@ -1,0 +1,6 @@
+rogue-corn.jpg
+Generated with the built-in image generation tool for Debrief's transformation scene.
+The game uses a JPEG conversion of the generated original.
+
+Prompt:
+Use case: illustration-story. Asset type: landscape rural horror game story illustration, 1536x1024. A corn's-eye view from among dense night-time Illinois corn rows: in the immediate foreground two uncannily human hands have transformed into jointed corn leaves and pale fibrous roots, a ragged sleeve and brass badge caught at a leaf joint. Beyond the soil furrows a tall wooden watchtower and its tiny silhouetted guard with rifle loom against an overcast sky, a narrow amber searchlight cuts through drifting dust. Serious understated body horror, no gore, no cartoon face. Photorealistic cinematic still with subtly aged archival-film grain and slightly worn dark edges. Restrained nearly black forest green, dusty olive, warm dry straw gold; match the existing game's moody tactile rural photography. Strong readable silhouette, natural small amber light sources, detailed dry leaves and damp earth, ominous stillness. Compose focal hands in lower third and watchtower in upper right, readable at small size. No typography, no UI, no text, no watermark. New art for the transformation scene only.
