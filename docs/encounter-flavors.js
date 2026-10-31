@@ -13,7 +13,7 @@ export const ENCOUNTER_FLAVORS = {
       choices: {
         leave: response('Leave the dial alone.', 'You walk on. Your voice keeps describing the next crossing through the buried radio, although you cannot see it yet.'),
         answer: response('Ask it where you are.', 'You ask, “Where am I?” The answer gives your position exactly. “Do not turn around.” The tuning needle stops. Behind you, a leaf brushes the back of your coat.'),
-        record: response('Record the changing channels.', 'You hold your recorder to the grille as the needle moves. On playback, none of the words remain. Only your breathing crosses from one channel to the next.')
+        record: response('Record the channels onto a tape.', 'You press RECORD and hold your recorder to the grille as the needle moves. On playback, none of the words remain. Only your breathing crosses from one channel to the next. You stop the tape, rewind it, and keep it in your recorder.')
       }
     },
     {
@@ -24,7 +24,7 @@ export const ENCOUNTER_FLAVORS = {
       choices: {
         leave: response('Step over the flooded furrow.', 'Your voice describes the next crossing as you leave the buried radio behind. The water around it is perfectly still now.'),
         answer: response('Ask it where you are.', '“Where am I?” you ask. Your voice gives the coordinates beneath your feet. “Do not turn around.” A second stream of bubbles rises behind your heel.'),
-        record: response('Hold your recorder to the grille.', 'You crouch above the water and record your voice. The words disappear on playback. Your breathing remains, close to the microphone, with no sound of water at all.')
+        record: response('Record the radio onto a tape.', 'You crouch above the water and press RECORD, capturing your voice on tape. The words disappear on playback. Your breathing remains, close to the microphone, with no sound of water at all. You stop the tape, rewind it, and keep it in your recorder.')
       }
     }
   ],
@@ -109,7 +109,7 @@ export const ENCOUNTER_FLAVORS = {
       choices: {
         disconnect: response('Unplug the loose microphone.', 'You pull the microphone lead from the buried set. The replay pauses. From the empty socket comes a quiet intake of breath.'),
         mislead: response('Tell it you are going west.', 'You give the radio a false direction: west. Leaves turn that way one row at a time. You take the other path.'),
-        compare: response('Play your first tape beside it.', 'You play your first recording beside the radio. The two voices cancel into a thin whistle. For a few seconds the field sounds ordinary. You can hear the real path under your boots.')
+        compare: response('Play last night’s radio tape beside it.', 'You play the tape you made of this radio last night beside its speaker. The two voices cancel into a thin whistle. For a few seconds the field sounds ordinary. You can hear the real path under your boots.')
       }
     },
     {
@@ -120,7 +120,7 @@ export const ENCOUNTER_FLAVORS = {
       choices: {
         disconnect: response('Disconnect its microphone.', 'You unplug the loose microphone. The sound retreats into the furrow. The empty plug vibrates against your finger.'),
         mislead: response('Give it a false heading: west.', 'You say you are heading west. The next replay carries your footsteps away in that direction. The crop bends after the sound. You go the other way.'),
-        compare: response('Play the first tape beside the radio.', 'Your tape and the radio voice meet in a thin whistle, then cancel. The field sounds ordinary for a few seconds. Even the nearest leaves seem farther away.')
+        compare: response('Play last night’s radio tape beside it.', 'The tape you made here last night and the radio voice meet in a thin whistle, then cancel. The field sounds ordinary for a few seconds. Even the nearest leaves seem farther away.')
       }
     }
   ],

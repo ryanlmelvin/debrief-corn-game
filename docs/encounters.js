@@ -10,7 +10,7 @@ export const ENCOUNTERS=[
     report:'A radio in the soil spoke in my voice while my own set was silent.',choices:[
       choice('leave','Leave the set in the mud.',0,'You step past the half-buried radio. Your voice from its speaker keeps describing a place you have not reached yet.'),
       choice('answer','Ask it where you are.',3,'The voice from the half-buried radio gives your exact position, then whispers, “Do not turn around.” Leaves scrape together behind you. You do not look.','answered-radio'),
-      choice('record','Hold your recorder to the grille.',5,'You keep a few seconds of your voice from the half-buried radio on your recorder. On playback, the voice stops speaking. The tape keeps running, recording your breathing.','recording')
+      choice('record','Record the radio onto a tape.',5,'You press RECORD and capture a few seconds of your voice from the half-buried radio on your recorder. On playback, the voice stops speaking. The tape keeps running, recording your breathing. You stop it, rewind, and keep the tape in your recorder.','recording')
     ]},
   {id:'paired-tracks',night:0,step:9,art:'tracks',title:'Someone is keeping pace.',
     text:'You find a second trail of boot prints beside your own. Each print has the same split at the heel as your boots. You take one step. A shallow print fills with water a little farther ahead.',
@@ -38,7 +38,7 @@ export const ENCOUNTERS=[
     report:'The field radio played sounds from my previous investigation.',choices:[
       choice('disconnect','Disconnect the loose microphone.',0,'You unplug the microphone from the half-buried radio. The sound of footsteps continues through the empty connector.'),
       choice('mislead','Give it a false direction.',3,'You tell the half-buried radio you are heading west. A whole row bends westward. You go the other way.','false-direction'),
-      choice('compare','Play your first recording beside it.',-3,'You play your first recording beside the half-buried radio. The recorded voice and the radio voice cancel into a thin whistle. For a few seconds the field sounds like an ordinary field. You use the silence to get your bearings.','verified-voice','recording')
+      choice('compare','Play last night’s radio tape beside it.',-3,'You rewind the tape you made here last night and play it beside the half-buried radio. The recorded voice and the radio voice cancel into a thin whistle. For a few seconds the field sounds like an ordinary field. You use the silence to get your bearings.','verified-voice','recording')
     ]},
   {id:'moved-crossing',night:1,step:9,art:'moved-crossing',title:'The crossing has moved.',
     text:s=>has(s,'twine')?'You reach a crossing between the corn rows. The survey twine you tied last night hangs from a stalk. But this crossing should be two rows farther west. The cut end of the twine is growing pale roots.':'You reach two crossings between the corn rows, although your map shows only one. Your boot prints lead into both crossings. No prints come out.',
@@ -126,7 +126,9 @@ export function encounterForState(s,id) {
     // Only presentation fields may be overridden. Mechanics stay canonical.
     choices:event.choices.map(c=>({...c,label:flavor.choices[c.id].label,result:flavor.choices[c.id].result,shortLabel:flavor.choices[c.id].shortLabel}))
   }:event;
-  return {...presentation,variant,text:typeof presentation.text==='function'?presentation.text(s):presentation.text};
+  let text=typeof presentation.text==='function'?presentation.text(s):presentation.text;
+  if(id==='second-call'&&has(s,'recording'))text+=' Your recorder still holds the tape you made of this radio last night. You could play it back beside the speaker.';
+  return {...presentation,variant,text};
 }
 export function encounterAfterStep(s) {
   const events=s.fieldEvents;
