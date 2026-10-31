@@ -47,6 +47,10 @@ export function cameraFor(width,height) {
   const viewWidth=width/scale,viewHeight=height/scale;
   return {scale,width:viewWidth,height:viewHeight,left:(W-viewWidth)/2,top:(H-viewHeight)/2};
 }
+// Distant landmarks follow the visible horizon while retaining their silhouettes.
+export function horizonProjection(x,view) {
+  return {x:view.left+x/W*view.width,size:Math.max(.65,Math.min(1,view.width/W))};
+}
 export function targetProjection(target,view) {
   const depth=.13+Math.sqrt(Math.max(0,Math.min(1,(target.y-281)/340)))*.72;
   const size=Math.min(1,Math.max(.82,view.width/W))*Math.max(.58,depth*1.45);
@@ -136,7 +140,8 @@ export class Renderer {
     }
     line(c,0,553.5,W,553.5,'#71745166');
   }
-  paintLandscape(c,farmLightsOn=true) {
+  paintLandscape(c,farmLightsOn=true,view=cameraFor(W,H)) {
+    this.landscapeWidth=view.width;
     this.farmLightsOn=farmLightsOn;
     const random=rng(40130);
     this.cropRows=[];
@@ -152,13 +157,21 @@ export class Renderer {
       c.lineTo(W,310);c.lineTo(0,310);c.fill();
     }
     // A distant farm, treatment silo and utility lines at the horizon.
+    const placeLandmark=x=>{
+      const p=horizonProjection(x,view);
+      c.save();c.translate(p.x-x*p.size,270*(1-p.size));c.scale(p.size,p.size);
+    };
+    placeLandmark(706);
     c.fillStyle='#192c24'; c.fillRect(641,217,95,39);
     c.beginPath(); c.moveTo(630,217); c.lineTo(689,181); c.lineTo(746,217); c.fill();
     c.fillStyle=farmLightsOn?'#af9a57':'#0e1712'; c.fillRect(679,226,8,13);c.fillRect(702,226,8,13);
     c.fillStyle='#253a30'; c.fillRect(757,198,25,61);c.beginPath();c.ellipse(769.5,198,12.5,9,0,0,Math.PI*2);c.fill();
+    c.restore();
+    placeLandmark(316.5);
     c.fillStyle='#283c32'; c.fillRect(300,182,33,36);c.beginPath();c.ellipse(316.5,182,16.5,5,0,0,Math.PI*2);c.fill();
     for(const x of [304,329]) line(c,x,214,x-5,261,'#25382d',3);
     line(c,301,220,328,251,'#26392e');line(c,328,220,300,251,'#26392e');
+    c.restore();
     [90,209,854,936].forEach((x,i)=>{ const y=204+i*5; line(c,x,y,x,292,'#27362b',3);line(c,x-13,y+8,x+13,y+8,'#27362b',2); });
     c.strokeStyle='#283a30';c.beginPath();c.moveTo(0,218);c.quadraticCurveTo(160,249,209,217);c.quadraticCurveTo(540,300,854,222);c.quadraticCurveTo(900,241,960,223);c.stroke();
     const ground=c.createLinearGradient(0,270,0,H);ground.addColorStop(0,'#505b37');ground.addColorStop(1,'#15221a');c.fillStyle=ground;c.fillRect(0,270,W,330);
@@ -230,7 +243,8 @@ export class Renderer {
     // The third briefing reports the outage. Repaint both cached landscapes
     // once so the windows stay dark with moving crops and after restoring a save.
     const farmLightsOn=!active||s.shift<2;
-    if(this.farmLightsOn!==farmLightsOn)this.paintLandscape(this.background.getContext('2d'),farmLightsOn);
+    if(this.farmLightsOn!==farmLightsOn||this.landscapeWidth!==this.view.width)
+      this.paintLandscape(this.background.getContext('2d'),farmLightsOn,this.view);
     if(this.trackScene!==s||this.trackShift!==s?.shift||s?.time<this.trackTime) {this.groundTracks=[];this.shotEffects=[];}
     this.trackScene=s;this.trackShift=s?.shift;this.trackTime=s?.time;
     this.groundTracks=active?updateGroundTracks(this.groundTracks||[],s.targets,s.time):[];

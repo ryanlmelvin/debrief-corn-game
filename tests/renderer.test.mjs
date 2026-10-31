@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createGame, startShift, shoot, focusNext } from '../docs/engine.js';
-import { Renderer, cameraFor, targetProjection, aimProjection, updateGroundTracks, visibleGuideTarget, perimeterWarnings } from '../docs/renderer.js';
+import { Renderer, horizonProjection, cameraFor, targetProjection, aimProjection, updateGroundTracks, visibleGuideTarget, perimeterWarnings } from '../docs/renderer.js';
 import { startGuide, guideTravel, guideRouteStatus, inspectGuide, advanceGuide, fireGuide, projectGuide } from '../docs/guide.js';
 
 for (const [width,height] of [[390,844],[844,390],[1440,900]]) {
@@ -177,3 +177,15 @@ test('guide pointer shots track the visible body, including when corn partly con
     }
   }
 });
+
+for(const [width,height] of [[320,740],[390,844],[430,932],[844,390],[960,600]]) {
+  test(`horizon landmarks stay inside the camera at ${width} × ${height}`,()=>{
+    const view=cameraFor(width,height);
+    for(const [anchor,left,right] of [[706,630,782],[316.5,299,333]]) {
+      const p=horizonProjection(anchor,view);
+      assert.ok(p.x+(left-anchor)*p.size>=view.left);
+      assert.ok(p.x+(right-anchor)*p.size<=view.left+view.width);
+      if(view.width===960)assert.deepEqual(p,{x:anchor,size:1});
+    }
+  });
+}
