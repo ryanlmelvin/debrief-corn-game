@@ -334,6 +334,7 @@ test('guide controls retain focus during travel and move it to the next useful a
   nodes.set('controls',controls);
   nodes.set('guide-message',{get textContent(){return message;},set textContent(value){message=value;messageWrites++;}});
   const context=vm.createContext({game,document,paused:false,lastControlsKey:'',guideRouteStatus,
+    markSeenEndingChoices(){},history:{collected:[]},
     $:id=>{if(!nodes.has(id))nodes.set(id,{});return nodes.get(id);},
     stat:()=>'',canvas:{getAttribute(){return label;},setAttribute(name,value){label=value;labelWrites++;}}});
   vm.runInContext(ui+';updateGuideUI();',context);

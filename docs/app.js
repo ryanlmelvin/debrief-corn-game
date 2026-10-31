@@ -16,6 +16,7 @@ import { endingShareData, shareEnding } from './sharing.js';
 import { decisionQuestion } from './decision-copy.js';
 import { chooseResolution } from './alternate-endings.js';
 import { resolutionMarkup } from './resolution-ui.js';
+import { markSeenEndingChoices } from './seen-endings.js';
 import { startRogue, chooseRogue, moveRogue } from './rogue.js';
 import { RogueUI, rogueMenuMarkup } from './rogue-ui.js';
 import { InstallHandoff, recoverInstallHandoff, progressSnapshot, encodeProgress, decodeProgress, storeProgress, MAX_PROGRESS_BYTES } from './progress.js';
@@ -124,6 +125,7 @@ function showModal(kind,html,art=null) {
   const artwork=dialogArtwork(kind,game?.shift,art);
   if(artwork)$('dialog-content').querySelector('.paper')?.insertAdjacentHTML('afterbegin',artwork);
   if(kind==='debrief')$('dialog-content').querySelector('.interview-scene')?.insertAdjacentHTML('beforeend',interviewRecord(game));
+  markSeenEndingChoices($('dialog-content'),game,history.collected);
   if(!dialog.open)dialog.showModal();
   pager.refresh();
   dialog.scrollTop=0;
@@ -234,6 +236,7 @@ function updateUI(force=false) {
   $('pause').textContent=paused?'Resume':'Pause';
   fieldMap.render(game,paused,dialog.open&&['evidence','site-encounter','corn'].includes(modalKind));
   rogueUI.render(game,paused||dialog.open||menuOpen());
+  if(phase==='rogue'&&['intro','choice'].includes(game.rogue.stage))markSeenEndingChoices($('rogue-play'),game,history.collected);
   if(phase==='rogue'){
     $('objective').textContent={corn:'Reach the road.',broadcast:'Find the carrier.',flood:'Reverse the flow.'}[game.rogue.route];
     $('objective-detail').textContent=game.rogue.message;
@@ -285,6 +288,7 @@ function updateGuideUI() {
     $('controls').innerHTML=escaping
       ? `<div class="guide-deck guide-decision"><p class="guide-instruction">${committed?'Shoot any that try to escape.':'They are leaving for the road.'}</p><div class="guide-actions"><button data-action="guide-focus">Aim at next light</button><button data-action="guide-fire" ${g.fired>=6||revealing?'disabled':''}>Fire rifle</button>${committed?'':`<button class="primary" data-action="guide-spare" ${revealing?'disabled':''}>Lower rifle · let them leave</button>`}</div><p class="guide-help">${committed?'Your hands will not lower the rifle. Keep firing.':'Once you fire, the order will not let you stop.'}</p></div>`
       : `<div class="guide-deck"><ol class="guide-route" aria-label="Search route">${stops.map((label,i)=>`<li class="${i<g.clues.length?'searched':i===g.clues.length?'current':''}" ${i===g.clues.length?'aria-current="step"':''}><span>${i<g.clues.length?'✓':String(i+1).padStart(2,'0')}</span>${label}</li>`).join('')}</ol><div class="guide-progress" aria-hidden="true"><i></i></div><button class="${route.ready||!route.walking?'primary':'secondary'}" data-action="${route.ready?'guide-inspect':'guide-travel'}">${route.ready?examination[g.clues.length]:route.walking?'Stop here':destinations[g.clues.length]}</button><p class="guide-help">${route.ready?'The team waits while you examine the ground.':route.walking?'Your light follows the path. You can stop at any time.':'Follow the path. You stop at each discovery.'}</p></div>`;
+    markSeenEndingChoices($('controls'),game,history.collected);
     if(paused)$('controls').querySelectorAll('button').forEach(button=>button.disabled=true);
     if(focused)($('controls').querySelector(`[data-action="${focusedAction}"]`)||$('controls').querySelector('button'))?.focus({preventScroll:true});
   }

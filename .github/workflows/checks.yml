@@ -1,0 +1,21 @@
+name: Game checks
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  game-checks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Test gameplay and ending hint safety
+        run: npm test
+      - name: Check shipped assets and ending audit
+        run: npm run check
