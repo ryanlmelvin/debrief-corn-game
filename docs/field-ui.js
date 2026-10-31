@@ -1,6 +1,7 @@
 import { FIELD_SITES, investigationComplete, nearbySite, currentSiteScene } from './engine.js';
 import { FIELD_PATHS, fieldStepCost, planFieldRoute } from './field.js';
 import { FIELD_ART, landmarkDrawing } from './art.js';
+import { fieldSignals, expeditionStatus, currentSignal } from './expedition.js';
 import { watchSummary } from './watch-play.js';
 
 const descriptions={pump:'A light beneath the pump-house door.',corner:'Something pale at the edge of the field.',drain:'Water moving against the slope.',tower:'The ladder. The radio. A way out.'};
@@ -11,33 +12,34 @@ export class FieldMap {
   constructor(root) {
     this.root=root;this.selected=null;this.style='quiet';this.travel=null;this.lastKey='';
     root.innerHTML=`<header class="field-heading"><p class="eyebrow" id="field-night"></p><button id="field-watch-record" class="watch-record-link" data-action="watch-record" hidden></button><div class="field-exposure"><span>EXPOSURE <b id="field-exposure-value"></b></span><div class="field-meter"><i id="field-exposure-fill"></i></div></div></header>
-      <div class="field-board"><span class="field-north" aria-label="North">N<svg viewBox="0 0 24 32" aria-hidden="true"><path d="M12 1L21 29L12 23L3 29Z" fill="#e8e3c9" stroke="currentColor" stroke-width="1.5"/><path d="M12 1V23L3 29Z" fill="currentColor"/></svg></span><div class="field-map-surface">
+      <div class="field-board"><div class="field-map-legend"><span>□ LANDMARK</span><span>◇ OPTIONAL SIGNAL</span></div><span class="field-north" aria-label="North">N<svg viewBox="0 0 24 32" aria-hidden="true"><path d="M12 1L21 29L12 23L3 29Z" fill="#e8e3c9" stroke="currentColor" stroke-width="1.5"/><path d="M12 1V23L3 29Z" fill="currentColor"/></svg></span><div class="field-map-surface">
         <svg viewBox="-.5 -.5 11 9" preserveAspectRatio="none" aria-hidden="true"><defs><pattern id="corn-rows" width="1" height="1" patternUnits="userSpaceOnUse"><path d="M.2 .15L.15 .8M.55 .15L.5 .8M.85 .15L.8 .8" stroke="#768352" stroke-opacity=".18" stroke-width=".025"/></pattern></defs><rect x="-.5" y="-.5" width="11" height="9" fill="url(#corn-rows)"/>
         ${FIELD_PATHS.map(points=>`<polyline points="${points.map(p=>p.join(',')).join(' ')}" class="field-path"/>`).join('')}<g id="field-footprints"></g><polyline id="field-route" class="field-route"/><g id="field-traces"></g></svg>
         ${FIELD_SITES.map(p=>`<button class="field-landmark" data-action="field-select" data-value="${p.id}" style="left:${percent(p.x,11)};top:${percent(p.y,9)}"><span class="field-site-icon" aria-hidden="true">${landmarkDrawing(p.id)}</span><span>${p.label}</span><small></small></button>`).join('')}
-        <span id="field-player" class="field-player" aria-hidden="true"></span>
+        <div id="field-signals"></div><span id="field-player" class="field-player" aria-hidden="true"></span>
       </div></div>
-      <section class="field-route-card" aria-label="Travel plan"><img id="field-route-photo" class="field-route-photo" width="300" height="200" alt="" hidden><div class="field-destination"><div><h3 id="field-destination"></h3></div></div><p id="field-route-note"></p>
+      <section class="field-route-card" aria-label="Travel plan"><div class="field-mission" id="field-mission"></div><p class="field-plan-tag" id="field-plan-tag"></p><img id="field-route-photo" class="field-route-photo" width="300" height="200" alt="" hidden><div class="field-destination"><div><h3 id="field-destination"></h3></div></div><p id="field-route-note"></p>
         <div class="field-route-options" role="group" aria-label="Choose your route"><button data-action="field-style" data-value="quiet"><b>Follow paths</b><span id="field-quiet-cost"></span></button><button data-action="field-style" data-value="direct"><b>Cut through rows</b><span id="field-direct-cost"></span></button></div>
-        <p id="field-risk" role="status"></p><button class="field-go" data-action="field-go"></button><button class="field-stop" data-action="field-stop" hidden>Stop</button>
+        <div class="field-route-metrics" id="field-route-metrics"></div><p id="field-risk" role="status"></p><button class="field-go" data-action="field-go"></button><button class="field-stop" data-action="field-stop" hidden>Stop</button>
       </section>`;
   }
   reset() { this.selected=null;this.travel=null;this.lastKey=''; }
+  destinations(s) { return [...FIELD_SITES,...fieldSignals(s)]; }
   choose(s,id) {
     if(this.travel)return;
     s.fieldEvents.journey=null;
-    const site=FIELD_SITES.find(p=>p.id===id);if(site)this.selected=id;
+    const site=this.destinations(s).find(p=>p.id===id);if(site)this.selected=id;
     this.render(s);
   }
   recommend(s) {
     const candidates=FIELD_SITES.filter(p=>p.id!=='tower'&&!s.inspected.includes(p.id));
     return candidates.sort((a,b)=>planFieldRoute(s,a).exposure-planFieldRoute(s,b).exposure)[0]?.id||'tower';
   }
-  route(s,style=this.style) { return planFieldRoute(s,FIELD_SITES.find(p=>p.id===this.selected),style); }
+  route(s,style=this.style) { return planFieldRoute(s,this.destinations(s).find(p=>p.id===this.selected),style); }
   start(s) {
-    if(this.travel||s.fieldEvents.pending)return false;
+    if(this.travel||s.fieldEvents.pending||currentSignal(s))return false;
     const route=this.route(s);
-    if(!route||s.exposure+route.exposure>=100)return false;
+    if(!route||!route.steps.length||s.exposure+route.exposure>=100)return false;
     s.fieldEvents.journey={destination:this.selected,style:this.style};
     this.travel={steps:[...route.steps],elapsed:0,interval:this.style==='direct'?.22:.38};this.lastKey='';return true;
   }
@@ -68,13 +70,28 @@ export class FieldMap {
     const active=s.phase==='field';this.root.hidden=!active;
     if(!active){this.reset();return;}
     this.updateSelection(s,holdDiscovery);
-    const key=[s.shift,s.player.x,s.player.y,s.exposure,s.inspected.join(','),this.selected,this.style,!!this.travel,paused,s.fieldEvents.journal.length].join(':');
+    const key=[s.shift,s.player.x,s.player.y,s.exposure,s.inspected.join(','),this.selected,this.style,!!this.travel,paused,s.fieldEvents.journal.length,JSON.stringify(expeditionStatus(s))].join(':');
     if(key===this.lastKey)return;this.lastKey=key;
-    const q=id=>this.root.querySelector(`#${id}`), complete=investigationComplete(s),site=FIELD_SITES.find(p=>p.id===this.selected),quiet=this.route(s,'quiet'),direct=this.route(s,'direct'),here=nearbySite(s)?.id===site.id;
+    const q=id=>this.root.querySelector(`#${id}`), complete=investigationComplete(s),site=this.destinations(s).find(p=>p.id===this.selected),quiet=this.route(s,'quiet'),direct=this.route(s,'direct'),here=s.player.x===site.x&&s.player.y===site.y;
     const route=this.travel?{steps:this.travel.steps,exposure:this.travel.steps.reduce((total,p)=>total+fieldStepCost(s,p.x,p.y),0)}:this.route(s);
     const returning=planFieldRoute({...s,player:site},FIELD_SITES.find(p=>p.id==='tower'));
     const fatal=s.exposure+route.exposure>=100,unsafeReturn=s.exposure+route.exposure+returning.exposure>=100;
-    q('field-night').textContent=`NIGHT 0${s.shift+1}`;
+    q('field-night').textContent=`NIGHT 0${s.shift+1} / FIELD SURVEY`;
+    const signals=fieldSignals(s),status=expeditionStatus(s),optional=signals.some(p=>p.id===site.id);
+    q('field-mission').innerHTML=`<span>${complete?'✓ RETURN TO TOWER':`${s.inspected.filter(id=>['corner','pump','drain'].includes(id)).length} / 3 LANDMARKS`}</span><span>${status.found} / 3 SIGNALS</span>`;
+    q('field-plan-tag').textContent=optional?'OPTIONAL DETOUR · FIELD SIGNAL':'MAIN INVESTIGATION';
+    const signalRoot=q('field-signals');
+    if(!signalRoot.children.length)signalRoot.innerHTML=signals.map(p=>`<button class="field-signal" data-action="field-select" data-value="${p.id}"><span aria-hidden="true"></span><small></small></button>`).join('');
+    for(const p of signals){
+      const button=signalRoot.querySelector(`[data-value="${p.id}"]`);
+      button.classList.toggle('searched',p.done);button.classList.toggle('selected',p.id===this.selected);
+      button.style.left=percent(p.x,11);button.style.top=percent(p.y,9);
+      button.setAttribute('aria-pressed',String(p.id===this.selected));
+      button.setAttribute('aria-label',`${p.label}. ${p.done?'Searched':'Optional signal. '+p.reward}`);
+      button.disabled=paused||!!this.travel;
+      button.querySelector('span').textContent=p.done?'✓':p.kind==='cache'?'+':p.kind==='hide'?'⌂':'≋';
+      button.querySelector('small').textContent=p.label;
+    }
     q('field-watch-record').hidden=!s.watch?.shots;
     if(s.watch?.shots){const record=watchSummary(s);q('field-watch-record').textContent=`Watch · ${record.score} pts ↗`;q('field-watch-record').setAttribute('aria-label',`Watch record. Grade ${record.grade}, ${record.score} points.`);q('field-watch-record').disabled=paused;}
     q('field-exposure-value').textContent=`${Math.floor(s.exposure)} / 100`;
@@ -98,20 +115,21 @@ export class FieldMap {
     q('field-route').setAttribute('points',[s.player,...visibleSteps].map(p=>`${p.x},${p.y}`).join(' '));
     q('field-destination').textContent=site.label;
     const photo=q('field-route-photo'),art=FIELD_ART[site.id];
-    photo.hidden=site.id!=='tower'&&!s.inspected.includes(site.id);
+    photo.hidden=optional||(site.id!=='tower'&&!s.inspected.includes(site.id));
     if(!photo.hidden){const src=`./assets/${art.file}.webp`;if(photo.getAttribute('src')!==src)photo.setAttribute('src',src);photo.alt=art.alt;}
     const scene=here?currentSiteScene(s):null;
-    q('field-route-note').textContent=this.travel?['The rows close behind your light.','Footsteps keep time on the other side of the row.','Your breathing comes back through the radio.'][s.shift]:scene?scene.cue:descriptions[site.id];
-    q('field-quiet-cost').textContent=`+${cost(quiet.exposure)} exposure`;
-    q('field-direct-cost').textContent=`+${cost(direct.exposure)} exposure`;
+    q('field-route-note').textContent=this.travel?['The rows close behind your light.','Footsteps keep time on the other side of the row.','Your breathing comes back through the radio.'][s.shift]:optional?(site.done?'Signal searched. Choose another stop.':site.description):scene?scene.cue:descriptions[site.id];
+    q('field-quiet-cost').textContent=`${quiet.steps.length} step${quiet.steps.length===1?'':'s'} · +${cost(quiet.exposure)} exposure`;
+    q('field-direct-cost').textContent=`${direct.steps.length} step${direct.steps.length===1?'':'s'} · +${cost(direct.exposure)} exposure`;
     this.root.querySelectorAll('[data-action="field-style"]').forEach(b=>{b.setAttribute('aria-pressed',String(b.dataset.value===this.style));b.disabled=paused||!!this.travel;});
     this.root.querySelector('.field-route-options').hidden=here;
+    q('field-route-metrics').innerHTML=`<span><b>${status.supplies}</b> SUPPL${status.supplies===1?'Y':'IES'}</span><span><b>${status.score}</b> FIELD POINTS</span>`;
     q('field-risk').textContent=fatal?'Route blocked: exposure would reach 100.':unsafeReturn?'Too much exposure to make it back.':site.id==='tower'&&!complete?'Search all three sites before debrief.':'';
     q('field-risk').hidden=!q('field-risk').textContent;
     q('field-risk').classList.toggle('risky',fatal||unsafeReturn);
     const go=this.root.querySelector('.field-go');go.hidden=!!this.travel;
-    go.textContent=here?(site.id==='tower'?(complete?'Debrief ↗':'Choose a landmark'):scene?scene.label:s.inspected.includes(site.id)?'Location searched':'Inspect'):(site.id==='tower'?'Return ↑':'Walk →');
-    go.disabled=paused||fatal||(here&&(site.id==='tower'?!complete:s.inspected.includes(site.id)&&!scene));
+    go.textContent=here?(site.id==='tower'?(complete?'Debrief ↗':'Choose a landmark'):optional?(site.done?'Signal searched':'Search signal →'):scene?scene.label:s.inspected.includes(site.id)?'Location searched':'Inspect'):(site.id==='tower'?'Return ↑':optional?'Follow signal →':'Walk →');
+    go.disabled=paused||fatal||(here&&(site.id==='tower'?!complete:optional?site.done:s.inspected.includes(site.id)&&!scene));
     const stop=this.root.querySelector('.field-stop');stop.hidden=!this.travel;stop.disabled=paused;
   }
 }

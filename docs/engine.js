@@ -3,6 +3,7 @@ import { startGuide, advanceGuide, guideDisposition, restoreGuideRoute } from '.
 import { ENDING_SHARES } from './sharing.js';
 import { ALTERNATE_ENDINGS, startResolution, validResolution, resolutionEnding } from './alternate-endings.js';
 import { witnessRequirements, canTakeEvidenceOutside, retirePreparations } from './ending-requirements.js';
+import { freshExpedition, migrateExpedition, validExpedition, currentSignal, signalAtPlayer } from './expedition.js';
 import { fieldStepCost } from './field.js';
 import { EVIDENCE, evidenceForState, evidenceAtSite, freshEvidenceScenes, migrateEvidenceScenes, validEvidenceScenes } from './evidence-scenes.js';
 import { freshSiteStories, siteScene, migrateSiteStories, validSiteStories } from './site-encounters.js';
@@ -28,7 +29,7 @@ export function createGame(mode = 'story', seed = Date.now()) {
     rounds: 6, reserve: 24, reload: 0, kills: 0, shots: 0, breaches: 0, exposure: 0,
     trust: 0, honesty: 0, evidence: [], evidenceScenes: freshEvidenceScenes(seed), reports: [], log: [], targets: [], nextSpawn: 3, nextId: 1,
     incident: false, lightsOut: [], entered: false, departure: null, compulsionNotice: false, searched: [], question: 0, ending: null, lastShot: null,
-    player: { x: 1, y: 7 }, visited: ['1,7'], fieldSteps: 0, inspected: [], focused: null, fieldEvents: freshFieldEvents(seed), siteStories: freshSiteStories(seed), watch: freshWatch() };
+    player: { x: 1, y: 7 }, visited: ['1,7'], fieldSteps: 0, inspected: [], focused: null, fieldEvents: freshFieldEvents(seed), siteStories: freshSiteStories(seed), watch: freshWatch(), expedition: freshExpedition() };
   return s;
 }
 function random(s) { s.rng = (Math.imul(1664525, s.rng) + 1013904223) >>> 0; return s.rng / 4294967296; }
@@ -273,7 +274,7 @@ export const FIELD_SITES = [
 ];
 export function nearbySite(s) { return FIELD_SITES.find(p => p.x === s.player.x && p.y === s.player.y); }
 export function move(s, dx, dy) {
-  if (s.phase !== 'field' || s.fieldEvents.pending || Math.abs(dx) + Math.abs(dy) !== 1) return false;
+  if (s.phase !== 'field' || s.fieldEvents.pending || currentSignal(s) || Math.abs(dx) + Math.abs(dy) !== 1) return false;
   const x = s.player.x + dx, y = s.player.y + dy;
   if (x < 0 || x > 10 || y < 0 || y > 8) return false;
   s.player = { x, y }; s.fieldSteps++;
@@ -282,7 +283,7 @@ export function move(s, dx, dy) {
   if (s.fieldSteps === 5) addLog(s, 'The rows close behind you. Nothing here smells like rain.', 'story');
   if (s.exposure >= 70 && !s.inspected.includes('warning')) { s.inspected.push('warning'); addLog(s, 'Your hands are cold. Return before exposure reaches 100.', 'alert'); }
   if (s.exposure >= 100) finish(s, 'assimilation');
-  else if(!nearbySite(s))encounterAfterStep(s);
+  else if(!nearbySite(s)&&!signalAtPlayer(s))encounterAfterStep(s);
   return true;
 }
 export function chooseFieldEncounter(s,id) {
@@ -293,7 +294,7 @@ export function chooseFieldEncounter(s,id) {
 }
 export function continueFieldEncounter(s) { return dismissEncounter(s); }
 export function inspect(s) {
-  if (s.phase !== 'field' || s.fieldEvents.pending) return null;
+  if (s.phase !== 'field' || s.fieldEvents.pending || currentSignal(s)) return null;
   const site = nearbySite(s);
   if (!site || site.id === 'tower' || s.inspected.includes(site.id)) return null;
   const id = evidenceAtSite(site.id, s.shift);
@@ -319,7 +320,7 @@ export function investigationComplete(s) {
   return ['corner', 'pump', 'drain'].every(id => s.inspected.includes(id));
 }
 export function beginDebrief(s) {
-  if (s.phase !== 'field' || s.fieldEvents.pending || nearbySite(s)?.id !== 'tower' || !investigationComplete(s)) return false;
+  if (s.phase !== 'field' || s.fieldEvents.pending || currentSignal(s) || nearbySite(s)?.id !== 'tower' || !investigationComplete(s)) return false;
   s.fieldEvents.journey=null;
   s.compulsionNotice=false;
   s.phase = 'debrief'; s.question = 0; return true;
@@ -450,6 +451,8 @@ export function restore(raw) {
     if (!s.player || !Number.isInteger(s.player.x) || !Number.isInteger(s.player.y) || s.player.x < 0 || s.player.x > 10 || s.player.y < 0 || s.player.y > 8) return null;
     migrateFieldEvents(s);
     if(!validFieldEvents(s))return null;
+    migrateExpedition(s);
+    if(!validExpedition(s))return null;
     migrateEvidenceScenes(s);
     if(!validEvidenceScenes(s))return null;
     migrateSiteStories(s);

@@ -3,6 +3,8 @@ import { watchNight, sightingPromptReady } from './watch-story.js';
 import { guideTravel, guideRouteStatus, inspectGuide, spareGuide, fireGuide, focusGuide, nearbyGuideSite, guideDebrief, answerGuideDebrief, isGuideAftermath } from './guide.js';
 import { createGame, startShift, advance, reload, shoot, focusNext, enterField, move, inspect, currentSiteScene, eatCrop, nearbySite, investigationPressure, investigationComplete, beginDebrief, chooseFieldEncounter, continueFieldEncounter, getQuestion, getEnding, endingId, answer, serialize, restore, BRIEFINGS, evidenceForState, ENDINGS, DATES, REPORT_DATES, SHIFT_LENGTH, COMPULSION_NOTICE } from './engine.js';
 import { Renderer, visibleGuideTarget } from './renderer.js';
+import { beginSignal, currentSignal, signalAtPlayer, tuneSignal, cashOutSignal, leaveSignal, finishSignal, protectEncounter } from './expedition.js';
+import { signalMarkup, SignalPlayback } from './expedition-ui.js';
 import { FieldMap } from './field-ui.js';
 import { dialogArtwork, evidenceMount, notebookMarkup, encounterMarkup, interviewRecord } from './art.js';
 import { GameAudio, loadMusic, loadEffects } from './audio.js';
@@ -23,23 +25,26 @@ const canvas=$('field'), renderer=new Renderer(canvas), dialog=$('paper-dialog')
 const pager=new DialogPager(dialog);
 let modalReturnFocus=null;
 const fieldMap=new FieldMap($('field-exploration'));
+const signalPlayback=new SignalPlayback();
 $('investigate-urge').innerHTML=pressureWordMarkup();
 const menu=$('game-menu');
 const menuOpen=()=>menu.matches(':popover-open');
 menu.addEventListener('toggle',()=>{syncAudio();if(menuOpen())save();});
 menu.addEventListener('click',event=>{if(event.target.closest('button')&&!event.target.closest('[popovertarget]'))menu.hidePopover();});
-const HISTORY_KEY=`debrief-history-v1:${new URL('.',location.href).pathname}`;
-const SAVE_KEY=`debrief-save-v1:${new URL('.',location.href).pathname}`;
+const localFieldPreview=['localhost','127.0.0.1','[::1]'].includes(location.hostname)&&new URLSearchParams(location.search).get('preview')==='field';
+const previewSuffix=localFieldPreview?':field-preview':'';
+const HISTORY_KEY=`debrief-history-v1:${new URL('.',location.href).pathname}${previewSuffix}`;
+const SAVE_KEY=`debrief-save-v1:${new URL('.',location.href).pathname}${previewSuffix}`;
 const progressKeys={save:SAVE_KEY,history:HISTORY_KEY};
 const progressPath=new URL('.',location.href).pathname;
 const isInstalled = () => window.matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
-const installHandoff=new InstallHandoff(document,progressPath,isInstalled);
+const installHandoff=localFieldPreview?{update:()=>Promise.resolve(false)}:new InstallHandoff(document,progressPath,isInstalled);
 let game=null, paused=false, modalKind='', lastModalKey='', lastControlsKey='', lastLog='', lastFrame=0, lastSave=0, lastUI=0, toastTimer, installPrompt=null;
 let audioContext=null, soundscape=null, soundEnabled=false, storageWarned=false;
 const soundEvents=new SoundEvents();
 const esc = value => String(value).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 let carriedProgress=false;
-try { if(isInstalled())carriedProgress=await recoverInstallHandoff(document,progressPath,localStorage,progressKeys); } catch {}
+try { if(!localFieldPreview&&isInstalled())carriedProgress=await recoverInstallHandoff(document,progressPath,localStorage,progressKeys); } catch {}
 function readSave() { try { return restore(localStorage.getItem(SAVE_KEY)); } catch { return null; } }
 let history={ collected: [], runs: [] };
 try { const stored=JSON.parse(localStorage.getItem(HISTORY_KEY)); if(stored && Array.isArray(stored.collected) && Array.isArray(stored.runs)){history.collected=stored.collected.filter(id=>Object.hasOwn(ENDINGS,id));history.runs=stored.runs.filter(r=>r&&typeof r.id==='string'&&Object.hasOwn(ENDINGS,r.ending)&&Array.isArray(r.reports)).slice(0,30);} } catch {}
@@ -116,6 +121,7 @@ function paper(title,body,tag='') {
 function showModal(kind,html,art=null) {
   modalReturnFocus=menuOpen()?$('game-menu-toggle'):null;
   if(menuOpen())menu.hidePopover();
+  if(kind!=='signal')signalPlayback.stop();
   modalKind=kind;$('dialog-content').innerHTML=html;
   dialog.dataset.kind=kind;
   const artwork=dialogArtwork(kind,game?.shift,art);
@@ -123,17 +129,19 @@ function showModal(kind,html,art=null) {
   if(kind==='debrief')$('dialog-content').querySelector('.interview-scene')?.insertAdjacentHTML('beforeend',interviewRecord(game));
   if(!dialog.open)dialog.showModal();
   pager.refresh();
+  if(kind==='signal')signalPlayback.mount(game,dialog);
   dialog.scrollTop=0;
   $('dialog-title')?.focus({preventScroll:true});
   syncAudio();
 }
-function closeModal() {dialog.close();modalKind='';if(game?.phase==='field')fieldMap.render(game,paused);syncAudio();const target=modalReturnFocus||(game?.phase==='field'?$('field-exploration').querySelector('button.field-go:not([hidden]),button.field-stop:not([hidden])'):canvas);target?.focus({preventScroll:true});modalReturnFocus=null;}
+function closeModal() {signalPlayback.stop();dialog.close();modalKind='';if(game?.phase==='field')fieldMap.render(game,paused);syncAudio();const target=modalReturnFocus||(game?.phase==='field'?$('field-exploration').querySelector('button.field-go:not([hidden]),button.field-stop:not([hidden])'):canvas);target?.focus({preventScroll:true});modalReturnFocus=null;}
 function begin(mode,fromSave=false) {
   if(compulsionNotice.matches(':popover-open'))compulsionNotice.hidePopover();
   clearTimeout(compulsionTimer);
   if($('guide-aftermath').matches(':popover-open'))$('guide-aftermath').hidePopover();
   game=fromSave?readSave():createGame(mode);
   if(!game){toast('The saved game could not be read. You can start a new game.');return;}
+  if(localFieldPreview&&!fromSave)Object.assign(game,{phase:'field',entered:true,departure:'chosen',exposure:18});
   soundEvents.reset(game);
   paused=false;lastModalKey='';lastControlsKey='';lastLog='';
   fieldMap.reset();
@@ -143,10 +151,11 @@ function begin(mode,fromSave=false) {
 }
 function sceneDialog() {
   if(!game)return;
-  const pending=game.fieldEvents.pending;
-  const key=`${game.phase}:${game.shift}:${game.question}:${game.ending}:${game.incident}:${sightingPromptReady(game)}:${pending?.id}:${pending?.choice}:${game.guide?.stage}:${game.guide?.debriefQuestion}:${game.resolution?.route}:${game.resolution?.step}`;
+  const pending=game.fieldEvents.pending,signal=game.phase==='field'?currentSignal(game):null;
+  const key=`${game.phase}:${game.shift}:${game.question}:${game.ending}:${game.incident}:${sightingPromptReady(game)}:${pending?.id}:${pending?.choice}:${JSON.stringify(signal)}:${game.guide?.stage}:${game.guide?.debriefQuestion}:${game.resolution?.route}:${game.resolution?.step}`;
   if(key===lastModalKey)return;
   lastModalKey=key;
+  if(game.phase==='field'&&signal){showModal('signal',signalMarkup(game));save();return;}
   if(game.phase==='field'&&pending){showModal('encounter',encounterMarkup(game));save();return;}
   if(game.phase==='briefing') {
     const b=BRIEFINGS[game.shift];
@@ -299,6 +308,22 @@ function act(action,value) {
     closeModal();lastModalKey='';save();updateUI(true);return;
   }
   if(action.startsWith('guide-')&&(!game||game.phase!=='guide'||paused||dialog.open||menuOpen()))return;
+  if(action==='encounter-protect') {
+    if(!protectEncounter(game))return;
+    lastModalKey='';save();updateUI(true);return;
+  }
+  if(action.startsWith('signal-')) {
+    if(!game||game.phase!=='field'||modalKind!=='signal')return;
+    if(action==='signal-replay'){signalPlayback.replay(game,dialog);return;}
+    if(action==='signal-tune'&&!signalPlayback.accepting)return;
+    const round=currentSignal(game)?.round;
+    const actions={'signal-tune':()=>tuneSignal(game,Number(value)),'signal-bank':()=>cashOutSignal(game),'signal-leave':()=>leaveSignal(game),'signal-finish':()=>finishSignal(game)};
+    if(!actions[action]?.())return;
+    if(action==='signal-finish'){closeModal();fieldMap.selected=fieldMap.recommend(game);}
+    lastModalKey='';save();updateUI(true);
+    if(action==='signal-tune'&&currentSignal(game)?.round===round&&!currentSignal(game)?.outcome)dialog.querySelector(`[data-action="signal-tune"][data-value="${value}"]`)?.focus({preventScroll:true});
+    return;
+  }
   if(action==='encounter-choice') {
     if(!chooseFieldEncounter(game,value))return;
     if(game.phase==='ending')closeModal();
@@ -324,6 +349,8 @@ function act(action,value) {
     if(action==='field-style'&&['quiet','direct'].includes(value)&&!fieldMap.travel)fieldMap.style=value;
     if(action==='field-stop')fieldMap.stop(game);
     if(action==='field-go') {
+      const signal=signalAtPlayer(game);
+      if(signal?.id===fieldMap.selected){if(beginSignal(game,signal.id)){lastModalKey='';save();updateUI(true);}return;}
       const site=nearbySite(game);
       if(site?.id===fieldMap.selected) {
         if(site.id==='tower'){act('debrief');return;}
@@ -385,7 +412,7 @@ $('new-game').addEventListener('click',()=>{
 $('resume').addEventListener('click',()=>begin(null,true));
 function togglePause(force) {if(!game||game.phase==='ending'||dialog.open)return;paused=typeof force==='boolean'?force:!paused;updateUI();save();syncAudio();}
 $('pause').addEventListener('click',()=>togglePause());$('unpause').addEventListener('click',()=>{togglePause(false);canvas.focus({preventScroll:true});});
-dialog.addEventListener('cancel',event=>{if(modalKind==='resolution-menu'){event.preventDefault();act('resolution-answer','back');}else if(['briefing','debrief','guide-debrief','resolution','ending','encounter'].includes(modalKind))event.preventDefault();else{event.preventDefault();closeModal();}});
+dialog.addEventListener('cancel',event=>{if(modalKind==='resolution-menu'){event.preventDefault();act('resolution-answer','back');}else if(['briefing','debrief','guide-debrief','resolution','ending','encounter','signal'].includes(modalKind))event.preventDefault();else{event.preventDefault();closeModal();}});
 $('manual').addEventListener('click',()=>showModal('manual',paper('Field manual',`<ol class="orders"><li><span>01</span>Watch the corn. Shoot any that try to escape.</li><li><span>02</span>Remain in the watchtower.</li><li><span>03</span>Do not consume the crop.</li><li><span>04</span>Remember any irregularities for your debrief at the end of the night.</li></ol><p class="watch-tips"><b>Runners</b> move fast. <b>Husks</b> take two hits. Five clean containments earn a replacement flare. Misses and breaches break the chain.</p><p class="small"><b>R / Reload:</b> tap again as the marker reaches gold to finish early. Waiting always completes a normal reload.<br><b>F / Flare:</b> slows all crops for 4.5 seconds. Start with two; earn more through streaks and bell rushes. Carry up to two.<br><b>B / Ring bell:</b> optional risk. Clear three marked crops in ten seconds for +600 points, +6 reserve rounds, and a flare. Any escape or timeout loses the bonus; the crops remain a threat. Two attempts per watch, available until 39 seconds.</p><button class="primary" data-action="close">Close</button>`)));
 
 $('about').addEventListener('click',()=>showModal('about',paper('About Debrief.', '<p>An interactive adaptation of the short story by Ryan L. Melvin.</p><p>Three shifts. About ten minutes. Headphones optional.</p><p class="small">Music: <a href="https://opengameart.org/content/lost-in-a-bad-place-horror-ambience-loop" target="_blank" rel="noopener">Lost in a Bad Place</a> by congusbongus · <a href="https://creativecommons.org/publicdomain/zero/1.0/" target="_blank" rel="noopener">CC0</a>.</p><p class="small">Field sounds (CC0): <a href="https://opengameart.org/content/crickets-ambient-noise-loopable" target="_blank" rel="noopener">crickets by Ted Kerr</a>; <a href="https://opengameart.org/content/random-sounds-samples" target="_blank" rel="noopener">footsteps and leaves by Brandon Morris</a>; <a href="https://opengameart.org/content/static" target="_blank" rel="noopener">radio static by xhunterko</a>.</p><p>The goal is to find your way through every possible ending. New endings added all the time.</p><p class="small">Your saved game, achieved endings, and transcripts stay in this browser or app, on this device. Clearing site data deletes them; installation is not a backup.</p><button class="primary" data-action="close">Back ↗</button>', 'STATION 04')));
@@ -413,6 +440,11 @@ canvas.addEventListener('pointerdown',event=>{
   }
 });
 function fire(p,padding=0) {const result=game.phase==='guide'?fireGuide(game,p.x,p.y):shoot(game,p.x,p.y,padding);if(!['blocked','empty'].includes(result))shotSound(result);updateUI();save();}
+dialog.addEventListener('keydown',event=>{
+  if(modalKind!=='signal'||event.repeat||event.ctrlKey||event.metaKey||event.altKey)return;
+  if(/^[1-4]$/.test(event.key)){event.preventDefault();act('signal-tune',String(Number(event.key)-1));}
+  if(event.key.toLowerCase()==='r'){event.preventDefault();act('signal-replay');}
+});
 document.addEventListener('keydown',event=>{
   if(!game||dialog.open||menuOpen()||event.ctrlKey||event.metaKey||event.altKey||['INPUT','SELECT','TEXTAREA'].includes(event.target.tagName))return;
   const k=event.key.toLowerCase();
@@ -438,10 +470,10 @@ document.addEventListener('keydown',event=>{
   if(game.phase==='field'){
     const directions={arrowup:'0,-1',w:'0,-1',arrowdown:'0,1',s:'0,1',arrowleft:'-1,0',a:'-1,0',arrowright:'1,0',d:'1,0'};
     if(directions[k]){event.preventDefault();act('move',directions[k]);}
-    if(k==='e'){event.preventDefault();fieldMap.stop(game);act(nearbySite(game)?.id==='tower'?'debrief':currentSiteScene(game)?'site-scene':'inspect');}
+    if(k==='e'){event.preventDefault();fieldMap.stop(game);const signal=signalAtPlayer(game);if(signal&&!signal.done&&beginSignal(game,signal.id)){lastModalKey='';save();updateUI(true);return;}act(nearbySite(game)?.id==='tower'?'debrief':currentSiteScene(game)?'site-scene':'inspect');}
   }
 });
-document.addEventListener('visibilitychange',()=>{if(document.hidden){save();if(game&&!dialog.open)togglePause(true);}syncAudio();});
+document.addEventListener('visibilitychange',()=>{if(document.hidden){signalPlayback.stop();save();if(game&&!dialog.open)togglePause(true);}else if(modalKind==='signal'&&dialog.open){signalPlayback.mount(game,dialog);}syncAudio();});
 window.addEventListener('pagehide',save);
 let sharingEnding=false;
 async function shareDisposition(ending,stamp) {
@@ -501,6 +533,9 @@ $('sound').addEventListener('click',async()=>{
 function shotSound(result) {
   if(soundEnabled)soundscape?.shot(result);
 }
+// An isolated local playtest starts at the map and never replaces normal progress.
+if(localFieldPreview){begin('story',Boolean(readSave()));document.title='DEBRIEF — Local map playtest';}
+
 function showProgressTransfer() {
   save();archiveRun();
   showModal('progress',paper('Move saved progress.',`
@@ -690,8 +725,9 @@ function frame(now) {
     advance(game,dt);
     if(game.phase==='tower')updateReloadUI(game, false);
     if(game.phase==='field')fieldMap.tick(game,dt,(dx,dy)=>move(game,dx,dy),()=>{
-      const site=nearbySite(game);
-      if(site?.id==='tower'&&investigationComplete(game))act('debrief');
+      const site=nearbySite(game),signal=signalAtPlayer(game);
+      if(signal&&!signal.done&&beginSignal(game,signal.id)){lastModalKey='';updateUI(true);save();}
+      else if(site?.id==='tower'&&investigationComplete(game))act('debrief');
       else if(site&&site.id!=='tower'&&!game.inspected.includes(site.id))act('inspect');
       else {updateUI(true);save();}
     });

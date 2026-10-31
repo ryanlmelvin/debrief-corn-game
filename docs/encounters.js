@@ -1,3 +1,4 @@
+import { fieldSignals, encounterCost, consumeProtection } from './expedition.js';
 import { ENCOUNTER_FLAVORS } from './encounter-flavors.js';
 import { storyDraw } from './story-random.js';
 import { ENCOUNTER_DETOURS } from './encounter-detours.js';
@@ -152,8 +153,9 @@ export function resolveEncounter(s,id) {
   if(s.phase!=='field'||!s.fieldEvents?.pending||s.fieldEvents.pending.choice)return false;
   const event=currentEncounter(s),option=event.choices.find(c=>c.id===id);
   if(!option)return false;
-  const before=s.exposure;s.exposure=Math.max(0,Math.min(100,s.exposure+option.delta));
+  const before=s.exposure;s.exposure=Math.max(0,Math.min(100,s.exposure+encounterCost(s,option.delta)));
   if(option.flag&&!has(s,option.flag))s.fieldEvents.flags.push(option.flag);
+  consumeProtection(s);
   s.fieldEvents.pending.choice=id;
   // Walking costs are fractional; don't save 7.000000000000004 as an invalid cost.
   s.fieldEvents.journal.push({id:event.id,choice:id,delta:Number((s.exposure-before).toFixed(9)),x:s.player.x,y:s.player.y});
@@ -187,6 +189,6 @@ export function validFieldEvents(s) {
     if(!e||s.phase!=='field'||e.night!==s.shift||!f.seen.includes(e.id)||!point(p)||p.x!==s.player.x||p.y!==s.player.y||!(p.choice===null||e.choices.some(c=>c.id===p.choice)))return false;
     if(p.choice===null?Boolean(record):!record||record.choice!==p.choice)return false;
   }
-  if(f.journey&&(!['corner','pump','drain','tower'].includes(f.journey.destination)||!['quiet','direct'].includes(f.journey.style)))return false;
+  if(f.journey&&(!['corner','pump','drain','tower',...fieldSignals(s).map(p=>p.id)].includes(f.journey.destination)||!['quiet','direct'].includes(f.journey.style)))return false;
   return true;
 }
