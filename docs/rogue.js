@@ -228,7 +228,7 @@ function checkCorn(s) {
     return;
   }
   r.x = 5; r.y = r.refuge; r.immuneUntil = r.time + 1.25; r.moveReadyAt = r.time + .20;
-  r.message = hazard.kind === 'car' ? `A wheel tears through the husk. ${3 - r.hits} left.` : `A layer of husk tears away. ${3 - r.hits} left. Back to cover.`;
+  r.message = hazard.kind === 'car' ? 'A wheel tears through the husk.' : 'A layer of husk tears away.';
 }
 
 export function moveRogue(s, dx, dy) {
@@ -237,7 +237,7 @@ export function moveRogue(s, dx, dy) {
   const x = r.x + dx, y = r.y + dy;
   if (x < 0 || x > 10 || y < 0 || y > 8) return false;
   r.x = x; r.y = y; r.moveReadyAt = r.time + .20;
-  if (y === 4) { r.refuge = 4; r.message = r.patternVersion === 2 && r.crossing === 2 ? 'The median grass bends around you.' : 'Halfway. The ditch hides you. Wait for a gap.'; }
+  if (y === 4) { r.refuge = 4; r.message = r.patternVersion === 2 && r.crossing === 2 ? 'The median grass bends around you.' : 'The ditch smells like warm soil.'; }
   if (y === 0) {
     if (r.crossing === 2) r.stage = 'choice';
     else {
