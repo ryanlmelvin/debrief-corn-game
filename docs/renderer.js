@@ -14,8 +14,9 @@ const GUIDE_PLATES = {
 // crown / shoes share the same ground anchor as the procedural fallback.
 const TARGET_SPRITES = {
   corn: { file:'watch-corn.webp', source:[29,4,233,499], destination:[-28,-86,56,94] },
-  'corn-roots': { file:'watch-anatomy.webp', source:[35,3,290,592], destination:[-28,-86,56,94] },
-  'corn-teeth': { file:'watch-anatomy.webp', source:[352,3,288,593], destination:[-28,-86,56,94] },
+  // Later-night hands sit above the rows; the third night adds a toothed mouth.
+  'corn-roots': { file:'watch-human-anatomy.webp', source:[82,0,601,1160], destination:[-25.5,-86,56,94] },
+  'corn-teeth': { file:'watch-human-anatomy.webp', source:[683,0,608,1160], destination:[-25,-86,56,94] },
   dress: { file:'watch-figure.webp', source:[96,20,160,464], destination:[-12,-70,25.5,74] },
   'retrieval-0': { file:'watch-retrieval.webp', source:[124,9,281,579], destination:[-18,-72,36,76] },
   'retrieval-1': { file:'watch-retrieval.webp', source:[474,42,274,545], destination:[-18,-68,36,72] },
@@ -468,7 +469,24 @@ export class Renderer {
       const lean=target.direction*.045+(this.reduced?0:Math.sin(phase*Math.PI*2)*.025);
       if(!this.drawSprite(form,lean,form==='corn'?1.45:1.2)) {
         stalk(c,0,0,1.1,'#aaa66b',lean,true);
-        if(form==='corn-teeth') {c.fillStyle='#dcd2ae';for(let i=0;i<4;i++)c.fillRect(2,-50+i*5,4,3);}
+        // Keep the nightly progression visible while the sprite is downloading.
+        c.save();c.rotate(lean);c.lineCap='round';
+        if(form!=='corn') {
+          line(c,11,-58,21,-52,'#aaa66b',2);
+          c.fillStyle='#c5b58e';c.beginPath();c.ellipse(22,-49,3.6,4.5,-.3,0,Math.PI*2);c.fill();
+          for(let i=0;i<4;i++) {
+            const x=20+i*2,y=-40+Math.abs(i-1.5);
+            line(c,x,-47,x+1,y,'#4d4935',2.4);
+            line(c,x,-47,x+1,y,'#d5c39b',1.3);
+          }
+          line(c,20,-51,17,-45,'#d5c39b',2);
+        }
+        if(form==='corn-teeth') {
+          c.fillStyle='#a69a78';c.beginPath();c.ellipse(5,-46,7,6,.2,0,Math.PI*2);c.fill();
+          c.fillStyle='#25281c';c.beginPath();c.ellipse(5,-46,5.5,4.5,.2,0,Math.PI*2);c.fill();
+          c.fillStyle='#dfd5b5';for(let i=0;i<4;i++){c.fillRect(.5+i*2.4,-49,1.8,2.4);c.fillRect(.5+i*2.4,-44.5,1.8,2);}
+        }
+        c.restore();
         if(form!=='corn')for(let i=-2;i<=2;i++)line(c,i*2,0,i*5,8,'#c5b58e',2.5);
       }
       c.fillStyle='#766445';c.beginPath();c.ellipse(-target.direction*7,6,4,2,0,0,Math.PI*2);c.fill();
