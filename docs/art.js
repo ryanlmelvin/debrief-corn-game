@@ -1,4 +1,4 @@
-import { EVIDENCE } from './engine.js';
+import { EVIDENCE, evidenceForState } from './engine.js';
 import { currentEncounter, encounterForState } from './encounters.js';
 import { ENDING_SHARES } from './sharing.js';
 
@@ -18,6 +18,15 @@ export const FIELD_ART = {
   'pump-keys': { file: 'pump-keys', alt: 'Two old keys hang from one hook, casting three key-shaped shadows on the pump-house wall.' },
   'pump-thread': { file: 'pump-thread', alt: 'Thin pale roots coil like thread around a dry, rusted valve wheel and its iron pipe.' },
   'pump-window': { file: 'pump-window', alt: 'A dusty pump-house window shows corn hanging upside down above a strip of dark sky.' },
+  'discovery-dress': { file: 'discovery-dress', alt: 'A corn stalk passes through torn white cotton beside the perimeter fence.' },
+  'discovery-ledger': { file: 'discovery-ledger', alt: 'An open, weathered treatment ledger rests beside the pipes and drums in the pump house.' },
+  'discovery-roots': { file: 'discovery-roots', alt: 'Pale roots connect the corn rows across the muddy drainage channel.' },
+  'discovery-badge': { file: 'discovery-badge', alt: 'A weathered recovery badge has a corn-shaped growth threaded through its metal clip.' },
+  'discovery-sample': { file: 'discovery-sample', alt: 'A sealed glass sample vial holds one pale filament beside a weathered treatment drum.' },
+  'discovery-teeth': { file: 'discovery-teeth', alt: 'An ear of corn has pale teeth where its kernels should be.' },
+  'discovery-map': { file: 'discovery-map', alt: 'A worn drainage survey shows a creek crossing the ring around a field station.' },
+  'discovery-water': { file: 'discovery-water', alt: 'A pale film gathers into joining swirls on dark drainage water.' },
+  'discovery-glove': { file: 'discovery-glove', alt: 'A worn work glove has soil packed into its fingers beneath the pump tap.' },
   debrief: { file: 'debrief-desk', alt: 'A reel-to-reel recorder and blank report sheets on a worn desk under lamplight.' },
   ...Object.fromEntries(Object.values(ENDING_SHARES).filter(card => card.art.startsWith('ending-')).map(card => [card.art, { file: card.art, alt: card.alt }]))
 };
@@ -40,9 +49,9 @@ export function specimenStudy(id) {
   return `<figure class="specimen-study"><div class="specimen-drawing" role="img" aria-label="Field sketch: ${escape(evidence.title)}" style="background-position:${x * 50}% ${y * 50}%"></div></figure>`;
 }
 
-export function evidenceMount(id) {
-  const specimen = SPECIMENS[id];
-  return specimen ? `<div class="evidence-mount">${scenePlate(specimen.site)}${specimenStudy(id)}</div>` : '';
+export function evidenceMount(id, game = null) {
+  const specimen = SPECIMENS[id], evidence = evidenceForState(game,id);
+  return specimen ? `<div class="evidence-mount">${scenePlate(evidence.art||specimen.site)}${specimenStudy(id)}</div>` : '';
 }
 
 // Only completed answers belong on the tape; field notes remain private.
@@ -84,8 +93,8 @@ export function notebookMarkup(game, requestedPage = 0) {
   else if (id === 'testimony') content = `<h3>What went on record.</h3><div class="notebook-testimony">${game.reports.map(r => `<section><p class="eyebrow">${r.kind==='recovery'?'RECOVERY DEBRIEF':r.kind==='resolution'?'AFTER THE WATCH':`SHIFT 0${r.shift + 1}`}</p><h4>${escape(r.question)}</h4><p>${r.redacted ? '<span class="withheld-note">Observation withheld</span> ' : ''}${escape(r.answer)}</p>${r.supervisorReply ? `<p class="pencil-note">${escape(r.replySpeaker||'Supervisor')}: ${escape(r.supervisorReply)}</p>` : ''}</section>`).join('')}</div>`;
   else if(id==='encounters')content=`<h3>Between the rows.</h3><div class="notebook-encounters">${game.fieldEvents.journal.map(j=>{const e=encounterForState(game,j.id),c=e.choices.find(c=>c.id===j.choice);return `<section><p class="eyebrow">NIGHT 0${e.night+1} · CROSSING ${j.x+1}, ${j.y+1}</p><h4>${escape(e.title)}</h4><p>${escape(e.report)}</p><p class="pencil-note">${escape(c.label)} ${escape(c.result)}</p></section>`;}).join('')}</div>`;
   else {
-    const e = EVIDENCE[id];
-    content = `<p class="eyebrow">${escape(e.code)} / ${escape(e.where)}</p><h3>${escape(e.title)}</h3>${evidenceMount(id)}<p class="handwritten-observation">${escape(e.text)}</p>`;
+    const e = evidenceForState(game,id);
+    content = `<p class="eyebrow">${escape(e.code)}${e.variant?` · ${escape(e.canonicalTitle)}`:''} / ${escape(e.where)}</p><h3>${escape(e.title)}</h3>${evidenceMount(id,game)}<p class="handwritten-observation">${escape(e.text)}</p>`;
   }
   return `<article class="field-notebook"><header class="notebook-header"><div><h2 id="dialog-title" tabindex="-1">Private notebook.</h2></div><button class="notebook-close" data-action="close" aria-label="Close notebook">×</button></header><button id="dialog-update" class="secondary" data-update hidden>Update ready. Download?</button><div class="notebook-spread"><aside class="notebook-index"><p class="pencil-note">Write it down.<br>Before it changes.</p><nav aria-label="Notebook pages">${pages.map((entry, i) => `<button data-action="notebook-page" data-value="${i}" ${i === page ? 'aria-current="page"' : ''}><span>${String(i + 1).padStart(2, '0')}</span>${entry === 'empty' ? 'No notes yet' : entry === 'testimony' ? 'Debrief answers' : entry === 'encounters' ? 'Field encounters' : escape(EVIDENCE[entry].title)}</button>`).join('')}</nav></aside><section class="notebook-leaf">${content}<footer class="notebook-pagination"><button data-action="notebook-page" data-value="${page - 1}" ${page === 0 ? 'disabled' : ''} aria-label="Previous notebook page">←</button><span>${String(page + 1).padStart(2, '0')} / ${String(pages.length).padStart(2, '0')}</span><button data-action="notebook-page" data-value="${page + 1}" ${page === pages.length - 1 ? 'disabled' : ''} aria-label="Next notebook page">→</button></footer></section></div></article>`;
 }

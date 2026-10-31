@@ -52,13 +52,23 @@ export class FieldMap {
     if(s.phase!=='field'||s.fieldEvents.pending){this.stop();return;}
     if(!this.travel.steps.length){this.stop(s);arrive();}
   }
-  render(s,paused=false) {
-    const active=s.phase==='field';this.root.hidden=!active;
-    if(!active){this.reset();return;}
+  updateSelection(s,holdDiscovery=false) {
+    // The open discovery belongs to the current landmark, not the suggested next
+    // stop. Keep the inspection change pending until its card is closed.
+    if(holdDiscovery){
+      const current=nearbySite(s);
+      if(current)this.selected=current.id;
+      return;
+    }
     if(!this.selected&&s.fieldEvents.journey){this.selected=s.fieldEvents.journey.destination;this.style=s.fieldEvents.journey.style;}
     if(!this.selected||(s.inspected.includes(this.selected)&&!this.travel&&this.lastInspected!==s.inspected.join(',')))this.selected=this.recommend(s);
     this.lastInspected=s.inspected.join(',');
-    const key=[s.shift,s.player.x,s.player.y,s.exposure,this.lastInspected,this.selected,this.style,!!this.travel,paused,s.fieldEvents.journal.length].join(':');
+  }
+  render(s,paused=false,holdDiscovery=false) {
+    const active=s.phase==='field';this.root.hidden=!active;
+    if(!active){this.reset();return;}
+    this.updateSelection(s,holdDiscovery);
+    const key=[s.shift,s.player.x,s.player.y,s.exposure,s.inspected.join(','),this.selected,this.style,!!this.travel,paused,s.fieldEvents.journal.length].join(':');
     if(key===this.lastKey)return;this.lastKey=key;
     const q=id=>this.root.querySelector(`#${id}`), complete=investigationComplete(s),site=FIELD_SITES.find(p=>p.id===this.selected),quiet=this.route(s,'quiet'),direct=this.route(s,'direct'),here=nearbySite(s)?.id===site.id;
     const route=this.travel?{steps:this.travel.steps,exposure:this.travel.steps.reduce((total,p)=>total+fieldStepCost(s,p.x,p.y),0)}:this.route(s);

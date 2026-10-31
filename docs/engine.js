@@ -4,6 +4,7 @@ import { ENDING_SHARES } from './sharing.js';
 import { ALTERNATE_ENDINGS, startResolution, validResolution, resolutionEnding } from './alternate-endings.js';
 import { witnessRequirements, canTakeEvidenceOutside, retirePreparations } from './ending-requirements.js';
 import { fieldStepCost } from './field.js';
+import { EVIDENCE, evidenceForState, evidenceAtSite, freshEvidenceScenes, migrateEvidenceScenes, validEvidenceScenes } from './evidence-scenes.js';
 import { freshSiteStories, siteScene, migrateSiteStories, validSiteStories } from './site-encounters.js';
 import { freshFieldEvents, encounterAfterStep, resolveEncounter, dismissEncounter, migrateFieldEvents, validFieldEvents, encounterById, encounterForState } from './encounters.js';
 import { RELOAD_DURATION, RELOAD_WINDOW_MIN, RELOAD_WINDOW_MAX, FLARE_DURATION, FLARE_SLOWDOWN, CROP_VARIANTS, freshWatch, watchFeedback, migrateWatch, validWatch } from './watch-play.js';
@@ -13,17 +14,7 @@ export const SHIFT_LENGTH = 55;
 export const COMPULSION_NOTICE = 'You could not resist the urge to investigate any longer.';
 export const DATES = ['SEPTEMBER 30', 'OCTOBER 14', 'OCTOBER 29'];
 export const REPORT_DATES = ['OCTOBER 01', 'OCTOBER 15', 'OCTOBER 30'];
-export const EVIDENCE = {
-  dress: { title: 'White fabric', code: 'EXHIBIT 01', text: 'You find a strip of white cotton fabric caught on a stalk. The tear is fresh. The stalk has grown through the weave.', where: 'The northeast corner' },
-  ledger: { title: 'Application record', code: 'EXHIBIT 02', text: 'You find an application record for the crop treatment. The record lists the same treatment, season after season. Each entry calls for a little more. Beneath the last row of figures: “Response below the root line. Do not amend the public log.”', where: 'An abandoned pump house' },
-  roots: { title: 'Connected roots', code: 'EXHIBIT 03', text: 'You find connected roots in the drainage channel. Pale threads run from root to root. When your light crosses them, the entire row leans away. The soil beyond the fence moves a moment later.', where: 'A drainage channel' },
-  badge: { title: 'Recovery team badge', code: 'EXHIBIT 04', text: 'You find a recovery team badge. The photograph on the badge is intact. The name has been worn smooth. Something has threaded itself through the badge clip, into the shape of a small ear.', where: 'The northeast corner' },
-  sample: { title: 'Sealed sample', code: 'EXHIBIT 05', text: 'You find a sealed sample in a glass vial beside an empty treatment drum. The sample label says BEFORE APPLICATION. Inside, one white filament turns slowly against the glass.', where: 'The pump house' },
-  teeth: { title: 'An ear of corn', code: 'EXHIBIT 06', text: 'You find an ear of corn. At first you count what look like kernels. Then you notice their roots. Each supposed kernel is a tooth. A few teeth are loose. You put the ear down.', where: 'The northeast corner' },
-  water: { title: 'Water sample', code: 'EXHIBIT 08', text: 'You stop to take a water sample from the drainage channel. A film on the water gathers against the current. You break it with a twig. The two halves drift back together.', where: 'The drainage channel' },
-  glove: { title: 'Work glove', code: 'EXHIBIT 09', text: 'You find a work glove beneath the pump tap. The fingers are packed with damp soil. The inside is still warm.', where: 'The pump house' },
-  map: { title: 'Drainage survey', code: 'EXHIBIT 07', text: 'You find a drainage survey showing old field boundaries, a creek, and the next farm. Someone has drawn a ring around this station. The water flows beyond the marked boundary.', where: 'The drainage channel' }
-};
+export { EVIDENCE, evidenceForState } from './evidence-scenes.js';
 const WATCH_ORDERS = ['Watch the corn. Shoot any that try to escape.', 'Remain in the watchtower.', 'Do not consume the crop.', 'Remember any irregularities for your debrief at the end of the night.'];
 export const BRIEFINGS = [
   { title: 'Watch the corn.', text: 'Your post overlooks an experimental crop outside ██████, Illinois. The night shift is quiet. Usually.', orders: WATCH_ORDERS, note: 'Your relief comes at the end of the night.' },
@@ -34,7 +25,7 @@ export const BRIEFINGS = [
 export function createGame(mode = 'story', seed = Date.now()) {
   const s = { runId: String(seed), version: SAVE_VERSION, mode: mode === 'hard' ? 'hard' : 'story', rng: seed >>> 0 || 1, phase: 'briefing', shift: 0, time: 0,
     rounds: 6, reserve: 24, reload: 0, kills: 0, shots: 0, breaches: 0, exposure: 0,
-    trust: 0, honesty: 0, evidence: [], reports: [], log: [], targets: [], nextSpawn: 3, nextId: 1,
+    trust: 0, honesty: 0, evidence: [], evidenceScenes: freshEvidenceScenes(seed), reports: [], log: [], targets: [], nextSpawn: 3, nextId: 1,
     incident: false, lightsOut: [], entered: false, departure: null, compulsionNotice: false, searched: [], question: 0, ending: null, lastShot: null,
     player: { x: 1, y: 7 }, visited: ['1,7'], fieldSteps: 0, inspected: [], focused: null, fieldEvents: freshFieldEvents(seed), siteStories: freshSiteStories(seed), watch: freshWatch() };
   return s;
@@ -250,8 +241,9 @@ export function inspect(s) {
   if (s.phase !== 'field' || s.fieldEvents.pending) return null;
   const site = nearbySite(s);
   if (!site || site.id === 'tower' || s.inspected.includes(site.id)) return null;
+  const id = evidenceAtSite(site.id, s.shift);
+  if (!id) return null;
   s.inspected.push(site.id);
-  const id = site.id === 'corner' ? ['dress', 'badge', 'teeth'][s.shift] : site.id === 'pump' ? ['ledger', 'sample', 'glove'][s.shift] : ['roots', 'water', 'map'][s.shift];
   if (!s.evidence.includes(id)) s.evidence.push(id);
   addLog(s, 'Private observation saved. Open your notebook to read it.', 'story');
   return id;
@@ -304,7 +296,7 @@ export function getQuestion(s) {
       : s.departure === 'compelled' ? 'I will record that you went in to investigate. What were you able to establish?' : s.entered ? 'You went in to investigate. What were you able to establish?' : 'You stayed in the tower. What could you establish from there?';
     const background = ['We have no other report of anyone entering the field tonight.', 'The recovery team sent to that corner has not returned.', 'Another recovery team is overdue. We need to account for those lights.'][s.shift];
     return { prompt: `${followup} ${background}`,
-      context: found ? `From your notebook: ${EVIDENCE[latest].text}` : s.entered ? 'The notebook has no entry for the northeast corner.' : 'From the tower, you could not see what happened between the rows.',
+      context: found ? `From your notebook: ${evidenceForState(s,latest).text}` : s.entered ? 'The notebook has no entry for the northeast corner.' : 'From the tower, you could not see what happened between the rows.',
       options: [
         { id: 'evidence', label: found ? ['I found white fabric in the corner. A stalk had grown through it.', 'I found a recovery team badge. Something shaped like an ear of corn was growing through the clip.', 'I found an ear of corn with teeth where the kernels should be.'][s.shift] : s.entered ? 'I cannot say what happened there. I did not recover anything from the corner.' : 'I cannot say. I did not reach the corner.', honesty: 1, trust: found ? -1 : 0 },
         ...(fieldNote?[{id:'field-notes',label:encounterForState(s,fieldNote.id).report,honesty:1,trust:-1}]:[]),
@@ -403,6 +395,8 @@ export function restore(raw) {
     if (!s.player || !Number.isInteger(s.player.x) || !Number.isInteger(s.player.y) || s.player.x < 0 || s.player.x > 10 || s.player.y < 0 || s.player.y > 8) return null;
     migrateFieldEvents(s);
     if(!validFieldEvents(s))return null;
+    migrateEvidenceScenes(s);
+    if(!validEvidenceScenes(s))return null;
     migrateSiteStories(s);
     if(!validSiteStories(s))return null;
     if (!s.targets.every(t => Number.isFinite(t.x) && Number.isFinite(t.y) && Number.isFinite(t.speed) && Number.isFinite(t.wobble) && [-1,1].includes(t.direction) && ['corn','person'].includes(t.kind))) return null;

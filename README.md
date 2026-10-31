@@ -39,6 +39,8 @@ Walking between locations brings twelve illustrated encounters across three nigh
 
 Each new game schedules the cooking smell on exactly one of the three nights. Inspecting the pump house that night offers the meal; the other two nights draw different optional scenes from a pool of six, each with its own custom illustration. There are 90 possible three-night arrangements, and an atmospheric scene cannot repeat within one game. Ignoring the smell does not cause it to return on a later night. You can revisit that night’s scene from the map or with **E** while at the inspected pump house. The saved schedule survives updates and progress transfers. Older saves keep a currently offered meal and avoid repeating an earlier offer.
 
+The first discovery card at each landmark also varies across new games. Each of the nine exhibits has its original discovery and two alternatives, with nine custom illustrations for the new scenes. The underlying exhibit and its discovery night remain available for the same ending requirements. The notebook, debrief, and exported transcript retain the version actually discovered. Existing saves keep their original discoveries; start a new game to see the alternatives. While a discovery card is open, the map stays on that location and suggests the next destination only after the card closes.
+
 At the last debrief, **I need to do something first** opens five more ways out: hand your post to your double, bring a witness, rescue the person at the lantern, accept a promotion, or return to the second tower. Earlier encounters and reports unlock them. Each route has three scenes, a choice to leave before committing, its own illustration, and a share card. The replacement can hear the truth about relief; the rescue costs your recordings. Every scene saves automatically.
 
 ## Publish on GitHub Pages
@@ -92,6 +94,7 @@ The game-rule tests cover ammunition, shooting, civilian encounters, timing, con
 | `docs/encounters.js` | Encounter timing, selection, choices, consequences, and saved field notes |
 | `docs/encounter-flavors.js` / `docs/encounter-detours.js` | Authored scene variants and replacements for closed leads |
 | `docs/site-encounters.js` / `docs/story-random.js` | Per-game landmark scene schedules and independent story randomness |
+| `docs/evidence-scenes.js` / `docs/evidence-flavors.js` | Canonical exhibit schedule, saved discovery selection, and authored discovery variants |
 | `docs/ending-paths.js` | Shared ending prerequisites, availability, and protection of still-possible leads |
 | `docs/alternate-endings.js` / `docs/resolution-ui.js` | Five final-night routes, choices, requirements, and saved scenes |
 | `docs/renderer.js` | Layered canvas landscape, illustrated actors, root motion and field survey |
@@ -110,6 +113,8 @@ Declare each ending’s prerequisites in `docs/ending-paths.js`. `endingPathRequ
 
 Landmark scene guarantees are declared separately in `SITE_POOLS` in `docs/site-encounters.js`: each site specifies its number of nights, required scenes, and alternatives. The selector fills and shuffles the schedule once; validation checks the same registry. `currentSiteScene` drives the evidence prompt, map button, keyboard action, and meal eligibility together.
 
+Primary discoveries use `EVIDENCE_SCHEDULE` and `EVIDENCE` in `docs/evidence-scenes.js` for their stable location, night, identity, and facts. Append presentations to that exhibit’s pool in `docs/evidence-flavors.js`; each supplies a title, prose, and art key. Selection and validation derive their limits from these pools, and `evidenceForState` supplies the same saved presentation to every reading surface. Keep existing pool indexes stable. Discovery flavor cannot change the exhibit ID or its ending credit.
+
 An unmet requirement remains possible until its opportunity has passed or a conflicting answer has been made. The director selects replacement content only when no possible ending still needs that encounter. Add replacement pools in `docs/encounter-detours.js`; these scenes keep their scheduling slot, but their distinct response IDs cannot earn the original lead’s ending credit. Calming replacements preserve the slot’s best exposure reduction. Add cosmetic versions in `docs/encounter-flavors.js` without changing canonical choice mechanics.
 
 A new game saves its presentation and timing plan independently of the watch’s random generator. Replacement selection is committed on arrival and never reconsidered when rendering the choice, result, notebook, or debrief. Keep shipped encounter IDs, response IDs, and variant/pool indexes stable; append content instead of reordering it. The selector and save validator derive their limits from the authored pools. Existing games without the director keep their original scenes. The tests cover a synthetic future ending with recursively discovered item prerequisites, real campaigns, branch-dependent replacements, offline assets, save migration, and progress transfer.
@@ -117,6 +122,8 @@ A new game saves its presentation and timing plan independently of the watch’s
 The original landscape is drawn in code. Custom moving crop and retrieval-team sprites, field photographs, nine specimen studies, notebook and survey textures, and station props are bundled locally in `docs/assets/`. The private notebook has an exhibit index and pages; discovered evidence keeps its own study and location image. The map uses a worn survey sheet and drawn landmarks, and briefings and interviews use illustrated station equipment. Asset prompts are recorded in `ASSET-PROMPTS.md`; each of the twelve walking encounters has its own illustration, documented with its prompt in `ENCOUNTER-ART.md`. Fonts use the system’s installed serif and monospace families. No font service, CDN, analytics, or external network call is used during play.
 
 The five additional ending illustrations and their social previews are documented in `ENDING-ART.md`.
+
+The nine primary-discovery illustrations and their exact generation prompts are documented in `DISCOVERY-ART.md`.
 
 ## Inspiration
 

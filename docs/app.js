@@ -1,7 +1,7 @@
 import './image-viewer.js';
 import { watchNight, sightingPromptReady } from './watch-story.js';
 import { guideTravel, guideRouteStatus, inspectGuide, spareGuide, fireGuide, focusGuide, nearbyGuideSite, guideDebrief, answerGuideDebrief, isGuideAftermath } from './guide.js';
-import { createGame, startShift, advance, reload, shoot, focusNext, enterField, move, inspect, currentSiteScene, eatCrop, nearbySite, investigationPressure, investigationComplete, beginDebrief, chooseFieldEncounter, continueFieldEncounter, getQuestion, getEnding, endingId, answer, serialize, restore, BRIEFINGS, EVIDENCE, ENDINGS, DATES, REPORT_DATES, SHIFT_LENGTH, COMPULSION_NOTICE } from './engine.js';
+import { createGame, startShift, advance, reload, shoot, focusNext, enterField, move, inspect, currentSiteScene, eatCrop, nearbySite, investigationPressure, investigationComplete, beginDebrief, chooseFieldEncounter, continueFieldEncounter, getQuestion, getEnding, endingId, answer, serialize, restore, BRIEFINGS, evidenceForState, ENDINGS, DATES, REPORT_DATES, SHIFT_LENGTH, COMPULSION_NOTICE } from './engine.js';
 import { Renderer, visibleGuideTarget } from './renderer.js';
 import { FieldMap } from './field-ui.js';
 import { dialogArtwork, evidenceMount, notebookMarkup, encounterMarkup, interviewRecord } from './art.js';
@@ -127,7 +127,7 @@ function showModal(kind,html,art=null) {
   $('dialog-title')?.focus({preventScroll:true});
   syncAudio();
 }
-function closeModal() {dialog.close();modalKind='';syncAudio();const target=modalReturnFocus||(game?.phase==='field'?$('field-exploration').querySelector('button.field-go:not([hidden]),button.field-stop:not([hidden])'):canvas);target?.focus({preventScroll:true});modalReturnFocus=null;}
+function closeModal() {dialog.close();modalKind='';if(game?.phase==='field')fieldMap.render(game,paused);syncAudio();const target=modalReturnFocus||(game?.phase==='field'?$('field-exploration').querySelector('button.field-go:not([hidden]),button.field-stop:not([hidden])'):canvas);target?.focus({preventScroll:true});modalReturnFocus=null;}
 function begin(mode,fromSave=false) {
   if(compulsionNotice.matches(':popover-open'))compulsionNotice.hidePopover();
   clearTimeout(compulsionTimer);
@@ -227,7 +227,7 @@ function updateUI(force=false) {
   if(field)$('scene-caption').textContent='';
   $('pause-layer').hidden=!paused;
   $('pause').textContent=paused?'Resume':'Pause';
-  fieldMap.render(game,paused);
+  fieldMap.render(game,paused,dialog.open&&['evidence','site-encounter','corn'].includes(modalKind));
   canvas.hidden=field;
   $('guide-message').hidden=phase!=='guide'||game.guide?.stage==='debrief'||paused;
   if (phase === 'guide') updateGuideUI();
@@ -367,7 +367,7 @@ function act(action,value) {
   if(action==='eat-crop' && eatCrop(game))closeModal();
   if(action==='inspect'){
     const id=inspect(game);
-    if(id){const e=EVIDENCE[id],scene=currentSiteScene(game);showModal('evidence',paper(e.title,`<p class="eyebrow">${e.code} / ${e.where.toUpperCase()}</p>${evidenceMount(id)}<p>${e.text}</p>${scene?`<p>${esc(scene.cue)}</p><button class="primary" data-action="site-scene">${esc(scene.label)}</button>`:''}<button class="primary" data-action="close">Close notebook ↗</button>`,'PRIVATE OBSERVATION'));}
+    if(id){const e=evidenceForState(game,id),scene=currentSiteScene(game);showModal('evidence',paper(esc(e.title),`<p class="eyebrow">${esc(e.code)}${e.variant?` · ${esc(e.canonicalTitle)}`:''} / ${esc(e.where.toUpperCase())}</p>${evidenceMount(id,game)}<p>${esc(e.text)}</p>${scene?`<p>${esc(scene.cue)}</p><button class="primary" data-action="site-scene">${esc(scene.label)}</button>`:''}<button class="primary" data-action="close">Close notebook ↗</button>`,'PRIVATE OBSERVATION'));}
   }
   if(action==='debrief')beginDebrief(game);
   if(action==='restart'){closeModal();begin(game.mode);return;}
@@ -458,7 +458,7 @@ async function shareDisposition(ending,stamp) {
 }
 function exportRecord() {
   const e=getEnding(game);
-  const body=`DEBRIEF — PRIVATE TRANSCRIPT\nBased on the story by Ryan L. Melvin\n\n${e.title}\n${e.stamp}\n\n${e.text}\n${e.last}\n\nTESTIMONY\n\n${game.reports.map(r=>`${r.kind==='recovery'?'RECOVERY DEBRIEF':r.kind==='resolution'?'AFTER THE WATCH':`SHIFT ${r.shift+1}`}\nQ: ${r.question}\nA: ${r.answer}${r.redacted?' [official wording]':''}${r.supervisorReply ? `\n${r.replySpeaker||'SUPERVISOR'}: ${r.supervisorReply}` : ''}`).join('\n\n')}\n\nEXHIBITS\n\n${game.evidence.map(id=>`${EVIDENCE[id].title}\n${EVIDENCE[id].text}`).join('\n\n')}`;
+  const body=`DEBRIEF — PRIVATE TRANSCRIPT\nBased on the story by Ryan L. Melvin\n\n${e.title}\n${e.stamp}\n\n${e.text}\n${e.last}\n\nTESTIMONY\n\n${game.reports.map(r=>`${r.kind==='recovery'?'RECOVERY DEBRIEF':r.kind==='resolution'?'AFTER THE WATCH':`SHIFT ${r.shift+1}`}\nQ: ${r.question}\nA: ${r.answer}${r.redacted?' [official wording]':''}${r.supervisorReply ? `\n${r.replySpeaker||'SUPERVISOR'}: ${r.supervisorReply}` : ''}`).join('\n\n')}\n\nEXHIBITS\n\n${game.evidence.map(id=>{const found=evidenceForState(game,id);return `${found.title}\n${found.text}`;}).join('\n\n')}`;
   const url=URL.createObjectURL(new Blob([body],{type:'text/plain;charset=utf-8'}));const a=document.createElement('a');a.href=url;a.download='debrief-private-transcript.txt';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
 }
 async function initAudio() {

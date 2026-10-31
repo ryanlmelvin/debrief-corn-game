@@ -6,6 +6,8 @@ import { notebookMarkup, interviewRecord, SPECIMENS } from '../docs/art.js';
 
 test('notebook exposes only discovered exhibits and clamps page navigation', () => {
   const game=createGame();
+  // Keep these exact-copy assertions on the original notebook presentation.
+  game.evidenceScenes=Object.fromEntries(Object.keys(EVIDENCE).map(id=>[id,0]));
   assert.match(notebookMarkup(game), /No notes yet/);
   game.evidence=['dress','ledger'];
   const first=notebookMarkup(game,-10), last=notebookMarkup(game,100);

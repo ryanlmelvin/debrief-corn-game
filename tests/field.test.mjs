@@ -14,6 +14,34 @@ const site=id=>FIELD_SITES.find(p=>p.id===id);
 function walk(s,route) { for(const p of route.steps){assert.equal(move(s,p.x-s.player.x,p.y-s.player.y),true);settle(s);} }
 function controller(selected='corner',style='quiet') { return Object.assign(Object.create(FieldMap.prototype),{selected,style,travel:null,lastKey:''}); }
 
+test('an open discovery keeps its actual location selected until the card closes',()=>{
+  const s=field(),c=controller('drain');
+  Object.assign(s,{shift:1,player:{x:3,y:3},inspected:['corner']});
+  c.lastInspected='corner';
+  assert.equal(inspect(s),'sample');
+  for(let frame=0;frame<3;frame++) {
+    c.updateSelection(s,true);
+    assert.equal(c.selected,'pump','the sealed sample belongs to the pump, even if another route was selected');
+    assert.equal(c.lastInspected,'corner','hold the recommendation change while either discovery or its follow-up is open');
+  }
+  c.updateSelection(s,false);
+  assert.equal(c.selected,'drain');
+  assert.equal(c.lastInspected,'corner,pump');
+  c.updateSelection(s,false);
+  assert.equal(c.selected,'drain');
+});
+
+test('closing the last discovery recommends the tower and preserves the player position',()=>{
+  const s=field(),c=controller('drain');
+  Object.assign(s,{player:{x:7,y:5},inspected:['corner','pump']});
+  c.lastInspected='corner,pump';
+  inspect(s);c.updateSelection(s,true);
+  assert.equal(c.selected,'drain');
+  c.updateSelection(s,false);
+  assert.equal(c.selected,'tower');
+  assert.deepEqual(s.player,{x:7,y:5});
+});
+
 test('every route preview matches actual cardinal movement and exposure in both modes',()=>{
   for(const mode of ['story','hard'])for(const start of FIELD_SITES)for(const destination of FIELD_SITES)for(const style of ['quiet','direct']) {
     const s={...field(mode),player:{x:start.x,y:start.y}},before=serialize(s),route=planFieldRoute(s,destination,style);
