@@ -1,5 +1,5 @@
 import { EVIDENCE } from './engine.js';
-import { currentEncounter, encounterById } from './encounters.js';
+import { currentEncounter, encounterForState } from './encounters.js';
 import { ENDING_SHARES } from './sharing.js';
 
 const escape = value => String(value).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -76,7 +76,7 @@ export function notebookMarkup(game, requestedPage = 0) {
   let content;
   if (id === 'empty') content = `${scenePlate('tower')}`;
   else if (id === 'testimony') content = `<h3>What went on record.</h3><div class="notebook-testimony">${game.reports.map(r => `<section><p class="eyebrow">${r.kind==='recovery'?'RECOVERY DEBRIEF':r.kind==='resolution'?'AFTER THE WATCH':`SHIFT 0${r.shift + 1}`}</p><h4>${escape(r.question)}</h4><p>${r.redacted ? '<span class="withheld-note">Observation withheld</span> ' : ''}${escape(r.answer)}</p>${r.supervisorReply ? `<p class="pencil-note">${escape(r.replySpeaker||'Supervisor')}: ${escape(r.supervisorReply)}</p>` : ''}</section>`).join('')}</div>`;
-  else if(id==='encounters')content=`<h3>Between the rows.</h3><div class="notebook-encounters">${game.fieldEvents.journal.map(j=>{const e=encounterById(j.id),c=e.choices.find(c=>c.id===j.choice);return `<section><p class="eyebrow">NIGHT 0${e.night+1} · CROSSING ${j.x+1}, ${j.y+1}</p><h4>${escape(e.title)}</h4><p>${escape(e.report)}</p><p class="pencil-note">${escape(c.label)} ${escape(c.result)}</p></section>`;}).join('')}</div>`;
+  else if(id==='encounters')content=`<h3>Between the rows.</h3><div class="notebook-encounters">${game.fieldEvents.journal.map(j=>{const e=encounterForState(game,j.id),c=e.choices.find(c=>c.id===j.choice);return `<section><p class="eyebrow">NIGHT 0${e.night+1} · CROSSING ${j.x+1}, ${j.y+1}</p><h4>${escape(e.title)}</h4><p>${escape(e.report)}</p><p class="pencil-note">${escape(c.label)} ${escape(c.result)}</p></section>`;}).join('')}</div>`;
   else {
     const e = EVIDENCE[id];
     content = `<p class="eyebrow">${escape(e.code)} / ${escape(e.where)}</p><h3>${escape(e.title)}</h3>${evidenceMount(id)}<p class="handwritten-observation">${escape(e.text)}</p>`;
@@ -110,6 +110,8 @@ const encounterFocus={radio:59,tracks:68,'unattended-lamp':63,'extra-step':60,'s
 export function encounterMarkup(game) {
   const e=currentEncounter(game);if(!e)return '';
   const pending=game.fieldEvents.pending,chosen=e.choices.find(c=>c.id===pending.choice);
+  const fieldArt=e.art.startsWith('field:')?FIELD_ART[e.art.slice(6)]:null;
+  const artwork=fieldArt||{file:`encounter-${e.art}`,alt:encounterAlt[e.art]};
   const effect=delta=>delta>0?`+${delta} exposure${game.exposure+delta>=100?' · reaches 100':''}`:delta<0?`−${-delta} exposure`:'0 exposure';
-  return `<article class="encounter-sheet${e.art==='unattended-lamp'?' encounter-portrait':''}"><div class="encounter-image" style="--encounter-focus:${encounterFocus[e.art]}%"><img src="./assets/encounter-${e.art}.webp" alt="${encounterAlt[e.art]}" width="1536" height="1024"></div><div class="encounter-copy"><button id="dialog-update" class="secondary" data-update hidden>Update ready. Download?</button><p class="eyebrow">EXPOSURE ${Math.floor(game.exposure)} / 100</p><h2 id="dialog-title" tabindex="-1">${escape(e.title)}</h2><p class="encounter-story">${escape(chosen?chosen.result:e.text)}</p>${chosen?`<div class="encounter-outcome"><button class="primary" data-action="encounter-continue">${game.fieldEvents.journey?'Continue →':'Return →'}</button>${game.fieldEvents.journey?'<button class="secondary" data-action="encounter-map">Map</button>':''}</div>`:`<div class="encounter-choices">${e.choices.map(c=>`<button class="choice" data-action="encounter-choice" data-value="${c.id}"><span>${escape(encounterLabels[`${e.id}:${c.id}`] || c.label)}</span><small class="${c.delta>0?'encounter-cost':''}">${effect(c.delta)}</small></button>`).join('')}</div>`}</div></article>`;
+  return `<article class="encounter-sheet${e.art==='unattended-lamp'?' encounter-portrait':''}"><div class="encounter-image" style="--encounter-focus:${encounterFocus[e.art]??56}%"><img src="./assets/${artwork.file}.webp" alt="${artwork.alt}" width="1536" height="1024"></div><div class="encounter-copy"><button id="dialog-update" class="secondary" data-update hidden>Update ready. Download?</button><p class="eyebrow">EXPOSURE ${Math.floor(game.exposure)} / 100</p><h2 id="dialog-title" tabindex="-1">${escape(e.title)}</h2><p class="encounter-story">${escape(chosen?chosen.result:e.text)}</p>${chosen?`<div class="encounter-outcome"><button class="primary" data-action="encounter-continue">${game.fieldEvents.journey?'Continue →':'Return →'}</button>${game.fieldEvents.journey?'<button class="secondary" data-action="encounter-map">Map</button>':''}</div>`:`<div class="encounter-choices">${e.choices.map(c=>`<button class="choice" data-action="encounter-choice" data-value="${c.id}"><span>${escape(c.shortLabel || ((e.variant||e.detour) ? c.label : encounterLabels[`${e.id}:${c.id}`] || c.label))}</span><small class="${c.delta>0?'encounter-cost':''}">${effect(c.delta)}</small></button>`).join('')}</div>`}</div></article>`;
 }

@@ -1,5 +1,6 @@
 // Optional final-night resolutions. The encounter journal is the source of truth:
 // a loose encounter flag cannot unlock a route by itself.
+import { endingPathRequirements } from './ending-paths.js';
 export const ALTERNATE_ENDINGS = {
   relief: { code: '11', title: 'I trained my replacement. He’s me.', art: 'ending-relief', stamp: 'RELIEF ACCEPTED', text: 'You give the figure your badge and show it how to check the rifle. It repeats each order without looking at the paper. At the ladder, it asks when its relief will come. You give it the same answer they gave you. By morning, you are on a bus heading out of the county. The department never calls. Two weeks later, your pay arrives, including overtime.', last: 'Your attendance remains perfect.' },
   witness_present: { code: '12', title: 'I brought a plus-one.', art: 'ending-witness', stamp: 'WITNESS PRESENT', text: 'The supervisor looks at the empty chair. You refuse to answer until he speaks to your witness. He asks its name. The chair creaks. The answer begins in the voice that asked you to hold the door. Halfway through, the voice changes. He reaches for the recorder. You move it out of his reach.', last: 'The tape runs out before your witness finishes its name.' },
@@ -11,39 +12,8 @@ export const ALTERNATE_ENDINGS = {
 const ROUTES = Object.keys(ALTERNATE_ENDINGS);
 const MENU_PROMPT = 'What will you do before they send another team?';
 const journalChoice = (s, event, choices) => s.fieldEvents?.journal?.some(entry => entry.id === event && choices.includes(entry.choice)) || false;
-const hasRecordings = s => s.resolution?.recordingsRelinquished !== true;
-const requirement = (id, label, current, target = 1) => ({ id, label, current: Number(current), target, met: Number(current) >= target });
-const priorRoutineReports = s => (s.reports || []).filter(report => [0, 1].includes(report.shift) && !report.kind);
-
 export function resolutionRequirements(s, route) {
-  const found = (event, choices) => journalChoice(s, event, choices);
-  switch (route) {
-    case 'relief': return [
-      requirement('relief-contact', 'Ask about the relief or offer a hand.', found('lamp-keeper', ['ask', 'hand'])),
-      requirement('relief-double', 'Call to your double or stand beside it.', found('your-outline', ['name', 'stand']))
-    ];
-    case 'witness_present': return [
-      requirement('witness-first', 'Record the first radio call.', hasRecordings(s) && found('first-call', ['record'])),
-      requirement('witness-future', 'Record the future interview.', hasRecordings(s) && found('future-call', ['record'])),
-      requirement('witness-invite', 'Invite the follower back.', found('last-follower', ['reply']))
-    ];
-    case 'rescue': return [
-      requirement('rescue-recording', 'Record the first radio call.', found('first-call', ['record'])),
-      requirement('rescue-silence', 'Play the first tape beside the radio.', found('second-call', ['compare'])),
-      requirement('rescue-hand', 'Offer the figure at the lantern your hand.', found('lamp-keeper', ['hand']))
-    ];
-    case 'vacancy': {
-      const reports = priorRoutineReports(s);
-      const signatures = new Set(reports.filter(report => report.choice === 'sign').map(report => report.shift)).size;
-      const corrections = new Set(reports.filter(report => ['comply', 'redact', 'sign'].includes(report.choice)).map(report => `${report.shift}:${report.choice}`)).size;
-      return [requirement('vacancy-signatures', 'Sign the first two reports.', signatures, 2), requirement('vacancy-corrections', 'Agree with the supervisor.', corrections, 4)];
-    }
-    case 'transmission': return [
-      requirement('transmission-tower', 'Approach the second tower.', found('two-towers', ['other'])),
-      requirement('transmission-time', 'Compare the future interview with your first tape.', hasRecordings(s) && found('future-call', ['compare']))
-    ];
-    default: return [];
-  }
+  return route === 'witness' ? [] : endingPathRequirements(s, route);
 }
 
 const LEADS = {

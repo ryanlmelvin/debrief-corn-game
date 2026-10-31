@@ -7,6 +7,7 @@ import { FieldMap } from './field-ui.js';
 import { dialogArtwork, evidenceMount, notebookMarkup, encounterMarkup, interviewRecord } from './art.js';
 import { GameAudio, loadMusic, loadEffects } from './audio.js';
 import { SoundEvents } from './audio-events.js';
+import { encounterAudioCue } from './encounters.js';
 import { flare } from './engine.js';
 import { updateWatchUI, updateReloadUI, watchRecord } from './watch-ui.js';
 import { pressureWordMarkup } from './pressure-word.js';
@@ -471,7 +472,7 @@ async function initAudio() {
   return true;
 }
 function syncAudio(){
-  const encounter=game?.phase==='field'?game.fieldEvents?.pending:null;
+  const encounter=encounterAudioCue(game);
   const held=paused||(dialog.open&&modalKind!=='encounter')||menuOpen()||document.hidden||!game||game.phase==='ending';
   const takeover=game?.phase==='field'&&game.compulsionNotice===true;
   soundscape?.sync({enabled:soundEnabled,held,pressure:game?investigationPressure(game)?.strength||0:0,takeover,scene:game?.phase,night:game?.shift||0,encounter});

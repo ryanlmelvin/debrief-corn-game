@@ -1,6 +1,7 @@
+import { encounterAudioCue } from './encounters.js';
 // Observe progress even while muted, so resuming never replays an old scare.
 function snapshot(game) {
-  const encounter = game?.phase === 'field' ? game.fieldEvents?.pending : null;
+  const encounter = encounterAudioCue(game);
   return {
     run: game?.runId, phase: game?.phase, night: game?.shift || 0,
     steps: game?.phase === 'field' ? game.fieldSteps : game?.phase === 'guide' ? Math.floor(game.guide.steps) : 0,

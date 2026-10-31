@@ -1,6 +1,6 @@
 # Walking encounter artwork
 
-Generated with the built-in image-generation tool. The existing landscape and palette are preserved. Each of the twelve walking encounters now has a distinct illustration in the same scratched-film, muddy olive and tarnished-gold direction as the existing field plates. The original radio, tracks and lantern plates belong exclusively to `first-call`, `paired-tracks` and `lamp-keeper`, respectively. Original PNGs remain outside the repository; the shipped files are WebP encodings with no composition edits.
+Generated with the built-in image-generation tool. The existing landscape and palette are preserved. Each of the twelve walking encounters now has a distinct illustration in the same scratched-film, muddy olive and tarnished-gold direction as the existing field plates. The original radio, tracks and lantern plates anchor `first-call`, `paired-tracks` and `lamp-keeper`, respectively. Replay variants also use these plates in other matching radio, track, and figure scenes. Original PNGs remain outside the repository; the shipped files are WebP encodings with no composition edits.
 
 ## Individual encounter additions
 
@@ -65,3 +65,7 @@ Use case: illustration-story. Production artwork for DEBRIEF, a rural ecological
 
 Use case: illustration-story. Production artwork for DEBRIEF, a rural ecological horror game. Landscape 3:2, no text, logos, watermark, lettering, UI or border. Tactile analog photographic illustration: scratched aging film negative, fine grain, worn faded corners, subdued forest green #141d18, muddy olive, dirty parchment highlights, tarnished gold, damp soil and physically believable materials. A weak warm flashlight beam against deep green dusk. Restrained dread, grounded cinematic realism, no glossy fantasy, no neon, no graphic injury. Match the game's existing gritty photographs of an abandoned pump shed and root-filled drainage ditch. Keep the main subject within the middle horizontal band so it can crop to a wide mobile banner. Subject: first-person eye-level view down a narrow dark corridor of corn. A battered metal oil lantern hangs from a crooked fencepost at center-left, its weak amber light showing corn leaves and pale delicate roots crossing the path. Beyond it, far back and half hidden by stalks, a barely visible human-sized dark shape faces away, ambiguous enough to be a coat on a post. No face, no visible eyes, no monster anatomy. The darkness beyond should feel inhabited, without an obvious creature.
 
+
+## Replay variety
+
+The scene pools in `docs/encounter-flavors.js` and `docs/encounter-detours.js` reuse the existing illustrated assets. Each scene names a matching illustration; some unique subjects keep their original plate, while radio, tracks, and figure variations can use another view of the same subject. Unrelated incidents can use the existing pump, drain, corner, and station-equipment photographs. No background artwork, asset files, or palette changed. Image descriptions and focal positions follow the selected illustration.

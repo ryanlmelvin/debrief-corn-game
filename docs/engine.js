@@ -4,7 +4,7 @@ import { ENDING_SHARES } from './sharing.js';
 import { ALTERNATE_ENDINGS, startResolution, validResolution, resolutionEnding } from './alternate-endings.js';
 import { witnessRequirements, canTakeEvidenceOutside, retirePreparations } from './ending-requirements.js';
 import { fieldStepCost } from './field.js';
-import { freshFieldEvents, encounterAfterStep, resolveEncounter, dismissEncounter, migrateFieldEvents, validFieldEvents, encounterById } from './encounters.js';
+import { freshFieldEvents, encounterAfterStep, resolveEncounter, dismissEncounter, migrateFieldEvents, validFieldEvents, encounterById, encounterForState } from './encounters.js';
 import { RELOAD_DURATION, RELOAD_WINDOW_MIN, RELOAD_WINDOW_MAX, FLARE_DURATION, FLARE_SLOWDOWN, CROP_VARIANTS, freshWatch, watchFeedback, migrateWatch, validWatch } from './watch-play.js';
 // All simulation and story state lives here. Rendering and storage are separate.
 export const SAVE_VERSION = 2;
@@ -35,7 +35,7 @@ export function createGame(mode = 'story', seed = Date.now()) {
     rounds: 6, reserve: 24, reload: 0, kills: 0, shots: 0, breaches: 0, exposure: 0,
     trust: 0, honesty: 0, evidence: [], reports: [], log: [], targets: [], nextSpawn: 3, nextId: 1,
     incident: false, lightsOut: [], entered: false, departure: null, compulsionNotice: false, searched: [], question: 0, ending: null, lastShot: null,
-    player: { x: 1, y: 7 }, visited: ['1,7'], fieldSteps: 0, inspected: [], focused: null, fieldEvents: freshFieldEvents(), watch: freshWatch() };
+    player: { x: 1, y: 7 }, visited: ['1,7'], fieldSteps: 0, inspected: [], focused: null, fieldEvents: freshFieldEvents(seed), watch: freshWatch() };
   return s;
 }
 function random(s) { s.rng = (Math.imul(1664525, s.rng) + 1013904223) >>> 0; return s.rng / 4294967296; }
@@ -303,7 +303,7 @@ export function getQuestion(s) {
       context: found ? `From your notebook: ${EVIDENCE[latest].text}` : s.entered ? 'The notebook has no entry for the northeast corner.' : 'From the tower, you could not see what happened between the rows.',
       options: [
         { id: 'evidence', label: found ? ['I found white fabric in the corner. A stalk had grown through it.', 'I found a recovery team badge. Something shaped like an ear of corn was growing through the clip.', 'I found an ear of corn with teeth where the kernels should be.'][s.shift] : s.entered ? 'I cannot say what happened there. I did not recover anything from the corner.' : 'I cannot say. I did not reach the corner.', honesty: 1, trust: found ? -1 : 0 },
-        ...(fieldNote?[{id:'field-notes',label:encounterById(fieldNote.id).report,honesty:1,trust:-1}]:[]),
+        ...(fieldNote?[{id:'field-notes',label:encounterForState(s,fieldNote.id).report,honesty:1,trust:-1}]:[]),
         { id: 'redact', label: 'Nothing outside the expected growth pattern.', honesty: -1, trust: 1 }
       ] };
   }

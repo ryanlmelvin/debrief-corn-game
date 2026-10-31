@@ -1,12 +1,12 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createGame, getQuestion, answer, serialize } from '../docs/engine.js';
-import { ENCOUNTERS } from '../docs/encounters.js';
+import { ENCOUNTERS, freshFieldEvents } from '../docs/encounters.js';
 import { observedSighting } from '../docs/watch-story.js';
 import { decisionQuestion } from '../docs/decision-copy.js';
 
 function interview(patch = {}) {
-  return Object.assign(createGame('story', 704), { phase: 'debrief' }, patch);
+  return Object.assign(createGame('story', 704), { phase: 'debrief', fieldEvents: freshFieldEvents() }, patch);
 }
 const choice = (question, id) => question.options.find(option => option.id === id);
 const mechanics = ({ label, detail, ...rest }) => rest;

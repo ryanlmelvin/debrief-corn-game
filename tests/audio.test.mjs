@@ -1,4 +1,5 @@
 import test from 'node:test';
+import { encounterAudioCue } from '../docs/encounters.js';
 import assert from 'node:assert/strict';
 import vm from 'node:vm';
 import { readFileSync } from 'node:fs';
@@ -88,7 +89,7 @@ test('AudioParam fallback cancels previous ramps before applying a new envelope'
 
 test('the game sends sound preference, pressure, all pause gates and the takeover to the mixer', () => {
   const source = readFileSync(new URL('../docs/app.js',import.meta.url),'utf8');
-  const calls = [], context = vm.createContext({soundscape:{sync:state=>calls.push(state)},soundEvents:{update(){}},fieldMap:{style:'quiet'},soundEnabled:true,paused:false,modalKind:'',dialog:{open:false},menuOpen:()=>false,document:{hidden:false},game:{phase:'tower'},investigationPressure:()=>({strength:.7})});
+  const calls = [], context = vm.createContext({encounterAudioCue,soundscape:{sync:state=>calls.push(state)},soundEvents:{update(){}},fieldMap:{style:'quiet'},soundEnabled:true,paused:false,modalKind:'',dialog:{open:false},menuOpen:()=>false,document:{hidden:false},game:{phase:'tower'},investigationPressure:()=>({strength:.7})});
   vm.runInContext(source.slice(source.indexOf('function syncAudio()'),source.indexOf("$('sound').addEventListener")),context);
   vm.runInContext('syncAudio()',context);assert.equal(calls.at(-1).pressure,.7);
   for(const gate of ['paused','dialog.open','document.hidden']) {

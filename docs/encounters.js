@@ -1,3 +1,6 @@
+import { ENCOUNTER_FLAVORS } from './encounter-flavors.js';
+import { ENCOUNTER_DETOURS } from './encounter-detours.js';
+import { neededEncounterIds } from './ending-paths.js';
 // Original field encounters for the game adaptation. No source manuscript text.
 const choice=(id,label,delta,result,flag=null,requires=null)=>({id,label,delta,result,flag,requires});
 const has=(s,flag)=>s.fieldEvents.flags.includes(flag);
@@ -88,18 +91,67 @@ export const ENCOUNTERS=[
     ]}
 ];
 export const encounterById=id=>ENCOUNTERS.find(e=>e.id===id);
-export function freshFieldEvents(){return {seen:[],journal:[],flags:[],pending:null,journey:null};}
+// A separate, stateless draw keeps story variety independent of tower difficulty.
+function storyDraw(seed, key) {
+  let value=2166136261;
+  for(const character of `${seed}:${key}`)value=Math.imul(value^character.charCodeAt(0),16777619);
+  value=Math.imul(value^(value>>>16),0x85ebca6b);
+  value=Math.imul(value^(value>>>13),0xc2b2ae35);
+  return (value^(value>>>16))>>>0;
+}
+export function freshFieldEvents(seed){
+  const events={seen:[],journal:[],flags:[],pending:null,journey:null};
+  // Missing plans are intentionally the original game, including older saves.
+  if(seed!==undefined){
+    events.director=1;
+    events.plan=ENCOUNTERS.map(e=>({id:e.id,step:e.step-1+storyDraw(seed,`${e.id}:step`)%3,variant:storyDraw(seed,`${e.id}:flavor`)%(1+(ENCOUNTER_FLAVORS[e.id]?.length||0))}));
+  }
+  return events;
+}
+export function encounterSchedule(s) {
+  return ENCOUNTERS.map(e=>({...e,step:s.fieldEvents?.plan?.find(p=>p.id===e.id)?.step??e.step}));
+}
+export function encounterForState(s,id) {
+  const event=encounterById(id);if(!event)return null;
+  const planned=s.fieldEvents?.plan?.find(p=>p.id===id),variant=planned?.variant??0;
+  const detour=planned?.detour?ENCOUNTER_DETOURS[id]?.[planned.detour-1]:null;
+  if(detour)return {...event,...detour,id:event.id,variant,detour:planned.detour,choices:detour.choices.map(c=>({
+    ...c,
+    // Replacing an unused lead must not remove its best calming opportunity.
+    delta:c.id==='observe'?Math.min(c.delta,...event.choices.map(option=>option.delta)):c.delta
+  }))};
+  const flavor=variant?ENCOUNTER_FLAVORS[id]?.[variant-1]:null;
+  const presentation=flavor?{
+    ...event,title:flavor.title,text:flavor.text,report:flavor.report,shortReport:flavor.shortReport,art:flavor.art,
+    // Only presentation fields may be overridden. Mechanics stay canonical.
+    choices:event.choices.map(c=>({...c,label:flavor.choices[c.id].label,result:flavor.choices[c.id].result,shortLabel:flavor.choices[c.id].shortLabel}))
+  }:event;
+  return {...presentation,variant,text:typeof presentation.text==='function'?presentation.text(s):presentation.text};
+}
 export function encounterAfterStep(s) {
   const events=s.fieldEvents;
   if(s.phase!=='field'||events.pending)return false;
-  const event=ENCOUNTERS.find(e=>e.night===s.shift&&e.step<=s.fieldSteps&&!events.seen.includes(e.id));
+  const event=encounterSchedule(s).find(e=>e.night===s.shift&&e.step<=s.fieldSteps&&!events.seen.includes(e.id));
   if(!event)return false;
+  // Choose once, at arrival: only the player's completed decisions can close a
+  // path. Shared ending rules protect every encounter a possible ending needs.
+  const alternatives=ENCOUNTER_DETOURS[event.id];
+  if(events.director===1&&alternatives&&!neededEncounterIds(s,ENCOUNTERS).has(event.id)){
+    events.plan.find(p=>p.id===event.id).detour=1+storyDraw(s.runId,`${event.id}:detour`)%alternatives.length;
+  }
   events.seen.push(event.id);events.pending={id:event.id,choice:null,x:s.player.x,y:s.player.y};return true;
 }
 export function currentEncounter(s) {
-  const pending=s.fieldEvents?.pending,event=pending&&encounterById(pending.id);
+  const pending=s.fieldEvents?.pending,event=pending&&encounterForState(s,pending.id);
   if(!event)return null;
-  return {...event,text:typeof event.text==='function'?event.text(s):event.text,choices:event.choices.filter(c=>!c.requires||has(s,c.requires))};
+  return {...event,choices:event.choices.filter(c=>!c.requires||has(s,c.requires))};
+}
+export function encounterAudioCue(s) {
+  const pending=s?.phase==='field'?s.fieldEvents?.pending:null;
+  if(!pending)return null;
+  const plan=s.fieldEvents.plan?.find(p=>p.id===pending.id);
+  const detour=plan?.detour?ENCOUNTER_DETOURS[pending.id]?.[plan.detour-1]:null;
+  return {id:detour?detour.id:pending.id,choice:pending.choice};
 }
 export function resolveEncounter(s,id) {
   if(s.phase!=='field'||!s.fieldEvents?.pending||s.fieldEvents.pending.choice)return false;
@@ -108,7 +160,8 @@ export function resolveEncounter(s,id) {
   const before=s.exposure;s.exposure=Math.max(0,Math.min(100,s.exposure+option.delta));
   if(option.flag&&!has(s,option.flag))s.fieldEvents.flags.push(option.flag);
   s.fieldEvents.pending.choice=id;
-  s.fieldEvents.journal.push({id:event.id,choice:id,delta:s.exposure-before,x:s.player.x,y:s.player.y});
+  // Walking costs are fractional; don't save 7.000000000000004 as an invalid cost.
+  s.fieldEvents.journal.push({id:event.id,choice:id,delta:Number((s.exposure-before).toFixed(9)),x:s.player.x,y:s.player.y});
   return true;
 }
 export function dismissEncounter(s) {
@@ -125,11 +178,17 @@ export function validFieldEvents(s) {
   const f=s.fieldEvents,known=ENCOUNTERS.map(e=>e.id),flags=ENCOUNTERS.flatMap(e=>e.choices.map(c=>c.flag).filter(Boolean));
   const uniqueKnown=(items,allowed,max)=>Array.isArray(items)&&items.length<=max&&new Set(items).size===items.length&&items.every(i=>allowed.includes(i));
   const point=p=>Number.isInteger(p.x)&&p.x>=0&&p.x<=10&&Number.isInteger(p.y)&&p.y>=0&&p.y<=8;
-  if(!f||!uniqueKnown(f.seen,known,12)||!uniqueKnown(f.flags,flags,36)||!Array.isArray(f.journal)||f.journal.length>12)return false;
+  if(!f||!uniqueKnown(f.seen,known,known.length)||!uniqueKnown(f.flags,flags,flags.length)||!Array.isArray(f.journal)||f.journal.length>known.length)return false;
+  if(f.director!==undefined&&(f.director!==1||!f.plan))return false;
+  if(f.plan!==undefined&&(!Array.isArray(f.plan)||f.plan.length!==ENCOUNTERS.length||!f.plan.every((p,i)=>{
+    const e=ENCOUNTERS[i];
+    return p&&p.id===e.id&&Number.isInteger(p.step)&&p.step>=e.step-1&&p.step<=e.step+1&&Number.isInteger(p.variant)&&p.variant>=0&&p.variant<=(ENCOUNTER_FLAVORS[p.id]?.length||0)&&
+      (p.detour===undefined||(f.director===1&&f.seen.includes(p.id)&&Number.isInteger(p.detour)&&p.detour>=1&&p.detour<=ENCOUNTER_DETOURS[p.id]?.length));
+  })))return false;
   if(new Set(f.journal.map(j=>j?.id)).size!==f.journal.length)return false;
-  if(!f.journal.every(j=>j&&f.seen.includes(j.id)&&encounterById(j.id)?.choices.some(c=>c.id===j.choice)&&Number.isFinite(j.delta)&&j.delta>=-4&&j.delta<=7&&point(j)))return false;
+  if(!f.journal.every(j=>j&&f.seen.includes(j.id)&&encounterForState(s,j.id)?.choices.some(c=>c.id===j.choice)&&Number.isFinite(j.delta)&&j.delta>=-4-1e-9&&j.delta<=7+1e-9&&point(j)))return false;
   if(f.pending){
-    const p=f.pending,e=encounterById(p.id),record=f.journal.find(j=>j.id===p.id);
+    const p=f.pending,e=encounterForState(s,p.id),record=f.journal.find(j=>j.id===p.id);
     if(!e||s.phase!=='field'||e.night!==s.shift||!f.seen.includes(e.id)||!point(p)||p.x!==s.player.x||p.y!==s.player.y||!(p.choice===null||e.choices.some(c=>c.id===p.choice)))return false;
     if(p.choice===null?Boolean(record):!record||record.choice!==p.choice)return false;
   }

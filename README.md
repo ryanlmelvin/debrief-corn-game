@@ -35,7 +35,7 @@ Clean containments build a streak and bonus points. A miss or breach resets the 
 
 People are not targets, whether they wear a white dress or recovery equipment. Six total perimeter breaches end the assignment. Leaving the tower early allows currently loose crops to escape. Investigations offer slower, lower-exposure paths or fast shortcuts through the rows. The map previews exposure before departure; walking can be stopped at any time. Each discovery opens on arrival, and the map suggests the next unread location. Inspect all three sites, then return to the tower before reaching 100 exposure. Debrief answers and retained exhibits affect the final disposition. The final refusal shows green and red requirements based on the assignment’s discoveries and choices. No ending checklist or evidence-preparation tasks appear earlier in play.
 
-Walking between locations brings twelve illustrated encounters across three nights: buried radios, impossible tracks, abandoned lamps, and things that follow. The walk pauses for a choice. You can always move on without extra exposure; investigating can cost exposure, uncover an aid, or change an encounter on a later night. Your choices go into the notebook, mark the map, and can become testimony in the debrief. Mid-encounter saves preserve the choice and destination, including after an update.
+Walking between locations brings twelve illustrated encounters across three nights. New games vary their timing and select from three versions of each recurring scene, with matching existing illustrations. Later incidents also respond to your choices: once an ending is out of reach, an encounter reserved for it can give way to an unrelated event. Ten replacement scenes cover abandoned equipment, strange water, survey marks, and other disturbances. Any encounter still needed by a possible ending stays available. The walk pauses for a choice. You can always move on without extra exposure; investigating can cost exposure, uncover an aid, or change an encounter on a later night. Your choices go into the notebook, mark the map, and can become testimony in the debrief. Mid-encounter saves preserve the chosen scene, response, and destination, including after an update or progress transfer. The notebook and debrief remember the version you actually saw. Games started before this change keep their original encounters; start a new game for the new variety.
 
 At the last debrief, **I need to do something first** opens five more ways out: hand your post to your double, bring a witness, rescue the person at the lantern, accept a promotion, or return to the second tower. Earlier encounters and reports unlock them. Each route has three scenes, a choice to leave before committing, its own illustration, and a share card. The replacement can hear the truth about relief; the rescue costs your recordings. Every scene saves automatically.
 
@@ -87,7 +87,9 @@ The game-rule tests cover ammunition, shooting, civilian encounters, timing, con
 | --- | --- |
 | `docs/engine.js` | Game rules, branching narrative, save validation |
 | `docs/field.js` / `docs/field-ui.js` | Route planning, exposure previews, responsive touch investigation map |
-| `docs/encounters.js` | Between-location scenes, choices, consequences, and field notes |
+| `docs/encounters.js` | Encounter timing, selection, choices, consequences, and saved field notes |
+| `docs/encounter-flavors.js` / `docs/encounter-detours.js` | Authored scene variants and replacements for closed leads |
+| `docs/ending-paths.js` | Shared ending prerequisites, availability, and protection of still-possible leads |
 | `docs/alternate-endings.js` / `docs/resolution-ui.js` | Five final-night routes, choices, requirements, and saved scenes |
 | `docs/renderer.js` | Layered canvas landscape, illustrated actors, root motion and field survey |
 | `docs/watch-story.js` | Nightly sightings, crop anatomy, and retrieval-team light timing |
@@ -98,6 +100,14 @@ The game-rule tests cover ammunition, shooting, civilian encounters, timing, con
 | `docs/sw.js` | Versioned offline cache |
 | `docs/manifest.webmanifest` | Installable app metadata |
 | `DESIGN.md` | Adaptation choices and proposed next iteration |
+
+### Adding endings and encounter variety
+
+Declare each ending’s prerequisites in `docs/ending-paths.js`. `endingPathRequirements` drives the final requirement display and gates; `neededEncounterIds` uses the same declarations to protect unfinished leads. The supported rules describe encounter answers, evidence with a discovery night, and report choices with their available questions and shifts. Item dependencies are discovered from canonical encounter choices’ `requires` and `flag` fields, so a new ending that needs a later tape comparison also protects its earlier recording opportunity automatically.
+
+An unmet requirement remains possible until its opportunity has passed or a conflicting answer has been made. The director selects replacement content only when no possible ending still needs that encounter. Add replacement pools in `docs/encounter-detours.js`; these scenes keep their scheduling slot, but their distinct response IDs cannot earn the original lead’s ending credit. Calming replacements preserve the slot’s best exposure reduction. Add cosmetic versions in `docs/encounter-flavors.js` without changing canonical choice mechanics.
+
+A new game saves its presentation and timing plan independently of the watch’s random generator. Replacement selection is committed on arrival and never reconsidered when rendering the choice, result, notebook, or debrief. Keep shipped encounter IDs, response IDs, and variant/pool indexes stable; append content instead of reordering it. The selector and save validator derive their limits from the authored pools. Existing games without the director keep their original scenes. The tests cover a synthetic future ending with recursively discovered item prerequisites, real campaigns, branch-dependent replacements, offline assets, save migration, and progress transfer.
 
 The original landscape is drawn in code. Custom moving crop and retrieval-team sprites, field photographs, nine specimen studies, notebook and survey textures, and station props are bundled locally in `docs/assets/`. The private notebook has an exhibit index and pages; discovered evidence keeps its own study and location image. The map uses a worn survey sheet and drawn landmarks, and briefings and interviews use illustrated station equipment. Asset prompts are recorded in `ASSET-PROMPTS.md`; each of the twelve walking encounters has its own illustration, documented with its prompt in `ENCOUNTER-ART.md`. Fonts use the system’s installed serif and monospace families. No font service, CDN, analytics, or external network call is used during play.
 

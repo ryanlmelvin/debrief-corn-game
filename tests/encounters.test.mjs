@@ -5,7 +5,8 @@ import { ENCOUNTERS, currentEncounter, encounterAfterStep, freshFieldEvents } fr
 import { FieldMap } from '../docs/field-ui.js';
 import { planFieldRoute } from '../docs/field.js';
 import { encounterMarkup, notebookMarkup } from '../docs/art.js';
-const field=()=>({...createGame('story',42),phase:'field',entered:true,departure:'chosen'});
+// These fixtures exercise the original scenes and their legacy save behavior.
+const field=()=>({...createGame('story',42),phase:'field',entered:true,departure:'chosen',fieldEvents:freshFieldEvents()});
 function trigger(s,id){const event=ENCOUNTERS.find(e=>e.id===id);s.shift=event.night;s.fieldSteps=event.step;s.player={x:4,y:4};s.fieldEvents.seen=ENCOUNTERS.filter(e=>e.night<s.shift||(e.night===s.shift&&e.step<event.step)).map(e=>e.id);assert.equal(encounterAfterStep(s),true);return currentEncounter(s);}
 
 test('a real walk stops for an encounter, blocks movement, and resumes at the same position after reload',()=>{

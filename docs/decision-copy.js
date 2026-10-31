@@ -1,5 +1,5 @@
 import { getQuestion } from './engine.js';
-import { encounterById } from './encounters.js';
+import { encounterById, encounterForState } from './encounters.js';
 import { observedSighting } from './watch-story.js';
 
 // Presentation copy only. The engine remains the authority for available answers,
@@ -67,7 +67,7 @@ export function decisionQuestion(game) {
       ? 'I recovered nothing from the corner.'
       : 'I never reached the corner. I can’t say.';
     const fieldNote = game.fieldEvents.journal.find(entry => encounterById(entry.id)?.night === game.shift);
-    if (fieldNote) labels['field-notes'] = encounterReports[fieldNote.id];
+    if (fieldNote) labels['field-notes'] = encounterForState(game,fieldNote.id).shortReport || encounterReports[fieldNote.id];
     labels.redact = 'Nothing outside the expected growth pattern.';
   } else if (game.question === 3 && game.shift < 2) {
     // Preserve the actual reply on the saved report, including after a reload.

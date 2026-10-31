@@ -1,18 +1,8 @@
 // Derive the final refusal from actions already taken. No separate preparation
 // state or early objective list: requirements are shown only at the last choice.
+import { endingPathRequirements } from './ending-paths.js';
 export function witnessRequirements(s) {
-  const recordings = s.resolution?.recordingsRelinquished ? 0 : new Set(s.fieldEvents.journal
-    .filter(entry => ['first-call', 'future-call'].includes(entry.id) && entry.choice === 'record')
-    .map(entry => entry.id)).size;
-  const objections = new Set(s.reports
-    .filter(report => [0, 1].includes(report.shift) && (report.choice === 'question' ||
-      (report.choice === undefined && typeof report.supervisorReply === 'string')))
-    .map(report => report.shift)).size;
-  return [
-    ...[['ledger', 'Application record'], ['sample', 'Sealed sample'], ['map', 'Drainage survey']].map(([id, label]) => ({ id, label, current: Number(s.evidence.includes(id)), target: 1 })),
-    { id: 'recordings', label: 'Field recordings', current: recordings, target: 2 },
-    { id: 'objections', label: 'Reports challenged', current: objections, target: 2 }
-  ].map(requirement => ({ ...requirement, met: requirement.current >= requirement.target }));
+  return endingPathRequirements(s, 'witness');
 }
 export function canTakeEvidenceOutside(s) { return witnessRequirements(s).every(requirement => requirement.met); }
 
