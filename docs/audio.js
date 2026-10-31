@@ -224,6 +224,34 @@ export class GameAudio {
     // Comparing recordings restores the ordinary insects through sync(). The
     // final radio choices intentionally add nothing after the follower stops.
   }
+  watchCue(kind) {
+    if (!this.active || this.scene !== 'tower') return;
+    // Small mechanical sounds belong to the station equipment. Avoid a musical
+    // fanfare, and replace any unfinished cue instead of stacking reward sounds.
+    const notes = {
+      bell: [[540, .085, .48, 0, 'triangle'], [1370, .022, .27, 0, 'sine']],
+      rush: [[440, .055, .1, 0, 'sine'], [660, .045, .16, .13, 'sine']],
+      flare: [[720, .05, .18, 0, 'triangle']],
+      reload: [[310, .05, .09, 0, 'triangle']]
+    }[kind];
+    if (!notes) return;
+    const context = this.context, now = context.currentTime;
+    for (const [source, voice] of this.voices) if (voice.name.startsWith('watch-')) {
+      ramp(voice.gain.gain, 0, now, .012); source.stop(now + .012); this.voices.delete(source);
+    }
+    if (this.voices.size + notes.length > 8) return;
+    for (const [frequency, level, duration, delay, type] of notes) {
+      const tone = context.createOscillator(), gain = context.createGain(), start = now + delay;
+      tone.type = type; tone.frequency.setValueAtTime(frequency, start);
+      tone.frequency.exponentialRampToValueAtTime(frequency * .97, start + duration);
+      gain.gain.setValueAtTime(0, start); gain.gain.linearRampToValueAtTime(level, start + .008);
+      gain.gain.exponentialRampToValueAtTime(.0001, start + duration);
+      tone.connect(gain); gain.connect(this.mix);
+      this.voices.set(tone, {gain, name:`watch-${kind}`});
+      tone.onended = () => { this.voices.delete(tone); tone.disconnect(); gain.disconnect(); };
+      tone.start(start); tone.stop(start + duration + .01);
+    }
+  }
   preview() {
     if (this.takeover) return;
     // Bypass the paused mix so enabling sound in the menu always confirms it.
@@ -240,8 +268,9 @@ export class GameAudio {
     tone.onended = () => { if(this.previewVoice?.tone===tone)this.previewVoice=null; tone.disconnect(); gain.disconnect(); };
     tone.start(); tone.stop(now + .32);
   }
-  shot(hit) {
+  shot(result) {
     if (!this.active) return;
+    const armor = result === 'armor', hit = result === true || result === 'hit';
     const context = this.context, now = context.currentTime;
     // Keep rapid clicks from piling up several full-volume impacts.
     if (this.shots.size >= 2) {
@@ -250,8 +279,8 @@ export class GameAudio {
       oldest.stop(now + .008); this.shots.delete(oldest); this.shotGains.delete(oldest);
     }
     const oscillator = context.createOscillator(), gain = context.createGain();
-    oscillator.type = 'triangle'; oscillator.frequency.setValueAtTime(hit ? 170 : 130, now); oscillator.frequency.exponentialRampToValueAtTime(45, now + .14);
-    gain.gain.setValueAtTime(0, now); gain.gain.linearRampToValueAtTime(.24, now + .006); gain.gain.exponentialRampToValueAtTime(.001, now + .18);
+    oscillator.type = 'triangle'; oscillator.frequency.setValueAtTime(armor ? 340 : hit ? 170 : 130, now); oscillator.frequency.exponentialRampToValueAtTime(45, now + (armor ? .09 : .14));
+    gain.gain.setValueAtTime(0, now); gain.gain.linearRampToValueAtTime(armor ? .2 : .24, now + .006); gain.gain.exponentialRampToValueAtTime(.001, now + .18);
     oscillator.connect(gain); gain.connect(this.mix); this.shots.add(oscillator); this.shotGains.set(oscillator,gain);
     oscillator.onended = () => { this.shots.delete(oscillator); this.shotGains.delete(oscillator); oscillator.disconnect(); gain.disconnect(); };
     oscillator.start(); oscillator.stop(now + .2);

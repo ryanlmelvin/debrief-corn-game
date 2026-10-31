@@ -7,7 +7,8 @@ import { fieldStepCost } from './field.js';
 import { EVIDENCE, evidenceForState, evidenceAtSite, freshEvidenceScenes, migrateEvidenceScenes, validEvidenceScenes } from './evidence-scenes.js';
 import { freshSiteStories, siteScene, migrateSiteStories, validSiteStories } from './site-encounters.js';
 import { freshFieldEvents, encounterAfterStep, resolveEncounter, dismissEncounter, migrateFieldEvents, validFieldEvents, encounterById, encounterForState } from './encounters.js';
-import { RELOAD_DURATION, RELOAD_WINDOW_MIN, RELOAD_WINDOW_MAX, FLARE_DURATION, FLARE_SLOWDOWN, CROP_VARIANTS, freshWatch, watchFeedback, migrateWatch, validWatch } from './watch-play.js';
+import { RELOAD_DURATION, RELOAD_WINDOW_MIN, RELOAD_WINDOW_MAX, FLARE_DURATION, FLARE_SLOWDOWN, RUSH_DURATION, RUSH_BONUS, CROP_VARIANTS, freshWatch, watchFeedback, watchWave, bellStatus, migrateWatch, validWatch } from './watch-play.js';
+export { bellStatus } from './watch-play.js';
 // All simulation and story state lives here. Rendering and storage are separate.
 export const SAVE_VERSION = 2;
 export const SHIFT_LENGTH = 55;
@@ -47,22 +48,66 @@ function spawnCrop(s, variant) {
   const y = 360 + random(s) * 90;
   const speed = (17 + s.shift * 4 + random(s) * 9) * (s.mode === 'hard' ? 1.4 : 1) * CROP_VARIANTS[variant].speed;
   s.targets.push({ id: s.nextId++, x, y, direction, speed, kind: 'corn', wobble: random(s) * 6.28, variant, hp: CROP_VARIANTS[variant].hp });
+  return s.targets.at(-1);
 }
 function spawn(s) {
-  const wave = s.watch.spawnCount++;
-  const variant = ['stalker','runner','husk','stalker'][wave % 4];
-  spawnCrop(s, variant);
-  if (wave % 4 === 3) {
-    spawnCrop(s, 'runner');
-    // The second specimen breaks in the other direction, giving the surge a clear shape.
-    s.targets.at(-1).direction = -s.targets.at(-2).direction;
-    addLog(s, 'Two movements. They are splitting toward the road.', 'alert');
-    watchFeedback(s, 'SPLIT SURGE · Both sides', 'alert');
+  const index = s.watch.spawnCount++, wave = watchWave(s, index);
+  if (!wave) return;
+  for (const [i, variant] of wave.variants.entries()) {
+    const target = spawnCrop(s, variant);
+    target.direction = wave.side === 'both' ? (i % 2 ? 1 : -1) : wave.side === 'left' ? -1 : 1;
+    if (wave.variants.length > 1) {
+      target.x = 350 + i * 120 + target.x % 35;
+      target.y = 375 + (i % 2) * 60;
+    }
+  }
+  if (wave.variants.length > 1) {
+    const side = wave.side === 'both' ? 'Both sides' : `${wave.side === 'left' ? 'Left' : 'Right'} fence`;
+    addLog(s, `${wave.label}. ${wave.variants.length} movements toward ${wave.side === 'both' ? 'both fences' : `the ${wave.side} fence`}.`, 'alert');
+    watchFeedback(s, `${wave.label} · ${side}`, 'alert');
   } else {
+    const variant = wave.variants[0];
     const message = variant === 'runner' ? 'Runner in the rows. It is moving fast.' : variant === 'husk' ? 'Armored husk. Break the shell, then fire again.' : 'Movement in the rows. Confirm your target.';
     addLog(s, message, 'alert');
-    if (wave < 3) watchFeedback(s, variant === 'runner' ? 'RUNNER · Fast, one shot' : variant === 'husk' ? 'HUSK · Two shots' : 'STALKER · One shot', 'ready');
+    if (index < 3) watchFeedback(s, variant === 'runner' ? 'RUNNER · Fast, one shot' : variant === 'husk' ? 'HUSK · Two shots' : 'STALKER · One shot', 'ready');
   }
+}
+
+function earnFlare(s) {
+  if (s.watch.flares >= 2) return false;
+  s.watch.flares++; s.watch.flaresEarned++;
+  return true;
+}
+function loseRush(s, message = 'RUSH LOST · Contain the remaining crops') {
+  if (s.watch.rush?.status !== 'active') return false;
+  Object.assign(s.watch.rush, { status: 'lost', finishedAt: s.time });
+  watchFeedback(s, message, 'alert');
+  addLog(s, 'The bell challenge is lost. Any remaining crops still need to be contained.', 'alert');
+  return true;
+}
+function checkRush(s) {
+  const rush = s.watch.rush;
+  if (rush?.status !== 'active') return;
+  if (s.time >= rush.deadline) { loseRush(s, 'TIME UP · Contain the remaining crops'); return; }
+  if (s.targets.some(t => rush.targetIds.includes(t.id))) return;
+  Object.assign(rush, { status: 'won', finishedAt: s.time });
+  s.watch.rushesWon++; s.watch.score += RUSH_BONUS; s.reserve += 6;
+  const flareEarned = earnFlare(s);
+  watchFeedback(s, `RUSH CLEARED · +${RUSH_BONUS} · +6 rounds${flareEarned ? ' · +1 flare' : ''}`, 'ready');
+  addLog(s, `Bell challenge cleared. ${RUSH_BONUS} bonus points and six reserve rounds earned${flareEarned ? ', with a replacement flare' : ''}.`);
+}
+export function ringBell(s) {
+  if (!bellStatus(s).available) return false;
+  const id = ++s.watch.bellsUsed, targetIds = [];
+  for (const [i, variant] of ['stalker','runner','husk'].entries()) {
+    const target = spawnCrop(s, variant);
+    Object.assign(target, { x: 350 + i * 130, y: i === 1 ? 435 : 375, direction: i === 1 ? -1 : 1, rushId: id });
+    targetIds.push(target.id);
+  }
+  s.watch.rush = { id, targetIds, deadline: s.time + RUSH_DURATION, status: 'active', finishedAt: null };
+  watchFeedback(s, 'BELL RUSH · Clear 3 marked crops in 10s', 'alert');
+  addLog(s, 'You ring the station bell. Three marked crops answer. Clear all three in ten seconds for 600 points, six rounds, and a replacement flare.', 'alert');
+  return true;
 }
 export function advance(s, dt) {
   if (s.phase === 'guide') { advanceGuide(s, dt); return; }
@@ -78,8 +123,9 @@ export function advance(s, dt) {
         completeReload(s);
       }
     }
-    if (s.time >= s.nextSpawn && s.time < SHIFT_LENGTH - 13) {
-      spawn(s); s.nextSpawn += (5.8 - s.shift * 0.65) * (s.mode === 'hard' ? .75 : 1);
+    if (s.time >= s.nextSpawn && s.time < (s.watch.waveVersion === 0 ? SHIFT_LENGTH - 13 : SHIFT_LENGTH)) {
+      spawn(s);
+      s.nextSpawn = watchWave(s)?.at ?? SHIFT_LENGTH + 1;
     }
     if (!s.incident && s.time >= SIGHTING_TIME) {
       s.incident = true;
@@ -106,9 +152,11 @@ export function advance(s, dt) {
         s.watch.streak = 0;
         watchFeedback(s, 'BREACH · Chain broken', 'alert', target);
         addLog(s, 'Perimeter breach. Something reached the road.', 'alert');
+        if (target.rushId === s.watch.rush?.id) loseRush(s, 'RUSH LOST · A marked crop escaped');
       }
     }
     s.targets = s.targets.filter(t => !t.gone);
+    checkRush(s);
     if (s.breaches >= 6) finish(s, 'breach');
     else if (s.time >= SHIFT_LENGTH) {
       // Relief prevents abandonment penalties. Go directly to the playable map.
@@ -168,6 +216,7 @@ export function shoot(s, x, y, padding = 0) {
     return 'miss';
   }
   const variant = target.variant || 'stalker';
+  Object.assign(s.lastShot, { targetId: target.id, target: { ...target } });
   s.watch.hits++;
   target.hp = (target.hp ?? 1) - 1;
   if (target.hp > 0) {
@@ -182,6 +231,11 @@ export function shoot(s, x, y, padding = 0) {
   s.watch.score += points;
   Object.assign(s.lastShot, { result: 'hit', points, variant, streak: s.watch.streak });
   watchFeedback(s, `+${points}${s.watch.streak > 1 ? ` · ${s.watch.streak} IN A ROW` : ' · CONTAINED'}`, 'hit', target);
+  if (s.watch.streak % 5 === 0 && earnFlare(s)) {
+    watchFeedback(s, `${s.watch.streak} IN A ROW · +1 FLARE`, 'ready', target);
+    addLog(s, 'Five clean containments. A replacement flare is ready.');
+  }
+  checkRush(s);
   addLog(s, 'Mobile crop contained.'); return 'hit';
 }
 export function focusNext(s) {
@@ -193,6 +247,7 @@ export function focusNext(s) {
 }
 export function enterField(s) {
   if (!['tower', 'decision'].includes(s.phase) || !s.incident) return false;
+  loseRush(s, 'RUSH ABANDONED · Bonus lost');
   // Leaving early lets any specimens already loose escape an unattended post.
   if (s.phase === 'tower') {
     const loose = s.targets.filter(t => t.kind === 'corn').length;
@@ -380,7 +435,7 @@ export function getEnding(s) {
   if (!Object.hasOwn(ENDINGS,s.ending)) return undefined;
   return s.ending === 'guide' && s.guide ? { ...ENDINGS[endingId(s)], ...guideDisposition(s), title: ENDINGS[endingId(s)].title } : { ...ENDINGS[s.ending], ...resolutionEnding(s) };
 }
-function finish(s, ending) { s.phase = 'ending'; s.ending = ending; s.targets = [];s.compulsionNotice=false;s.fieldEvents.pending=null;s.fieldEvents.journey=null; }
+function finish(s, ending) { loseRush(s);s.phase = 'ending'; s.ending = ending; s.targets = [];s.compulsionNotice=false;s.fieldEvents.pending=null;s.fieldEvents.journey=null; }
 
 export function serialize(s) { return JSON.stringify(s); }
 export function restore(raw) {

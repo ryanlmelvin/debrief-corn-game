@@ -1,4 +1,5 @@
 import { RELOAD_DURATION, RELOAD_WINDOW_MIN, RELOAD_WINDOW_MAX, watchSummary } from './watch-play.js';
+import { bellStatus } from './engine.js';
 
 const $ = id => document.getElementById(id);
 const BEST_KEY = `debrief-watch-bests-v1:${new URL('.', location.href).pathname}`;
@@ -36,8 +37,10 @@ export function updateWatchUI(s, paused = false) {
 
   const flareTime = Math.max(0, w.flareUntil - s.time);
   $('hud-flare').disabled = paused || w.flares <= 0 || flareTime > 0;
-  $('hud-flare').innerHTML = flareTime > 0 ? `◇ Burning · ${flareTime.toFixed(1)}s` : `◇ Flare · ${w.flares} <kbd>F</kbd>`;
+  $('hud-flare').innerHTML = flareTime > 0 ? `◇ ${flareTime.toFixed(1)}s` : `<span><span class="hud-wide-label">◇ </span>Flare · ${w.flares}</span> <kbd>F</kbd>`;
   $('hud-flare').setAttribute('aria-label', `Emergency flare. ${w.flares} remaining. Slows all crops for four and a half seconds.`);
+
+  updateBell(s, paused);
 
   const feedback = w.feedback;
   const fresh = feedback && s.time - feedback.time < 2.4;
@@ -46,6 +49,22 @@ export function updateWatchUI(s, paused = false) {
   const message = fresh ? feedback.text : danger ? 'At the fence. Contain them before they cross.' : crops.length >= 3 ? 'Multiple movements. A flare will buy you time.' : crops.some(t => t.variant === 'husk') ? 'Thick husk. Two hits to contain it.' : crops.some(t => t.variant === 'runner') ? 'Runner in the rows. Take it before it reaches the road.' : s.time < 8 ? 'Click / tap corn to fire. X aims. Space fires.' : !crops.length ? 'Perimeter quiet. A good time to reload.' : 'Keep your shots clean. Misses break your streak.';
   $('watch-radio-text').textContent = message;
   $('watch-radio').dataset.tone = fresh ? feedback.tone : danger ? 'alert' : 'normal';
+}
+
+function updateBell(s, paused) {
+  const bell = bellStatus(s), button = $('hud-bell');
+  button.disabled = paused || !bell.available;
+  button.classList.toggle('bell-ready', bell.available);
+  button.classList.toggle('bell-active', bell.active);
+  button.innerHTML = bell.active
+    ? `<span>Bell rush<small class="bell-countdown">${bell.left} left · ${Math.ceil(bell.seconds)}s</small></span>`
+    : bell.remaining <= 0 || s.time > 39 ? 'Bell quiet <kbd>B</kbd>'
+    : `<span>Ring bell<span class="bell-uses"> · ${bell.remaining}</span></span> <kbd>B</kbd>`;
+  button.title = bell.available ? 'Optional rush: contain three marked crops in ten seconds. Win 600 points, six rounds and a flare.' : bell.reason;
+  button.setAttribute('aria-label', bell.active
+    ? `Bell rush. ${bell.left} crops remaining. ${Math.ceil(bell.seconds)} seconds remaining.`
+    : bell.available ? `Ring the bell. ${bell.remaining} calls remaining. Summon three crops; contain all in ten seconds for 600 points, six rounds and a flare.`
+    : `Ring bell unavailable. ${bell.reason}`);
 }
 
 export function watchRecord(s) { return { ...watchSummary(s), best: bestWatch(s) }; }
@@ -59,7 +78,9 @@ export function updateReloadUI(s, paused = false) {
   button.disabled = paused || (reloading ? w.reloadAttempted : s.rounds === 6 || s.reserve === 0);
   button.classList.toggle('needs-reload', !reloading && !button.disabled && s.rounds === 0);
   button.classList.toggle('reload-sweet', sweet);
-  const label = `${reloading ? sweet ? 'Lock it in!' : w.reloadAttempted ? 'Reloading…' : '↻ Reloading' : '↻ Reload'} <kbd>R</kbd>`;
+  const wideLabel = reloading ? sweet ? 'Lock it in!' : w.reloadAttempted ? 'Reloading…' : '↻ Reloading' : '↻ Reload';
+  const compactLabel = reloading ? sweet ? 'Now!' : 'Loading' : 'Reload';
+  const label = `<span class="hud-wide-label">${wideLabel}</span><span class="hud-compact-label">${compactLabel}</span> <kbd>R</kbd>`;
   if(button.innerHTML !== label) button.innerHTML = label;
   button.setAttribute('aria-label', reloading ? sweet ? 'Press reload now for a fast reload' : 'Reloading. Press again when the marker reaches gold for a fast reload.' : `Reload rifle. ${s.rounds} rounds loaded, ${s.reserve} in reserve.`);
   $('reload-timing').hidden = !reloading;

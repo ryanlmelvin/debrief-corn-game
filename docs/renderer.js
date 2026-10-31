@@ -331,6 +331,22 @@ export class Renderer {
       if(age>=duration||!p||!Number.isFinite(p.x)||!Number.isFinite(p.y))continue;
       const fade=Math.min(1,(duration-age)/.3),color=hit?'#e4cd91':armor?'#c9bd93':'#a8ae91';
       c.save();c.globalAlpha=fade;
+      // A contained specimen crumples into its own row; preserve the original
+      // sprite and keep the effect local, with no camera shake or screen flash.
+      if(hit&&shot.target&&!this.reduced&&age<.5) {
+        const body=targetProjection(shot.target,view);
+        c.save();c.globalAlpha=(1-age/.5)*.72;
+        c.translate(body.x+shot.target.direction*age*16,body.y+age*9);
+        c.rotate(shot.target.direction*age*1.6);
+        c.scale(body.size,body.size*(1-age*.9));
+        this.drawSprite(targetArtwork(s.shift,shot.target),0,.95);
+        c.restore();
+      }
+      if(!this.reduced&&age<.09) {
+        c.save();c.globalAlpha=(1-age/.09)*.4;
+        line(c,view.left+view.width*.55,view.top+view.height,p.x,p.y,'#e4cd91',.8);
+        c.restore();
+      }
       if(hit||armor) {
         if(!this.reduced)for(let i=0;i<(hit?11:6);i++) {
           const direction=i*2.399+shot.time,spread=(hit?58:32)*age;
@@ -340,6 +356,15 @@ export class Renderer {
         }
         // A clear hit mark survives reduced-motion mode without animated debris.
         for(const dx of [-1,1])for(const dy of [-1,1])line(c,p.x+dx*5,p.y+dy*5,p.x+dx*10,p.y+dy*10,color,1.7);
+        if(armor&&!this.reduced&&age<.3) {
+          c.save();c.globalAlpha=1-age/.3;c.strokeStyle='#d8c79b';c.lineWidth=1.5;
+          for(const side of [-1,1]) {
+            c.beginPath();c.moveTo(p.x+side*(12+age*30),p.y-22+age*20);
+            c.lineTo(p.x+side*(4+age*24),p.y-4+age*28);
+            c.lineTo(p.x+side*(14+age*35),p.y+12+age*38);c.stroke();
+          }
+          c.restore();
+        }
         const label=hit?`+${shot.points||100}${shot.streak>=3?' · '+shot.streak+' STREAK':''}`:'HUSK BROKEN';
         c.font='bold 11px monospace';c.textAlign='center';
         const labelWidth=c.measureText(label).width+12;
@@ -452,7 +477,10 @@ export class Renderer {
     const c=this.c,p=targetProjection(target,this.view),shift=this.scene?.shift||0;
     const phase=this.reduced?.35:((target.direction*p.x/(28*p.size)+target.wobble)%1+1)%1;
     const form=targetArtwork(shift,target);
-    c.save();c.translate(p.x,p.y);c.scale(p.size,p.size);
+    const impact=this.scene?.lastShot,age=impact?this.scene.time-impact.time:1;
+    const recoil=!this.reduced&&impact?.result==='armor'&&impact.targetId===target.id&&age>=0&&age<.22
+      ? Math.sin(age/.22*Math.PI)*5*-target.direction:0;
+    c.save();c.translate(p.x+recoil,p.y);c.scale(p.size,p.size);
     c.fillStyle='#07120ba0';c.beginPath();c.ellipse(0,4,22,5,0,0,Math.PI*2);c.fill();
     if(target.kind==='person'&&personRole(shift,target)==='retrieval') {
       this.drawRetrievalMember(target.member||0,phase,personLight(shift,this.scene.time,target),form);
@@ -497,18 +525,21 @@ export class Renderer {
     const c=this.c,p=targetProjection(target,this.view);
     c.save();c.translate(p.x,p.y);c.scale(p.size,p.size);
     // Markers stay above the canopy so partially hidden crops remain selectable.
-    const col=s.focused===target.id?'#f2d694':'#c47756';
+    const marked=s.watch?.rush?.status==='active'&&s.watch.rush.targetIds.includes(target.id);
+    const col=s.focused===target.id||marked?'#f2d694':'#c47756';
     for(const side of [-1,1]) {line(c,side*24,-77,side*15,-77,col,1.5);line(c,side*24,-77,side*24,-67,col,1.5);line(c,side*24,9,side*15,9,col,1.5);}
-    if(target.variant==='runner'||target.variant==='husk') {
+    if(marked||target.variant==='runner'||target.variant==='husk') {
       const husk=target.variant==='husk';
-      c.fillStyle='#111914df';c.fillRect(-29,-101,58,17);
+      const label=marked?`BELL${husk?' / HUSK':target.variant==='runner'?' / RUNNER':''}`:husk?'HUSK':'RUNNER';
+      const width=marked&&target.variant!=='stalker'?88:58;
+      c.fillStyle='#111914ef';c.fillRect(-width/2,-101,width,17);
       c.font='bold 9px monospace';c.textAlign='center';c.fillStyle=husk?'#d8c79b':'#dfb878';
-      c.fillText(husk?'HUSK':'RUNNER',0,-89);
+      c.fillText(label,0,-89);
       if(husk)for(let i=0;i<2;i++) {
         c.strokeStyle='#d8c79b';c.lineWidth=1;c.strokeRect(-7+i*9,-81,5,4);
         if(i<(target.hp??2)){c.fillStyle='#d8c79b';c.fillRect(-7+i*9,-81,5,4);}
       }
-      else for(let i=0;i<2;i++) {
+      else if(target.variant==='runner')for(let i=0;i<2;i++) {
         const x=-4+i*8,dir=target.direction||1;
         line(c,x-dir*2,-81,x+dir*2,-78,'#dfb878',1.3);
         line(c,x+dir*2,-78,x-dir*2,-75,'#dfb878',1.3);

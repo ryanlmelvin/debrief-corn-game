@@ -4,6 +4,7 @@ import assert from 'node:assert/strict';
 import vm from 'node:vm';
 import { readFileSync } from 'node:fs';
 import { GameAudio, PressureDrone, loadMusic, loadEffects } from '../docs/audio.js';
+import { SoundEvents } from '../docs/audio-events.js';
 
 class Param {
   constructor(value = 0) { this.value = value; this.events = []; }
@@ -306,4 +307,71 @@ test('radio interference shortens over the nights and a story transition cancels
   sound.sync({enabled:true,scene:'field',encounter:{...encounter,choice:'leave'}});
   sound.cueEncounter({...encounter,choice:'leave'},2);
   assert.equal(sound.voices.size,0);
+});
+
+test('watch equipment cues use the gated mix, remain quiet, and replace earlier cues', () => {
+  const context = new Context(), sound = new GameAudio(context,{duration:134});
+  sound.watchCue('bell');assert.equal(sound.voices.size,0);
+  sound.sync({enabled:true,scene:'tower'});sound.watchCue('bell');
+  const bell = [...sound.voices];
+  assert.equal(bell.length,2);
+  for (const [source,{gain,name}] of bell) {
+    assert.equal(name,'watch-bell');assert.deepEqual(gain.connections,[sound.mix]);
+    assert.ok(gain.gain.events.filter(e=>e[0]==='linear').every(e=>e[1]<=.085));
+    assert.ok(source.stops[0]-source.starts[0][0]<.5);
+  }
+  sound.watchCue('rush');
+  assert.equal(sound.voices.size,2);
+  assert.ok(bell.every(([source])=>source.stops.at(-1)===context.currentTime+.012));
+  assert.ok([...sound.voices.values()].every(voice=>voice.name==='watch-rush'));
+  for (const [source,{gain}] of [...bell,...sound.voices]) {
+    source.onended();assert.equal(source.connections.length,0);assert.equal(gain.connections.length,0);
+  }
+  assert.equal(sound.voices.size,0);
+  sound.sync({enabled:true,scene:'field'});sound.watchCue('bell');assert.equal(sound.voices.size,0);
+});
+
+test('pause, mute, takeover and phase changes cancel pending watch acknowledgment notes', () => {
+  for (const gate of [{held:true},{enabled:false},{takeover:true},{scene:'field'}]) {
+    const context = new Context(), sound = new GameAudio(context,{duration:134});
+    sound.sync({enabled:true,scene:'tower'});sound.watchCue('rush');
+    const delayed = [...sound.voices.keys()].at(-1);
+    assert.ok(delayed.starts[0][0]>context.currentTime);
+    sound.sync({enabled:true,scene:'tower',...gate});
+    assert.equal(sound.voices.size,0);assert.ok(delayed.stops.at(-1)<delayed.starts[0][0]);
+    sound.watchCue('flare');assert.equal(sound.voices.size,0);
+    sound.sync({enabled:true,scene:'tower'});assert.equal(sound.voices.size,0);
+  }
+});
+
+test('watch milestones acknowledge once, combine simultaneous rewards, and never replay on resume', () => {
+  const game = {runId:'watch',phase:'tower',shift:0,watch:{bellsUsed:0,rushesWon:0,flaresEarned:0,fastReloads:0}};
+  const events = new SoundEvents(), calls = [], sound = {watchCue:kind=>calls.push(kind)};
+  events.reset(game);
+  game.watch.bellsUsed++;events.update(game,sound,true);events.update(game,sound,true);
+  game.watch.rushesWon++;game.watch.flaresEarned++;events.update(game,sound,true);
+  game.watch.flaresEarned++;events.update(game,sound,true);
+  game.watch.fastReloads++;events.update(game,sound,true);
+  assert.deepEqual(calls,['bell','rush','flare','reload']);
+  events.reset(game);events.update(game,sound,true);assert.equal(calls.length,4);
+  game.watch.bellsUsed++;events.update(game,sound,false);events.update(game,sound,true);
+  game.watch.rushesWon++;events.update(game,null,false);events.update(game,sound,true);
+  game.shift++;game.watch.flaresEarned++;events.update(game,sound,true);
+  game.runId='next';game.watch.flaresEarned++;events.update(game,sound,true);
+  game.phase='field';game.watch.flaresEarned++;events.update(game,sound,true);
+  assert.equal(calls.length,4);
+});
+
+test('armor cracks have a distinct, quieter envelope while boolean hit callers still work', () => {
+  const context = new Context(), sound = new GameAudio(context,{duration:134});
+  sound.sync({enabled:true});
+  const frequencies = [];
+  for (const result of [true,'hit',false,'miss','armor']) {
+    sound.shot(result);
+    const source=[...sound.shots].at(-1), gain=sound.shotGains.get(source);
+    frequencies.push(source.frequency.events[0][1]);
+    if(result==='armor')assert.ok(gain.gain.events.find(e=>e[0]==='linear')[1]<.24);
+  }
+  assert.deepEqual(frequencies,[170,170,130,130,340]);
+  assert.equal(sound.shots.size,2);
 });
