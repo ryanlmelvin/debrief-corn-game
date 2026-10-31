@@ -18,7 +18,6 @@
 .playing .tower-hud button{width:100%;min-width:0;display:flex;justify-content:center;align-items:center;gap:10px;min-height:46px;padding:10px;font-size:13px;border:1px solid #8a9470;background:#283324}
 .tower-hud kbd{font:9px ui-monospace,monospace;border:1px solid #a0a88266;padding:2px 4px;color:#b8bda2}
 .watch-reload,.watch-flare{position:relative;min-width:0}
-.watch-control-note{display:block;margin-top:8px;min-height:22px;font-size:9px;line-height:1.4;color:#b8bda2;text-align:center}
 .reload-timing{position:absolute;top:-12px;left:0;right:0;height:6px;background:#0b140d;border:1px solid #8c9770}
 .reload-window{position:absolute;inset:-1px auto;left:var(--window-start);width:var(--window-width);background:var(--gold)}
 .reload-cursor{position:absolute;top:-4px;width:3px;height:12px;background:#f4eed6;transform:translateX(-50%)}
@@ -42,7 +41,6 @@
  .watch-rifle .watch-eyebrow{font-size:8px;letter-spacing:1px}
  .playing .tower-hud #hud-ammo{font-size:20px;margin:0}
  .watch-rounds{margin:0;gap:3px}.watch-rounds small{font-size:8px}
- .watch-control-note{min-height:24px;font-size:8px;margin-top:6px}
  .playing .tower-hud button{font-size:12px;min-height:46px}
  .reload-timing{top:-6px;bottom:auto;height:4px;left:2px;right:2px}
  .watch-radio{bottom:calc(160px + env(safe-area-inset-bottom));max-width:calc(100% - 30px)}
@@ -53,7 +51,7 @@
 @media(max-height:500px) and (min-width:480px){
  .playing .tower-hud{grid-template-columns:1fr 1fr 1fr;gap:12px;padding:8px 12px;bottom:8px;max-width:760px}
  .watch-rifle{display:block;grid-column:auto}.watch-rifle .watch-eyebrow{display:none}.watch-rounds{margin-top:5px}
- .watch-control-note{min-height:0;font-size:8px;margin-top:5px}.playing .tower-hud button{min-height:42px;padding:6px}
+ .playing .tower-hud button{min-height:42px;padding:6px}
  .watch-scoreboard{top:62px}.watch-scoreboard strong{font-size:26px}
  .watch-radio{bottom:105px}.watch-radio>span{display:none}.watch-radio p{font-size:12px;margin:0}
  .reload-timing{top:-7px;bottom:auto;height:4px}

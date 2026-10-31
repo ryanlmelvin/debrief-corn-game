@@ -38,7 +38,6 @@ export function updateWatchUI(s, paused = false) {
   $('hud-flare').disabled = paused || w.flares <= 0 || flareTime > 0;
   $('hud-flare').innerHTML = flareTime > 0 ? `◇ Burning · ${flareTime.toFixed(1)}s` : `◇ Flare · ${w.flares} <kbd>F</kbd>`;
   $('hud-flare').setAttribute('aria-label', `Emergency flare. ${w.flares} remaining. Slows all crops for four and a half seconds.`);
-  $('flare-hint').textContent = flareTime > 0 ? 'Crops slowed · make your shots count' : w.flares ? 'Slows every crop · buys time to reload' : 'No flares left this watch';
 
   const feedback = w.feedback;
   const fresh = feedback && s.time - feedback.time < 2.4;
@@ -68,6 +67,5 @@ export function updateReloadUI(s, paused = false) {
   $('reload-timing').style.setProperty('--window-start', `${(1 - RELOAD_WINDOW_MAX / RELOAD_DURATION) * 100}%`);
   $('reload-timing').style.setProperty('--window-width', `${(RELOAD_WINDOW_MAX - RELOAD_WINDOW_MIN) / RELOAD_DURATION * 100}%`);
   $('reload-cursor').style.left = `${Math.max(0, Math.min(100, (1 - s.reload / RELOAD_DURATION) * 100))}%`;
-  $('reload-hint').textContent = reloading ? sweet ? 'NOW · press R / tap again' : w.reloadAttempted ? 'Rifle will finish reloading' : 'Press again when the marker reaches gold' : 'Optional: tap again in gold to finish early';
 
 }
