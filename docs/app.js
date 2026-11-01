@@ -1,3 +1,4 @@
+import { evidenceAtSite } from './evidence-scenes.js';
 import './image-viewer.js';
 import { watchNight, sightingPromptReady } from './watch-story.js';
 import { guideTravel, guideRouteStatus, inspectGuide, spareGuide, fireGuide, focusGuide, nearbyGuideSite, guideDebrief, answerGuideDebrief, isGuideAftermath } from './guide.js';
@@ -433,8 +434,9 @@ function act(action,value) {
     showModal('dungeon-help',paper('Below the field.',`<p>Find the key. Reach the stairs. Keep moving.</p><p class="small">Move with <b>arrows / WASD</b> or tap a neighboring square. Move into a root to strike with your rifle butt.<br><b>F / Space</b> fires at the root in your sights. <b>R</b> reloads. <b>Period</b> waits.<br>Red squares are struck next turn. The roots only move when you act.</p><button class="primary" data-action="close">Back to the dungeon</button>`).replace('<article','<section').replace('</article>','</section>'));return;
   }
   if(action==='dungeon-enter'){
-    if(!game||game.phase!=='field'||paused||dialog.open||menuOpen())return;
+    if(!game||game.phase!=='field'||paused||(dialog.open&&modalKind!=='evidence')||menuOpen())return;
     if(!startRogue(game,'dungeon'))return;
+    closeModal();
     fieldMap.stop(game);lastModalKey='';save();updateUI(true);
     $('rogue-play').focus({preventScroll:true});return;
   }
@@ -562,8 +564,8 @@ function act(action,value) {
   }
   if(action==='eat-crop' && eatCrop(game))closeModal();
   if(action==='inspect'){
-    const id=inspect(game);
-    if(id){const e=evidenceForState(game,id),scene=currentSiteScene(game);showModal('evidence',paper(esc(e.title),`<p class="eyebrow">${esc(e.code)}${e.variant?` · ${esc(e.canonicalTitle)}`:''} / ${esc(e.where.toUpperCase())}</p>${evidenceMount(id,game)}<p>${esc(e.text)}</p>${scene?`<p>${esc(scene.cue)}</p><button class="primary" data-action="site-scene">${esc(scene.label)}</button>`:''}<button class="primary" data-action="close">Close notebook ↗</button>`,'PRIVATE OBSERVATION'));}
+    const id=inspect(game)||(nearbySite(game)?.id==='drain'&&game.inspected.includes('drain')?evidenceAtSite('drain',game.shift):null);
+    if(id){const e=evidenceForState(game,id),scene=currentSiteScene(game);showModal('evidence',paper(esc(e.title),`<p class="eyebrow">${esc(e.code)}${e.variant?` · ${esc(e.canonicalTitle)}`:''} / ${esc(e.where.toUpperCase())}</p>${evidenceMount(id,game)}<p>${esc(e.text)}</p>${scene?`<p>${esc(scene.cue)}</p><button class="primary" data-action="site-scene">${esc(scene.label)}</button>`:''}${nearbySite(game)?.id==='drain'?'<button class="primary" data-action="dungeon-enter">Follow the drain below ground ↘</button>':''}<button class="primary" data-action="close">Close notebook ↗</button>`,'PRIVATE OBSERVATION'));}
   }
   if(action==='debrief')beginDebrief(game);
   if(action==='restart'){if(game?.practice){launchMiniGame(game.practice,!!previewGame);return;}closeModal();begin(game.mode);return;}
@@ -946,7 +948,7 @@ function frame(now) {
     if(game.phase==='field'&&!game.practice)fieldMap.tick(game,dt,(dx,dy)=>move(game,dx,dy),()=>{
       const site=nearbySite(game);
       if(site?.id==='tower'&&investigationComplete(game))act('debrief');
-      else if(site&&site.id!=='tower'&&!game.inspected.includes(site.id))act('inspect');
+      else if(site&&site.id!=='tower'&&(!game.inspected.includes(site.id)||site.id==='drain'))act('inspect');
       else {updateUI(true);save();}
     });
     const focused=game.targets.find(t=>t.id===game.focused);if(focused)renderer.pointer={x:focused.x,y:focused.y-34};

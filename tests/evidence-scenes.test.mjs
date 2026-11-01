@@ -3,10 +3,10 @@ import assert from 'node:assert/strict';
 import { existsSync, readFileSync } from 'node:fs';
 import vm from 'node:vm';
 import {
-  createGame, inspect, currentSiteScene, FIELD_SITES, EVIDENCE, evidenceForState,
+  createGame, inspect, nearbySite, currentSiteScene, FIELD_SITES, EVIDENCE, evidenceForState,
   getQuestion, answer, getEnding, restore, serialize
 } from '../docs/engine.js';
-import { freshEvidenceScenes, validEvidenceScenes } from '../docs/evidence-scenes.js';
+import { evidenceAtSite, freshEvidenceScenes, validEvidenceScenes } from '../docs/evidence-scenes.js';
 import { witnessRequirements } from '../docs/ending-requirements.js';
 import { availableResolutions } from '../docs/alternate-endings.js';
 import { FIELD_ART, evidenceMount, notebookMarkup } from '../docs/art.js';
@@ -110,11 +110,12 @@ test('the first card shown by the inspect action uses the saved scene rather tha
     const scene = evidenceForState(game, id);
     let card;
     vm.runInNewContext(source.slice(start, end), {
-      action: 'inspect', game, inspect, currentSiteScene, EVIDENCE, evidenceForState, evidenceMount, esc: escape,
+      action: 'inspect', game, inspect, nearbySite, evidenceAtSite, currentSiteScene, EVIDENCE, evidenceForState, evidenceMount, esc: escape,
       paper: (title, body, tag) => ({ title, body, tag }),
       showModal: (kind, content) => { card = { kind, ...content }; }
     });
     assert.equal(card.kind, 'evidence');
+    assert.equal(card.body.includes('data-action="dungeon-enter"'), siteId === 'drain');
     assert.equal(card.title, escape(scene.title));
     assert.ok(card.body.includes(escape(scene.text)), `${id} must vary on the initial discovery card`);
     assert.ok(card.body.includes(evidenceMount(id, game)), `${id} must use its saved discovery illustration`);
