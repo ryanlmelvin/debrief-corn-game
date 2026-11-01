@@ -25,6 +25,7 @@ import { startRogue, chooseRogue, moveRogue, getRogueScene, rogueOptions } from 
 import { RogueUI } from './rogue-ui.js';
 import { MINI_GAMES, createMiniGame, miniGameComplete, miniGameResult, getMiniGameUnlocks, normalizeMiniGameUnlocks } from './mini-games.js';
 import { InstallHandoff, recoverInstallHandoff, progressSnapshot, encodeProgress, decodeProgress, storeProgress, MAX_PROGRESS_BYTES } from './progress.js';
+import { prepareBackup, backupMethod, saveBackup, downloadBackup } from './progress-backup.js';
 
 const $ = id => document.getElementById(id);
 const canvas=$('field'), renderer=new Renderer(canvas), dialog=$('paper-dialog');
@@ -732,36 +733,63 @@ $('sound').addEventListener('click',async()=>{
 function shotSound(result) {
   if(soundEnabled)soundscape?.shot(result);
 }
-function showProgressTransfer() {
+function showProgressTransfer(view = 'files') {
   save();archiveRun();
-  showModal('progress',paper('Move saved progress.',`
-    <p class="small">Carry your saved game, mini-game unlocks, endings, and transcripts between the browser and installed app.</p>
-    <p class="small">In the browser with your progress, copy it or save a backup. Then open the app’s <b>Menu → Move saved progress</b> and paste the code or open that backup.</p>
-    <div class="paper-actions"><button id="copy-progress" class="secondary" disabled>Copy progress</button><button id="download-progress" class="secondary" disabled>Save backup ↓</button></div>
-    <p id="progress-export-status" class="small" role="status">Preparing progress…</p>
-    <div class="paper-actions"><div class="progress-entry"><label for="progress-code">Progress code</label><textarea id="progress-code" rows="3" spellcheck="false" autocapitalize="off" autocomplete="off" placeholder="Paste the code from your browser here"></textarea></div>
-    <button id="restore-progress" class="primary">Restore progress ↗</button><button id="open-progress" class="secondary">Open backup</button>
-    <p id="progress-import-status" class="small" role="status"></p></div>
+  const useCode=view==='code';
+  showModal('progress',paper(useCode?'Progress code.':'Back up / restore.',useCode?`
+    <p class="small">Copy progress from this device, or paste a code from another browser or app.</p>
+    <button id="copy-progress" class="secondary" disabled>Copy progress code</button>
+    <p id="progress-export-status" class="small" role="status" aria-live="polite">Preparing progress…</p>
+    <div class="progress-entry"><label for="progress-code">Progress code</label><textarea id="progress-code" rows="3" spellcheck="false" autocapitalize="off" autocomplete="off" placeholder="Paste your progress code here"></textarea></div>
+    <button id="restore-progress" class="primary">Restore from code ↗</button>
+    <p id="progress-import-status" class="small" role="status" aria-live="polite"></p>
+    <button id="progress-files" class="secondary">Back to backups</button>`:`
+    <p class="small">Your game saves automatically on this device. Keep a separate backup in case this browser’s data is cleared.</p>
+    <div class="paper-actions"><button id="download-progress" class="primary" disabled>Save backup…</button><button id="open-progress" class="secondary">Restore from backup…</button></div>
+    <p id="progress-export-status" class="small" role="status" aria-live="polite">Preparing backup…</p>
+    <p id="progress-import-status" class="small" role="status" aria-live="polite"></p>
+    <p id="progress-backup-help" class="small">Backups include your saved game, mini-game unlocks, endings, and transcripts. To move them, open this menu on the other device or app and choose Restore from backup.</p>
+    <button id="download-progress-copy" class="secondary" hidden disabled>Download a copy ↓</button>
+    <button id="progress-code-options" class="secondary">Use a progress code instead</button>
     <input id="progress-file" type="file" accept=".txt,text/plain" hidden>`, 'SAVED PROGRESS'));
   const copy=$('copy-progress'),download=$('download-progress'),input=$('progress-code'),file=$('progress-file');
   const exportStatus=$('progress-export-status'),importStatus=$('progress-import-status');
-  let code='';
+  const directDownload=$('download-progress-copy');
+  let code='',backup=null;
   try {
     const snapshot=progressSnapshot(game?.practice?readSave():(game||readSave()),history);
-    encodeProgress(snapshot).then(value=>{
-      if(!copy.isConnected)return;
-      code=value;copy.disabled=false;download.disabled=false;
-      exportStatus.textContent='Ready to copy or save. Your original progress stays here.';
-    }).catch(()=>{exportStatus.textContent='Progress could not be prepared. Close this window and try again.';});
-  } catch {exportStatus.textContent='No saved progress here yet. Bring it over from your browser below.';}
-  copy.addEventListener('click',async()=>{
-    try {await navigator.clipboard.writeText(code);exportStatus.textContent='Copied. Open the other app or browser, choose Move saved progress, and paste the code.';}
-    catch {input.value=code;pager.refresh();pager.go(pager.pages.findIndex(page=>page.contains(input)));input.focus();input.select();exportStatus.textContent='Select and copy the code below, or use Save backup.';}
+    (useCode?encodeProgress(snapshot):prepareBackup(snapshot)).then(value=>{
+      if(!exportStatus.isConnected)return;
+      if(useCode){code=value;copy.disabled=false;}
+      else{
+        backup=value;download.disabled=false;directDownload.disabled=false;
+        const method=backupMethod(backup);
+        download.textContent=method==='share'?'Save or share backup…':method==='picker'?'Save backup…':'Download backup ↓';
+        directDownload.hidden=method==='download';
+        if(method==='share')$('progress-backup-help').textContent='Choose Save to Files on iPhone / iPad, or a storage app on your device. To restore elsewhere, open this menu there and choose Restore from backup. Backups are updated only when you save a new copy.';
+      }
+      exportStatus.textContent=`${snapshot.history.collected.length} endings · ${snapshot.history.runs.length} transcripts · ${snapshot.history.miniGames.length} mini-game unlock${snapshot.history.miniGames.length===1?'':'s'}${snapshot.save?' · Current game included':''}. Ready to ${useCode?'copy':'back up'}.`;
+    }).catch(()=>{if(exportStatus.isConnected)exportStatus.textContent='Progress could not be prepared. Close this window and try again.';});
+  } catch {exportStatus.textContent='No saved progress here yet. You can restore a backup or progress code.';}
+  $('progress-code-options')?.addEventListener('click',()=>showProgressTransfer('code'));
+  $('progress-files')?.addEventListener('click',()=>showProgressTransfer());
+  copy?.addEventListener('click',async()=>{
+    try {await navigator.clipboard.writeText(code);exportStatus.textContent='Copied. On the other device, choose Back up / restore → Use a progress code instead, then paste.';}
+    catch {input.value=code;pager.refresh();pager.go(pager.pages.findIndex(page=>page.contains(input)));input.focus();input.select();exportStatus.textContent='Select and copy the code below, or choose Back to backups.';}
   });
-  download.addEventListener('click',()=>{
-    const url=URL.createObjectURL(new Blob([code],{type:'text/plain;charset=utf-8'}));
-    const link=document.createElement('a');link.href=url;link.download='debrief-progress.txt';link.click();
-    setTimeout(()=>URL.revokeObjectURL(url),1000);
+  download?.addEventListener('click',async()=>{
+    if(!backup)return;
+    download.disabled=true;
+    try{
+      const result=await saveBackup(backup);
+      if(exportStatus.isConnected)exportStatus.textContent={saved:'Backup saved. Save a new copy after making more progress.',shared:'Finish saving in the share sheet, then check your chosen location for the backup.',downloaded:'Download requested. Check your downloads for the backup file.',canceled:'Backup canceled. Your progress is still saved on this device.'}[result];
+    }catch{if(exportStatus.isConnected)exportStatus.textContent='The backup could not be saved. Try Download a copy, or use a progress code.';}
+    finally{download.disabled=false;}
+  });
+  directDownload?.addEventListener('click',()=>{
+    if(!backup)return;
+    try{downloadBackup(backup);exportStatus.textContent='Download requested. Check your downloads for the backup file.';}
+    catch{exportStatus.textContent='The download could not start. Try using a progress code.';}
   });
   const review=async value=>{
     importStatus.textContent='Checking progress…';
@@ -785,9 +813,9 @@ function showProgressTransfer() {
       });
     } catch {if(importStatus.isConnected)importStatus.textContent='That progress could not be read. Copy the full code again, or open a Debrief progress backup.';}
   };
-  $('restore-progress').addEventListener('click',()=>review(input.value));
-  $('open-progress').addEventListener('click',()=>file.click());
-  file.addEventListener('change',async()=>{
+  $('restore-progress')?.addEventListener('click',()=>review(input.value));
+  $('open-progress')?.addEventListener('click',()=>{file.value='';file.click();});
+  file?.addEventListener('change',async()=>{
     const backup=file.files[0];if(!backup)return;
     if(backup.size>MAX_PROGRESS_BYTES*2){importStatus.textContent='That file is too large. Choose a Debrief progress backup.';return;}
     try {await review(await backup.text());}catch {importStatus.textContent='That backup could not be opened. Try choosing it again.';}
@@ -822,13 +850,13 @@ function showInstallGuide() {
     <p class="small" id="install-status" role="status"></p>
     <p class="small" id="install-progress-status" role="status">Preparing your progress for installation…</p>
     <button class="primary" id="install-now" hidden>Install now ↗</button>
-    <button class="secondary" id="install-transfer">Move saved progress</button>
+    <button class="secondary" id="install-transfer">Back up / restore</button>
     <ul class="small">
       <li><b>iPhone / iPad:</b> Open this page in Safari, open Share (sometimes inside the page menu), choose Add to Home Screen, enable Open as Web App if offered, then tap Add.</li>
       <li><b>Android:</b> Open the browser menu and choose Install app or Add to Home screen, then confirm.</li>
       <li><b>Computer:</b> Look for the install icon in the address bar or Install app in the browser menu. In Safari on Mac, use File → Add to Dock. If unavailable, try a browser that supports installation.</li>
     </ul>
-    <p class="small">Open the new icon once online to prepare for offline play. Installation carries progress on supported browsers. After installation, browser and app saves may advance separately. For an app already installed, or if progress is missing, use Move saved progress.</p>
+    <p class="small">Open the new icon once online to prepare for offline play. Installation carries progress on supported browsers. After installation, browser and app saves may advance separately. For an app already installed, or if progress is missing, use Back up / restore.</p>
     <h3>Protect saves</h3>
     <p class="small">Keep saves during automatic browser cleanup.</p>
     <button id="protect-storage" class="secondary">Protect saved progress</button>
@@ -838,10 +866,10 @@ function showInstallGuide() {
   refreshInstallGuide();
   $('install-transfer').addEventListener('click',showProgressTransfer);
   const progressStatus=$('install-progress-status');
-  if(isInstalled())progressStatus.textContent='Missing browser progress? Use Move saved progress in both places to bring it here.';
+  if(isInstalled())progressStatus.textContent='Missing browser progress? Use Back up / restore in both places to bring it here.';
   else installHandoff.update(game?.practice?readSave():(game||readSave()),history).then(ready=>{
     if(!progressStatus.isConnected)return;
-    progressStatus.textContent=ready?'Your progress is prepared for installation. Recent Safari versions carry it into the new app; if it is missing, use Move saved progress.':'Use Move saved progress to keep a copy before installing. This browser could not prepare an automatic transfer.';
+    progressStatus.textContent=ready?'Your progress is prepared for installation. Recent Safari versions carry it into the new app; if it is missing, use Back up / restore.':'Use Back up / restore to keep a copy before installing. This browser could not prepare an automatic transfer.';
   });
   const status=$('storage-status'), protect=$('protect-storage');
   if(!navigator.storage?.persist || !navigator.storage?.persisted){
