@@ -7,7 +7,7 @@ import { FieldMap } from './field-ui.js';
 import { dialogArtwork, evidenceMount, notebookMarkup, encounterMarkup, interviewRecord } from './art.js';
 import { GameAudio, loadMusic, loadEffects } from './audio.js';
 import { SoundEvents } from './audio-events.js';
-import { encounterAudioCue } from './encounters.js';
+import { currentEncounter, encounterAudioCue } from './encounters.js';
 import { flare, ringBell } from './engine.js';
 import { updateWatchUI, updateReloadUI, watchRecord } from './watch-ui.js';
 import { pressureWordMarkup } from './pressure-word.js';
@@ -485,8 +485,17 @@ function act(action,value) {
   }
   if(action.startsWith('guide-')&&(!game||game.phase!=='guide'||paused||dialog.open||menuOpen()))return;
   if(action==='encounter-choice') {
+    const outcome=currentEncounter(game)?.choices.find(choice=>choice.id===value)?.result;
     if(!chooseFieldEncounter(game,value))return;
-    if(game.phase!=='field')closeModal();
+    if(outcome)toast(outcome);
+    const journey=game.fieldEvents.journey;
+    if(game.phase==='field'&&continueFieldEncounter(game)){
+      closeModal();
+      if(journey&&!fieldMap.travel){
+        fieldMap.choose(game,journey.destination);fieldMap.style=journey.style;
+        fieldMap.start(game);
+      }
+    }else if(game.phase!=='field')closeModal();
     lastModalKey='';save();updateUI(true);return;
   }
   if(action==='encounter-continue'||action==='encounter-map') {
