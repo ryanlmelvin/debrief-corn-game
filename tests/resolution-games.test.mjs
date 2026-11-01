@@ -3,10 +3,11 @@ import assert from 'node:assert/strict';
 import { advance, restore, serialize } from '../docs/engine.js';
 import { createMiniGame, getMiniGameUnlocks, miniGameComplete, miniGameResult } from '../docs/mini-games.js';
 import { chooseResolution, startResolution, getResolution, validResolution } from '../docs/alternate-endings.js';
-import { resolutionGameAction, releaseResolutionGame } from '../docs/resolution-games.js';
+import { resolutionGameAction, resolutionGameActive, releaseResolutionGame } from '../docs/resolution-games.js';
 import { solveResolutionGame } from './helpers/resolution-play.mjs';
 import { rescueStatus } from '../docs/rescue.js';
-import { transmissionStatus } from '../docs/transmission.js';
+import { chooseRogue } from '../docs/rogue.js';
+import { transmissionStatus, transmissionHorror, TRANSMISSION_DELAY, TRANSMISSION_EXPOSURE_COST } from '../docs/transmission.js';
 
 function storyRescue() {
   const s = createMiniGame('rescue', 'story', 753);
@@ -187,5 +188,130 @@ test('Transmission saves reject changed memories, wrong route provenance, imposs
   ]) {
     const copy = structuredClone(s);mutate(copy);
     assert.equal(restore(serialize(copy)), null);
+  }
+});
+
+
+function waitForTransmissionState(s, condition) {
+  for (let frame = 0; !condition(); frame++) {
+    assert.ok(frame < 1000, 'the requested state must be reachable through the real clock');
+    advance(s, .05);
+  }
+}
+function firstTransmissionBend(s) {
+  const t = s.resolution.activity.state;
+  while (!transmissionStatus(t).arrivalSafe) advance(s, .05);
+  assert.equal(resolutionGameAction(s, 'advance'), true);
+  waitForTransmissionState(s, () => t.crossing === 1);
+  return t;
+}
+function faceSecondCrossing(s) {
+  const t = firstTransmissionBend(s);
+  waitForTransmissionState(s, () => !transmissionHorror(t).present && !transmissionHorror(t).warning);
+  assert.equal(resolutionGameAction(s, 'turn'), true);
+  advance(s, TRANSMISSION_DELAY);
+  assert.equal(t.heading, 1);
+  return t;
+}
+function hitTransmissionRow(s) {
+  const t = s.resolution.activity.state, previous = t.setbacks;
+  waitForTransmissionState(s, () => transmissionStatus(t).canAdvance && !transmissionStatus(t).arrivalSafe);
+  assert.equal(resolutionGameAction(s, 'advance'), true);
+  waitForTransmissionState(s, () => t.setbacks > previous);
+  return t;
+}
+function hitTransmissionHorror(s) {
+  const t = s.resolution.activity.state, previous = t.setbacks;
+  waitForTransmissionState(s, () => transmissionHorror(t, t.crossing, t.time + TRANSMISSION_DELAY).present);
+  assert.equal(resolutionGameAction(s, 'turn'), true);
+  waitForTransmissionState(s, () => t.setbacks > previous);
+  return t;
+}
+
+test('Transmission collisions add ten exposure once, while tutorial, idle time and reloading add none', () => {
+  let s = storyTransmission();s.exposure = 23.5;
+  const journal = structuredClone(s.fieldEvents.journal), reports = structuredClone(s.reports);
+  advance(s, 60);
+  assert.equal(s.exposure, 23.5);
+  faceSecondCrossing(s);
+  assert.equal(s.exposure, 23.5, 'the tutorial and correctly timed Turn are safe');
+  hitTransmissionRow(s);
+  assert.equal(s.exposure, 23.5 + TRANSMISSION_EXPOSURE_COST);
+  advance(s, 60);
+  assert.equal(s.exposure, 33.5, 'the same setback cannot be charged on a later frame');
+  s = restore(serialize(s));assert.ok(s);
+  advance(s, 60);
+  assert.equal(s.exposure, 33.5, 'restoring a past setback is not a new collision');
+  hitTransmissionRow(s);
+  assert.equal(s.exposure, 43.5);
+  assert.deepEqual(s.fieldEvents.journal, journal);assert.deepEqual(s.reports, reports);
+  assert.deepEqual(restore(serialize(s)), s);
+});
+
+test('a delayed blocked Turn adds exposure without turning or losing the cleared crossing', () => {
+  let s = storyTransmission();firstTransmissionBend(s);
+  const t = s.resolution.activity.state;
+  waitForTransmissionState(s, () => transmissionHorror(t, t.crossing, t.time + TRANSMISSION_DELAY).present);
+  resolutionGameAction(s, 'turn');advance(s, .4);
+  s = restore(serialize(s));assert.ok(s);
+  advance(s, 60);
+  assert.equal(s.exposure, 10);
+  assert.equal(s.resolution.activity.state.crossing, 1);
+  assert.equal(s.resolution.activity.state.heading, 0);
+  assert.equal(s.resolution.activity.state.setbacks, 1);
+  assert.equal(transmissionStatus(s.resolution.activity.state).canTurn, true);
+  assert.deepEqual(restore(serialize(s)), s);
+  solveResolutionGame(s);
+  assert.equal(s.exposure, 10, 'safe commands add no further exposure');
+});
+
+test('story exposure reaching 100 follows the existing Corn consequence and retains the Transmission receipt', () => {
+  let s = storyTransmission();s.exposure = 95;
+  faceSecondCrossing(s);
+  const reports = structuredClone(s.reports);
+  hitTransmissionRow(s);
+  assert.equal(s.exposure, 100);assert.equal(s.phase, 'rogue');assert.equal(s.rogue.route, 'corn');
+  assert.equal(s.rogue.stage, 'intro');assert.equal(s.ending, null);assert.equal(s.resolution, undefined);
+  assert.deepEqual(s.reports, reports, 'the completed entry receipt remains in the transcript');
+  assert.deepEqual(getMiniGameUnlocks(s), ['watch', 'transmission']);
+  s = restore(serialize(s));assert.ok(s);
+  assert.equal(chooseRogue(s, 'root'), true);assert.equal(s.ending, 'assimilation');
+  assert.deepEqual(restore(serialize(s)), s);
+});
+
+test('practice exposure reaches a failed result at 100 without chaining into story or awarding an ending', () => {
+  let s = createMiniGame('transmission', 'story', 4);firstTransmissionBend(s);
+  for (let hit = 1; hit <= 10; hit++) {
+    hitTransmissionHorror(s);
+    assert.equal(s.exposure, hit * 10);
+    s = restore(serialize(s));assert.ok(s);
+    assert.equal(miniGameComplete(s), hit === 10);
+  }
+  assert.equal(s.phase, 'resolution');assert.equal(s.practice, 'transmission');
+  assert.equal(s.ending, null);assert.equal(s.rogue, undefined);
+  assert.equal(resolutionGameActive(s), false);
+  assert.equal(miniGameResult(s).success, false);assert.equal(miniGameResult(s).id, 'transmission');
+  assert.match(miniGameResult(s).message, /Exposure reached 100/);
+  assert.deepEqual(getMiniGameUnlocks(s), []);
+  const finished = serialize(s);
+  for (const action of ['advance', 'turn', 'wait']) assert.equal(resolutionGameAction(s, action), false);
+  advance(s, 60);assert.equal(serialize(s), finished);
+  for (const action of ['back', 'transmission-broadcast']) assert.equal(chooseResolution(s, action), false);
+  assert.deepEqual(restore(finished), s);
+});
+
+test('legacy pending saves pay only their new collision even when the saved retry counter is saturated', () => {
+  for (const priorSetbacks of [7, 1000000]) {
+    let s = storyTransmission();s.exposure = 18;
+    const t = s.resolution.activity.state;t.version = 1;t.setbacks = priorSetbacks;
+    waitForTransmissionState(s, () => !transmissionStatus(t).arrivalSafe);
+    resolutionGameAction(s, 'advance');advance(s, .4);
+    s = restore(serialize(s));assert.ok(s);
+    assert.equal(s.exposure, 18, 'old failures are never retroactively charged');
+    advance(s, 60);
+    assert.equal(s.exposure, 28);
+    assert.equal(s.resolution.activity.state.setbacks, Math.min(1000000, priorSetbacks + 1));
+    s = restore(serialize(s));advance(s, 60);
+    assert.equal(s.exposure, 28);
   }
 });

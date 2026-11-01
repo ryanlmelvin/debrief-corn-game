@@ -84,7 +84,8 @@ export function createMiniGame(id, mode = 'story', seed = Date.now()) {
 export function miniGameComplete(s) {
   if (!s || !MINI_GAMES.some(game => game.id === s.practice)) return false;
   if (s.practice === 'watch') return s.phase !== 'tower';
-  if (RESOLUTION_GAMES.includes(s.practice)) return s.resolution?.activity?.kind === s.practice && s.resolution.activity.state.stage === 'complete';
+  if (RESOLUTION_GAMES.includes(s.practice)) return s.resolution?.activity?.kind === s.practice &&
+    (s.resolution.activity.state.stage === 'complete' || s.practice === 'transmission' && s.exposure >= 100);
   return s.rogue?.route === s.practice && (s.phase === 'ending' || s.rogue.stage === 'choice');
 }
 
@@ -113,9 +114,10 @@ export function miniGameResult(s) {
     title = 'Both boots are free.';
     message = 'The voices hold the roots loose. In the story, carrying the person out means leaving the recordings behind.';
   } else if (id === 'transmission') {
-    success = true;
-    title = 'You found your way back.';
-    message = `All three crossings cleared · ${s.resolution.activity.state.commands} commands sent · ${s.resolution.activity.state.setbacks} crossings retried.`;
+    success = s.resolution.activity.state.stage === 'complete' && s.exposure < 100;
+    title = success ? 'You found your way back.' : 'The field found you.';
+    message = success ? `All three crossings cleared · ${s.resolution.activity.state.commands} commands sent · ${s.resolution.activity.state.setbacks} crossings retried.` :
+      'Exposure reached 100. Watch the moving rows and try again.';
   } else {
     success = s.ending === 'dungeon_escape';
     title = success ? 'Back above ground.' : 'The roots closed in.';

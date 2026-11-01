@@ -10,10 +10,11 @@ import { possibleChoiceEndings, hasSeenChoiceEndings, markSeenEndingChoices } fr
 import { REVIEWED_ENDING_HINTS } from '../scripts/check-ending-hints.mjs';
 import { resolutionGameAction, resolutionGameActive } from '../docs/resolution-games.js';
 import { rescueStatus } from '../docs/rescue.js';
-import { transmissionStatus } from '../docs/transmission.js';
+import { transmissionStatus, transmissionHorror, TRANSMISSION_DELAY } from '../docs/transmission.js';
 import { solveResolutionGame } from './helpers/resolution-play.mjs';
 
 const guideEndings = ['guide', 'guide_arrested', 'guide_interrupted', 'guide_shot'];
+const transmissionExposureEndings = ['assimilation', 'corn_contained', 'roadkill', 'corn_escape', 'corn_uprising'];
 const requirements = {
   relief: [['lamp-keeper', 'ask'], ['your-outline', 'name']],
   witness_present: [['first-call', 'record'], ['future-call', 'record'], ['last-follower', 'reply']],
@@ -238,6 +239,12 @@ function finishAfterResolutionWithdrawal(game, ending) {
       solveResolutionGame(game);
       assert.equal(chooseResolution(game, choice), true);
     }
+  } else if (transmissionExposureEndings.includes(ending)) {
+    enter('transmission', game);
+    assert.equal(chooseResolution(game, 'transmission-tower'), true);
+    assert.equal(chooseResolution(game, 'transmission-listen'), true);
+    reachTransmissionExposureLimit(game);
+    finishExposedCorn(game, ending);
   } else {
     const outcome = ending === 'guide_shot' ? 'secured' : ending === 'guide_arrested' ? 'arrested' : 'spared';
     interview(outcome, ending === 'guide_arrested', game);
@@ -366,7 +373,7 @@ test('locked rescue leads and practice rescue controls cannot receive collection
   assert.equal(hasSeenChoiceEndings(practice, 'resolution-answer', 'rescue-leave', all), false);
 });
 
-function transmissionAtRadio(firstCall = 'record') {
+function transmissionAtRadio(firstCall = 'record', version = 2) {
   const game = ready('transmission', 'rescue', 'relief', 'vacancy');
   if (firstCall !== 'record') {
     // Preserve support for older saved first-call variants. The normal current
@@ -379,6 +386,9 @@ function transmissionAtRadio(firstCall = 'record') {
   enter('transmission', game);
   assert.equal(chooseResolution(game, 'transmission-tower'), true);
   assert.equal(chooseResolution(game, 'transmission-listen'), true);
+  // Version 1 fixtures represent saved activities from before the guided first
+  // crossing. All movement and results below still use actual player inputs.
+  if (version === 1) game.resolution.activity.state.version = 1;
   assert.equal(resolutionGameActive(game), true);
   return game;
 }
@@ -390,7 +400,96 @@ function waitForTransmission(game, condition) {
   }
 }
 
-function transmissionChoices() {
+function waitForSafeTransmissionTurn(game) {
+  const t = game.resolution.activity.state;
+  waitForTransmission(game, () => transmissionStatus(t).canTurn && !transmissionHorror(t, t.crossing, t.time + TRANSMISSION_DELAY).present);
+}
+
+function reachTransmissionExposureLimit(game, inspect = () => {}) {
+  for (let frame = 0; resolutionGameActive(game); frame++) {
+    assert.ok(frame < 10000, 'real row collisions must eventually exhaust exposure');
+    const status = transmissionStatus(game.resolution.activity.state);
+    if (status.canTurn) assert.equal(resolutionGameAction(game, 'turn'), true);
+    else if (status.canAdvance && (status.tutorial || !status.arrivalSafe)) assert.equal(resolutionGameAction(game, 'advance'), true);
+    inspect(game);
+    advance(game, .05);
+  }
+  assert.equal(game.exposure, 100);
+  if (game.practice === 'transmission') {
+    assert.equal(game.phase, 'resolution');
+    assert.equal(game.ending, null);
+    assert.equal(game.rogue, undefined);
+    return game;
+  }
+  assert.equal(game.phase, 'rogue');
+  assert.equal(game.rogue.route, 'corn');
+  assert.equal(game.rogue.stage, 'intro');
+  assert.equal(game.resolution, undefined);
+  return game;
+}
+
+// Search public actions, then replay them. No coordinates, hits, immunity or
+// timing are assigned to manufacture a Corn outcome after the transmission.
+const cornReplayPaths = new Map();
+function crossCornSafely(game) {
+  const { crossing, hits, time } = game.rogue, cacheKey = `${game.mode}:${crossing}:${hits}:${time}`;
+  let path = cornReplayPaths.get(cacheKey);
+  if (!path) {
+    const queue = [{ game, path: [] }], seen = new Set();
+    for (let at = 0; at < queue.length && !path; at++) {
+      const current = queue[at];
+      if (current.path.length > 100) break;
+      const advanced = { ...current.game, rogue: { ...current.game.rogue } };
+      advance(advanced, .21);
+      if (advanced.rogue.hits !== hits) continue;
+      for (const [dx, dy] of [[0, -1], [-1, 0], [1, 0], [0, 0], [0, 1]]) {
+        const next = { ...advanced, rogue: { ...advanced.rogue } };
+        if ((dx || dy) && !moveRogue(next, dx, dy)) continue;
+        if (next.rogue.hits !== hits) continue;
+        const candidate = [...current.path, [dx, dy]];
+        if (next.rogue.stage === 'choice' || next.rogue.crossing > crossing) { path = candidate; break; }
+        const key = `${candidate.length}:${next.rogue.x}:${next.rogue.y}:${next.rogue.refuge}`;
+        if (!seen.has(key)) { seen.add(key); queue.push({ game: next, path: candidate }); }
+      }
+    }
+    assert.ok(path, 'the actual Corn simulation must offer a safe crossing');
+    cornReplayPaths.set(cacheKey, path);
+  }
+  for (const [dx, dy] of path) {
+    advance(game, .21);
+    if (dx || dy) assert.equal(moveRogue(game, dx, dy), true);
+  }
+  assert.equal(game.rogue.hits, hits);
+}
+
+function finishExposedCorn(game, ending) {
+  if (ending === 'assimilation') {
+    assertTerminalHint(game, 'rogue-choice', 'root', ending);
+    assert.equal(chooseRogue(game, 'root'), true);
+    return;
+  }
+  assert.equal(chooseRogue(game, 'begin'), true);
+  if (ending !== 'corn_contained') {
+    crossCornSafely(game);crossCornSafely(game);
+  }
+  if (ending === 'corn_escape' || ending === 'corn_uprising') {
+    crossCornSafely(game);
+    const choice = ending === 'corn_escape' ? 'escape' : 'gate';
+    assertTerminalHint(game, 'rogue-choice', choice, ending);
+    assert.equal(chooseRogue(game, choice), true);
+  } else {
+    for (let frame = 0; game.phase !== 'ending'; frame++) {
+      assert.ok(frame < 2000, 'waiting in a firing or traffic lane must produce real collisions');
+      if (game.rogue.y === 8) moveRogue(game, 0, -1);
+      advance(game, .25);
+    }
+    assert.equal(game.rogue.lastHit, ending === 'roadkill' ? 'car' : 'bullet');
+    conservativeFixtures.add(ending);
+  }
+  assert.equal(game.ending, ending);
+}
+
+function transmissionChoices(version = 2) {
   const game = ready('transmission', 'rescue', 'relief', 'vacancy'), choices = [];
   const record = (action, value) => choices.push({ game: structuredClone(game), action, value });
   record('answer', 'follow-lead');
@@ -401,8 +500,22 @@ function transmissionChoices() {
   assert.equal(chooseResolution(game, 'transmission-tower'), true);
   record('resolution-answer', 'transmission-listen');
   assert.equal(chooseResolution(game, 'transmission-listen'), true);
-  record('resolution-answer', 'back');
   const t = game.resolution.activity.state;
+  if (version === 1) t.version = 1;
+  record('resolution-answer', 'back');
+  if (version === 2) {
+    assert.equal(t.version, 2);
+    advance(game, 12);
+    assert.equal(transmissionStatus(t).arrivalSafe, true, 'reading the tutorial cannot miss its safe first move');
+    assert.equal(resolutionGameAction(game, 'advance'), true);
+    record('resolution-answer', 'back');
+    waitForTransmission(game, () => t.crossing === 1);
+    assert.equal(t.setbacks, 0);
+    record('resolution-answer', 'back');
+    waitForSafeTransmissionTurn(game);
+    assert.equal(resolutionGameAction(game, 'turn'), true);
+    waitForTransmission(game, () => transmissionStatus(t).canAdvance);
+  }
   waitForTransmission(game, () => transmissionStatus(t).canAdvance && !transmissionStatus(t).arrivalSafe);
   assert.equal(resolutionGameAction(game, 'advance'), true);
   assert.ok(t.pending);
@@ -416,10 +529,10 @@ function transmissionChoices() {
   return choices;
 }
 
-test('transmission entry, delayed commands and setbacks preserve every demonstrated withdrawal destination', () => {
+test('transmission entry, tutorial, delayed commands and setbacks preserve every demonstrated withdrawal destination', () => {
   const all = Object.keys(ENDINGS);
-  const reachable = ['transmission', 'rescue', 'relief', 'vacancy', 'dissent', ...guideEndings];
-  for (const { game, action, value } of transmissionChoices()) {
+  const reachable = ['transmission', 'rescue', 'relief', 'vacancy', 'dissent', ...guideEndings, ...transmissionExposureEndings];
+  for (const version of [1, 2]) for (const { game, action, value } of transmissionChoices(version)) {
     const before = structuredClone(game);
     assert.deepEqual(possibleChoiceEndings(game, action, value), sorted(all));
     for (const ending of reachable) {
@@ -435,10 +548,82 @@ test('transmission entry, delayed commands and setbacks preserve every demonstra
   }
 });
 
+test('real Transmission exposure reaches every Corn outcome without narrowing entry or live-control hints', () => {
+  const all = Object.keys(ENDINGS);
+  for (const version of [1, 2]) {
+    const game = transmissionAtRadio('record', version);
+    let lastCommand;
+    reachTransmissionExposureLimit(game, state => {
+      if (!lastCommand && state.exposure >= 90 && state.resolution.activity.state.pending) lastCommand = structuredClone(state);
+    });
+    assert.ok(lastCommand, 'the final exposure increase must come from a real delayed command');
+    const before = structuredClone(lastCommand);
+    for (const value of ['wait', 'advance', 'turn']) {
+      assert.equal(possibleChoiceEndings(lastCommand, 'resolution-game', value), null);
+      assert.equal(hasSeenChoiceEndings(lastCommand, 'resolution-game', value, all), false);
+    }
+    for (const ending of transmissionExposureEndings) {
+      const actual = structuredClone(game);
+      finishExposedCorn(actual, ending);
+      assert.equal(endingId(actual), ending);
+      assert.equal(hasSeenChoiceEndings(lastCommand, 'resolution-answer', 'back', historyExcept(ending)), false);
+      if (ending !== 'assimilation') assert.equal(hasSeenChoiceEndings(game, 'rogue-choice', 'begin', historyExcept(ending)), false);
+    }
+    assert.equal(hasSeenChoiceEndings(lastCommand, 'resolution-answer', 'back', all), true);
+    assert.equal(hasSeenChoiceEndings(game, 'rogue-choice', 'begin', all), true);
+    assertTerminalHint(game, 'rogue-choice', 'root', 'assimilation');
+    assert.equal(possibleChoiceEndings(game, 'resolution-answer', 'transmission-broadcast'), null);
+    assert.equal(hasSeenChoiceEndings(game, 'resolution-answer', 'transmission-broadcast', all), false);
+    assert.deepEqual(lastCommand, before, 'exposure, queued command and testimony stay unchanged during previews');
+  }
+});
+
+test('a delayed Turn into the horror retains every actual exposure ending and keeps its live hint suppressed', () => {
+  const game = transmissionAtRadio(), t = game.resolution.activity.state, all = Object.keys(ENDINGS);
+  assert.equal(resolutionGameAction(game, 'advance'), true);
+  waitForTransmission(game, () => t.crossing === 1);
+  let lastTurn;
+  for (let attempts = 0; game.phase === 'resolution'; attempts++) {
+    assert.ok(attempts < 10, 'each failed Turn must add exposure');
+    waitForTransmission(game, () => transmissionStatus(t).canTurn && transmissionHorror(t, t.crossing, t.time + TRANSMISSION_DELAY).present);
+    assert.equal(resolutionGameAction(game, 'turn'), true);
+    const priorExposure = game.exposure, before = structuredClone(game);
+    assert.equal(possibleChoiceEndings(game, 'resolution-game', 'turn'), null);
+    assert.equal(hasSeenChoiceEndings(game, 'resolution-game', 'turn', all), false);
+    for (const ending of transmissionExposureEndings) assert.equal(hasSeenChoiceEndings(game, 'resolution-answer', 'back', historyExcept(ending)), false);
+    assert.equal(hasSeenChoiceEndings(game, 'resolution-answer', 'back', all), true);
+    assert.deepEqual(game, before, 'preview cannot deliver the pending Turn or charge its exposure');
+    lastTurn = before;
+    waitForTransmission(game, () => game.phase !== 'resolution' || !t.pending);
+    assert.equal(game.exposure, Math.min(100, priorExposure + 10));
+    assert.equal(t.heading, 0, 'the horror prevents the turn');
+  }
+  assert.equal(game.phase, 'rogue');
+  assert.equal(game.rogue.route, 'corn');
+  assert.equal(game.resolution, undefined);
+  for (const ending of transmissionExposureEndings) {
+    const actual = structuredClone(game);
+    finishExposedCorn(actual, ending);
+    assert.equal(endingId(actual), ending);
+    assert.equal(hasSeenChoiceEndings(lastTurn, 'resolution-game', 'turn', historyExcept(ending)), false);
+  }
+});
+
+test('practice exposure failure never gains a story-ending hint or a Corn continuation', () => {
+  const practice = createMiniGame('transmission', 'story', 42), all = Object.keys(ENDINGS);
+  reachTransmissionExposureLimit(practice);
+  const before = structuredClone(practice);
+  for (const [action, value] of [['resolution-answer', 'back'], ['resolution-answer', 'transmission-broadcast'], ['resolution-game', 'advance'], ['resolution-game', 'wait'], ['resolution-game', 'turn'], ['rogue-choice', 'root'], ['rogue-choice', 'begin']]) {
+    assert.equal(possibleChoiceEndings(practice, action, value), null);
+    assert.equal(hasSeenChoiceEndings(practice, action, value, all), false);
+  }
+  assert.deepEqual(practice, before);
+});
+
 test('every supported first-call memory reaches the same stable warning through real transmission play', () => {
   const all = Object.keys(ENDINGS);
-  for (const firstCall of ['record', 'answer', 'leave']) {
-    const game = transmissionAtRadio(firstCall);
+  for (const version of [1, 2]) for (const firstCall of ['record', 'answer', 'leave']) {
+    const game = transmissionAtRadio(firstCall, version);
     const journal = structuredClone(game.fieldEvents.journal);
     const t = game.resolution.activity.state;
     assert.equal(t.firstCall, firstCall);
@@ -459,7 +644,7 @@ test('every supported first-call memory reaches the same stable warning through 
   }
 });
 
-test('transmission controls remain unmarked before delivery, while moving, at bends and after setbacks', () => {
+test('transmission tutorial controls remain unmarked before delivery, while moving, at bends and after later setbacks', () => {
   const game = transmissionAtRadio(), t = game.resolution.activity.state, all = Object.keys(ENDINGS);
   function assertLiveInputs() {
     const before = structuredClone(game);
@@ -472,7 +657,9 @@ test('transmission controls remain unmarked before delivery, while moving, at be
     assert.deepEqual(game, before);
   }
   assertLiveInputs();
-  waitForTransmission(game, () => !transmissionStatus(t).arrivalSafe);
+  advance(game, 12);
+  assert.equal(transmissionStatus(t).arrivalSafe, true);
+  assertLiveInputs();
   assert.equal(resolutionGameAction(game, 'advance'), true);
   assert.ok(t.pending);
   assertLiveInputs();
@@ -481,43 +668,71 @@ test('transmission controls remain unmarked before delivery, while moving, at be
   assert.deepEqual(game, queued, 'a queued radio call cannot be overwritten by another control');
   waitForTransmission(game, () => t.moving);
   assertLiveInputs();
+  waitForTransmission(game, () => transmissionStatus(t).canTurn);
+  assert.equal(t.crossing, 1);
+  assert.equal(t.setbacks, 0);
+  assertLiveInputs();
+  waitForSafeTransmissionTurn(game);
+  assert.equal(resolutionGameAction(game, 'turn'), true);
+  assertLiveInputs();
+  waitForTransmission(game, () => transmissionStatus(t).canAdvance && !transmissionStatus(t).arrivalSafe);
+  assert.equal(resolutionGameAction(game, 'advance'), true);
+  assertLiveInputs();
   waitForTransmission(game, () => t.setbacks > 0);
+  assert.equal(t.crossing, 1, 'later timed failure keeps the tutorial crossing cleared');
   assertLiveInputs();
   waitForTransmission(game, () => transmissionStatus(t).arrivalSafe);
   assert.equal(resolutionGameAction(game, 'advance'), true);
   waitForTransmission(game, () => transmissionStatus(t).canTurn);
   assertLiveInputs();
+  waitForSafeTransmissionTurn(game);
   assert.equal(resolutionGameAction(game, 'turn'), true);
   assertLiveInputs();
   solveResolutionGame(game);
   assertTerminalHint(game, 'resolution-answer', 'transmission-broadcast', 'transmission');
 });
 
-test('transmission previews leave pending commands, saved history and randomness untouched', () => {
-  const game = transmissionAtRadio();
-  const t = game.resolution.activity.state;
-  assert.equal(resolutionGameAction(game, 'advance'), true);
-  const history = { collected: Object.keys(ENDINGS), runs: [{ id: 'previous', reports: [] }] };
-  const priorHistory = JSON.stringify(history), journal = structuredClone(game.fieldEvents.journal), random = Math.random;
-  let randomCalls = 0;
-  try {
-    Math.random = () => { randomCalls++; return .5; };
-    for (let frame = 0; frame < 6; frame++) {
-      const save = JSON.stringify(game);
-      for (const [action, value] of [['resolution-answer', 'back'], ['resolution-answer', 'transmission-broadcast'], ['resolution-game', 'wait'], ['resolution-game', 'advance'], ['resolution-game', 'turn']]) {
-        possibleChoiceEndings(game, action, value);
-        hasSeenChoiceEndings(game, action, value, history.collected);
-        assert.equal(JSON.stringify(game), save);
-        assert.equal(JSON.stringify(history), priorHistory);
+test('transmission previews leave tutorial and legacy pending commands, saved history and randomness untouched', () => {
+  for (const version of [1, 2]) {
+    const game = transmissionAtRadio('record', version);
+    const t = game.resolution.activity.state;
+    assert.equal(resolutionGameAction(game, 'advance'), true);
+    const history = { collected: Object.keys(ENDINGS), runs: [{ id: 'previous', reports: [] }] };
+    const priorHistory = JSON.stringify(history), journal = structuredClone(game.fieldEvents.journal), random = Math.random;
+    let randomCalls = 0;
+    try {
+      Math.random = () => { randomCalls++; return .5; };
+      const inspect = () => {
+        const save = JSON.stringify(game);
+        for (const [action, value] of [['resolution-answer', 'back'], ['resolution-answer', 'transmission-broadcast'], ['resolution-game', 'wait'], ['resolution-game', 'advance'], ['resolution-game', 'turn']]) {
+          possibleChoiceEndings(game, action, value);
+          hasSeenChoiceEndings(game, action, value, history.collected);
+          assert.equal(JSON.stringify(game), save);
+          assert.equal(JSON.stringify(history), priorHistory);
+        }
+      };
+      for (let frame = 0; frame < 12; frame++) {
+        inspect();advance(game, .6);
       }
-      advance(game, .6);
+      if (version === 2) {
+        assert.equal(t.crossing, 1);
+        assert.equal(t.setbacks, 0);
+        waitForSafeTransmissionTurn(game);
+        assert.equal(resolutionGameAction(game, 'turn'), true);
+        inspect();
+        waitForTransmission(game, () => transmissionStatus(t).canAdvance && !transmissionStatus(t).arrivalSafe);
+        assert.equal(resolutionGameAction(game, 'advance'), true);
+        for (let frame = 0; frame < 12; frame++) {
+          inspect();advance(game, .6);
+        }
+      }
+    } finally {
+      Math.random = random;
     }
-  } finally {
-    Math.random = random;
+    assert.ok(t.setbacks > 0, 'the clock exercised both queued delivery and the real closed-row setback');
+    assert.equal(randomCalls, 0);
+    assert.deepEqual(game.fieldEvents.journal, journal);
   }
-  assert.ok(t.setbacks > 0, 'the clock exercised both queued delivery and the real closed-row setback');
-  assert.equal(randomCalls, 0);
-  assert.deepEqual(game.fieldEvents.journal, journal);
 });
 
 test('locked transmission leads and practice never acquire collection hints', () => {

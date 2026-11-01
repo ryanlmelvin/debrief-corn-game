@@ -1,5 +1,21 @@
 # Debrief asset sources
 
+## Rescue work boots
+
+`docs/assets/rescue-boot.webp` was generated with the built-in image-generation tool and encoded as transparent WebP with the original alpha preserved. Rescue uses the sprite for both boots, mirroring the left boot. The existing root bindings remain a separate animated layer, and the boots retain their independent pull and release movement. The background artwork and game palette are unchanged.
+
+### rescue-boot.webp
+
+Use case: stylized-concept
+Asset type: transparent game sprite for Debrief's rural horror Rescue minigame.
+Primary request: ONE custom, worn mid-calf farm work boot, isolated on true transparent background, entire boot visible. This is a functional game sprite, not a scene or product mockup.
+Subject: rugged battered leather lace-up field boot, tall softly creased shaft, sturdy rounded toe pointing slightly to the viewer's right in a near-front three-quarter view, thick dark treaded sole, dull brass eyelets, frayed faded laces, scuffed leather and small traces of dried soil. A believable boot for someone stranded in a dark cornfield. No leg or person.
+Style/medium: finely painted naturalistic rural-horror illustration with etched grain and weathered photographic detail, clear readable silhouette at small size, restrained and sober.
+Composition/framing: one upright boot centered; upper shaft in upper half, ankle and toe lower half. Boot silhouette about 4:5 width-to-height, little transparent padding, no cropping. No companion boot.
+Lighting/mood: dim soft lantern rim light from upper left, readable warm muted highlights, deep olive shadows without crushing detail.
+Color palette: desaturated peat brown and olive leather, charcoal sole, old brass hardware, pale tan scuffs. Fit a dark forest-green and faded parchment game interface. No saturated colors.
+Constraints: true transparent alpha outside the boot. No backdrop, ground plane, cast shadow, roots, vines, grass, scenery, labels, lettering, text, logo, border, glow, watermark or white halo. Root bindings will be animated separately by the game.
+
 ## Readable watchtower anatomy — nights two and three
 
 `docs/assets/watch-human-anatomy.webp` was generated with the built-in image-generation tool using the existing generated corn sprites as edit references, then encoded as transparent WebP. Night two has one pale hand growing from an upper leaf; night three retains it and adds a small human mouth among the kernels. Both details sit above the roots so foreground rows do not conceal the entire change. The ordinary first-night corn, landscape, palette, hitboxes, and nightly progression are unchanged. The previous atlas remains available; the renderer uses the new atlas for later nights.

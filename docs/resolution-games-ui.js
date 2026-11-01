@@ -18,6 +18,6 @@ export class ResolutionGamesUI {
     const back = this.root.querySelector('.resolution-game-exit');
     back.hidden = !!s.practice;
     back.querySelector('button').disabled = disabled;
-    this.ui.render(s.resolution.activity.state, disabled);
+    this.ui.render(s.resolution.activity.state, disabled, s.exposure);
   }
 }

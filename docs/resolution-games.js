@@ -1,5 +1,6 @@
 import { createRescue, advanceRescue, rescueAction, validRescue } from './rescue.js';
-import { createTransmission, advanceTransmission, transmissionAction, validTransmission } from './transmission.js';
+import { createTransmission, advanceTransmission, transmissionAction, validTransmission, TRANSMISSION_EXPOSURE_COST } from './transmission.js';
+import { startRogue } from './rogue.js';
 
 export const RESOLUTION_GAMES = ['rescue', 'transmission'];
 
@@ -22,6 +23,7 @@ export function validResolutionActivity(activity, route) {
 export function resolutionGameActive(s) {
   const r = s?.resolution;
   return s?.phase === 'resolution' && r?.step === 2 &&
+    !(s.practice === 'transmission' && s.exposure >= 100) &&
     validResolutionActivity(r.activity, r.route) && r.activity.state.stage !== 'complete';
 }
 
@@ -35,7 +37,20 @@ export function advanceResolutionGame(s, dt) {
   if (!resolutionGameActive(s)) return;
   const { kind, state } = s.resolution.activity;
   if (kind === 'rescue') advanceRescue(state, dt);
-  else advanceTransmission(state, dt);
+  else {
+    // Charge new collision events, never the saved retry count. This also keeps
+    // the cost exact when an old save's display counter has reached its limit.
+    let collisions = 0;
+    advanceTransmission(state, dt, () => { collisions++; });
+    if (!collisions) return;
+    s.exposure = Math.min(100, s.exposure + collisions * TRANSMISSION_EXPOSURE_COST);
+    if (s.exposure < 100 || s.practice) return;
+    // Exposure has the same consequence as it does on the field. Keep the
+    // completed entry receipts so the Transmission unlock is not lost.
+    delete s.resolution;
+    s.phase = 'field';
+    startRogue(s, 'corn');
+  }
 }
 
 // Held inputs belong to the current pointer/key session, never to a pause,

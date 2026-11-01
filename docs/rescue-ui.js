@@ -9,7 +9,7 @@ function waveform(offset) {
 }
 
 const boot = (index, x) => `<g data-rescue-boot="${index}" transform="translate(${x} 0)">
-  <g class="rescue-boot-shape"><path d="M-26 31h38l3 64 28 17q9 7 3 17h-70q-10-6-10-16z" fill="#4b4d38" stroke="#c3ba94" stroke-width="2"/><path d="M-17 41h22M-17 51h23M-17 61h24M-17 71h25M-26 121h72" stroke="#9b9c76" stroke-width="2"/></g>
+  <g class="rescue-boot-shape"><image href="./assets/rescue-boot.webp" x="-48" y="20" width="96" height="120" preserveAspectRatio="xMidYMax meet"${index ? '' : ' transform="scale(-1 1)"'}/></g>
   <g class="rescue-boot-roots" fill="none" stroke="#baa67c" stroke-width="3" stroke-linecap="round"><path d="M-70 146q35-64 93-47t37 48M-63 165q15-67 49-57t64 14M-44 95q28-22 64-5M-28 102l-32-24m17 9-2-24M19 111l35-38m-11 14 24-3M-2 132l-9 34m8-20 22 24"/></g>
   <text x="0" y="193" text-anchor="middle" class="rescue-boot-label">${index ? 'RIGHT BOOT' : 'LEFT BOOT'}</text>
 </g>`;
