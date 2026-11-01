@@ -27,7 +27,9 @@ export const REVIEWED_ENDING_HINTS = Object.freeze({
   field_voice: reviewed('direct', 'The stable final command is simulated; timed signal locks are never predicted from a render snapshot.'),
   flood: reviewed('conservative', 'The pipe puzzle remains within open gameplay bounds; its introduction can return to the field.'),
   corn_contained: reviewed('conservative', 'Bullet collisions happen during live movement and remain within open gameplay bounds.'),
-  roadkill: reviewed('conservative', 'Traffic collisions happen during live movement and remain within open gameplay bounds.')
+  roadkill: reviewed('conservative', 'Traffic collisions happen during live movement and remain within open gameplay bounds.'),
+  dungeon_escape: reviewed('conservative', 'A human guard reaches the keyed surface exit in a real three-floor replay using movement, rifle fire and reloading. Drain entry, beginning and withdrawal keep all endings regardless of ammunition; turn controls stay unmarked. Field-only entry is unavailable throughout committed recovery.'),
+  dungeon_lost: reviewed('conservative', 'Real waiting turns let roots reduce the human guard’s condition to zero. The loss remains in every drain entry and introduction bound alongside escape and withdrawal outcomes; rifle, reload and other turn inputs stay unmarked. Recovery cannot enter the field-only route.')
 });
 
 export function validateEndingHintCoverage(endings = ENDINGS) {

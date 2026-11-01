@@ -117,9 +117,9 @@ for (const mode of ['story', 'hard']) for (const [id, route] of Object.entries(r
     assert.equal(endingId(game), id);
     const ending = getEnding(game);
     assert.equal(ending.title, route.title);
-    assert.equal(Object.keys(ENDINGS).length, 22);
+    assert.equal(Object.keys(ENDINGS).length, 24);
     const share = endingShareData(id, [id]);
-    assert.equal(share.text, `${route.title}\nI've achieved 1 of 22 endings.`);
+    assert.equal(share.text, `${route.title}\nI've achieved 1 of 24 endings.`);
     assert.ok(share.url.endsWith(`/share/${ending.code}/`));
     assert.ok(game.reports.some(report => report.kind === 'resolution'));
     const history = { collected: [id], runs: [{ ...ending, id: game.runId, ending: id, date: '2026-10-30T12:00:00Z', reports: game.reports }] };

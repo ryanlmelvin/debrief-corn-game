@@ -89,7 +89,7 @@ function takeCornRoute(s, path, saves = true) {
 
 test('reckless opportunities are reachable, location gated, and reject invalid starts', () => {
   const s = field();
-  assert.deepEqual(rogueOptions(s).map(o => [o.id, o.disabled]), [['corn',true],['broadcast',false],['flood',true]]);
+  assert.deepEqual(rogueOptions(s).map(o => [o.id, o.disabled]), [['corn',true],['broadcast',false],['flood',true],['dungeon',true]]);
   assert.equal(startRogue(s, 'corn'), false);
   assert.equal(startRogue(s, 'flood'), false);
   assert.equal(startRogue(s, 'unknown'), false);
@@ -432,7 +432,7 @@ test('older saves remain compatible and forged or out-of-bounds rogue states are
     const wrongCommit=structuredClone(s);wrongCommit.reports.at(-1).rogueRoute='other';assert.equal(restore(serialize(wrongCommit)),null);
     const wrongPhase=structuredClone(s);wrongPhase.phase='field';assert.equal(validRogue(wrongPhase),false);
   }
-  for(const ending of ['corn_escape','corn_uprising','radio_ghost','field_voice','flood','corn_contained','roadkill']) {
+  for(const ending of ['corn_escape','corn_uprising','radio_ghost','field_voice','flood','corn_contained','roadkill','dungeon_escape','dungeon_lost']) {
     const forged=field();forged.phase='ending';forged.ending=ending;assert.equal(restore(serialize(forged)),null);
   }
 });

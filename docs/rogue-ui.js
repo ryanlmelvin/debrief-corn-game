@@ -1,9 +1,10 @@
 import { rogueOptions, getRogueScene, cornHazards, broadcastCursor, broadcastWindow, floodConnections } from './rogue.js';
 import { pressureWordMarkup } from './pressure-word.js';
+import { dungeonMarkup, renderDungeon } from './dungeon-ui.js';
 
 const escape = value => String(value).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const TITLES = { corn: 'Shoot any that try to escape.', broadcast: 'Everyone is listening.', flood: 'The field drinks first.' };
-const LABELS = { corn: 'SPECIMEN 04 / PERIMETER CROSSING', broadcast: 'UNAUTHORIZED TRANSMISSION', flood: 'TREATMENT CONTROL / MANUAL OVERRIDE' };
+const LABELS = { corn: 'SPECIMEN 04 / PERIMETER CROSSING', broadcast: 'UNAUTHORIZED TRANSMISSION', flood: 'TREATMENT CONTROL / MANUAL OVERRIDE', dungeon: 'DRAINAGE ACCESS / BELOW THE ROOT LINE' };
 // Crop the same human-anatomy specimen used by the third watch; its roots sit on the hit marker.
 const CORN = `<svg class="rogue-corn-body" x="-.52" y="-1.58" width="1.14" height="1.78" viewBox="683 0 608 1160" preserveAspectRatio="none" overflow="hidden"><defs><clipPath id="rogue-specimen-crop" clipPathUnits="userSpaceOnUse"><rect x="683" y="0" width="608" height="1160"/></clipPath></defs><image href="./assets/watch-human-anatomy.webp" width="1312" height="1199" clip-path="url(#rogue-specimen-crop)"/></svg>`;
 const trafficCrossing = r => r.patternVersion === 2 && r.crossing === 2;
@@ -17,7 +18,7 @@ export function rogueMenuMarkup(game) {
 function sceneMarkup(game) {
   const r = game.rogue, scene = getRogueScene(game);
   if (!scene) return '';
-  const art = r.route === 'corn' ? 'field-corner' : r.route === 'broadcast' ? 'encounter-radio' : 'field-pump';
+  const art = r.route === 'corn' ? 'field-corner' : r.route === 'broadcast' ? 'encounter-radio' : r.route === 'dungeon' ? 'field-drain' : 'field-pump';
   const customCorn = r.route === 'corn' && r.stage === 'intro';
   return `<div class="rogue-scene"><div class="rogue-scene-art" ${customCorn ? '' : 'aria-hidden="true"'} style="background-image:linear-gradient(0deg,#111b16,transparent 80%),url('./assets/${art}.webp')">${customCorn ? '<img class="rogue-scene-photo" src="./assets/rogue-corn.jpg" alt="Hands turn to roots beneath the watchtower searchlight.">' : ''}</div><article class="rogue-scene-copy"><p class="rogue-eyebrow">${LABELS[r.route]}</p><h2 id="rogue-title" tabindex="-1">${escape(scene.title)}</h2><div class="rogue-scene-text">${scene.text.split('\n\n').map(p => `<p>${escape(p)}</p>`).join('')}</div>${r.route === 'corn' ? escapeWordMarkup() : ''}<div class="rogue-scene-choices">${scene.options.map((option, i) => `<button class="${i === 0 ? 'primary' : 'secondary'}" data-action="rogue-choice" data-value="${escape(option.id)}"><span>${escape(option.label)}</span>${option.detail ? `<small>${escape(option.detail)}</small>` : ''}</button>`).join('')}</div></article></div>`;
 }
@@ -58,14 +59,15 @@ export class RogueUI {
     const r = game.rogue, key = `${game.runId}:${r.route}:${r.stage}:${r.route === 'corn' ? `${r.patternVersion || 1}:${r.crossing || 0}` : ''}`;
     if (key !== this.key) {
       const hadFocus = !this.key || this.root.contains(document.activeElement);
-      this.key = key; this.hazardNodes = new Map(); this.lastMessage = '';
+      this.key = key; this.hazardNodes = new Map(); this.lastMessage = ''; delete this.root.dataset.dungeonRender;
       this.root.dataset.route = r.route; this.root.dataset.stage = r.stage;
-      this.root.innerHTML = r.stage === 'play' ? ({ corn: cornMarkup, broadcast: broadcastMarkup, flood: floodMarkup }[r.route])(game) : sceneMarkup(game);
+      this.root.innerHTML = r.stage === 'play' ? ({ corn: cornMarkup, broadcast: broadcastMarkup, flood: floodMarkup, dungeon: dungeonMarkup }[r.route])(game) : sceneMarkup(game);
       if (hadFocus) this.root.querySelector('#rogue-title')?.focus({ preventScroll: true });
     }
     this.root.classList.toggle('rogue-is-paused', paused);
     this.root.querySelectorAll('button').forEach(button => { button.disabled = paused; });
     if (r.stage !== 'play') return;
+    if (r.route === 'dungeon') { renderDungeon(this.root, game, paused); return; }
     const q = selector => this.root.querySelector(selector);
     q('#rogue-health').textContent = r.route === 'corn' ? `${3 - r.hits} / 3` : r.route === 'broadcast' ? `${r.locks} / 3 locked` : `${3 - r.hits} seals left`;
     q('.rogue-condition').classList.toggle('rogue-critical', r.hits >= 2);

@@ -21,7 +21,7 @@ export function updateWatchUI(s, paused = false) {
   $('watch-radio').hidden = !active || paused;
   $('watch-record').hidden = !w || !w.shots;
   if (!w) return;
-  if (!active && s.phase !== 'briefing' && w.score > bestWatch(s)) {
+  if (!s.practice && !active && s.phase !== 'briefing' && w.score > bestWatch(s)) {
     bests[`${s.mode}-${s.shift}`] = w.score;
     try { localStorage.setItem(BEST_KEY, JSON.stringify(bests)); } catch {}
   }

@@ -20,6 +20,7 @@ export class FieldMap {
       <section class="field-route-card" aria-label="Travel plan"><img id="field-route-photo" class="field-route-photo" width="300" height="200" alt="" hidden><div class="field-destination"><div><h3 id="field-destination"></h3></div></div><p id="field-route-note"></p>
         <div class="field-route-options" role="group" aria-label="Choose your route"><button data-action="field-style" data-value="quiet"><b>Follow paths</b><span id="field-quiet-cost"></span></button><button data-action="field-style" data-value="direct"><b>Cut through rows</b><span id="field-direct-cost"></span></button></div>
         <p id="field-risk" role="status"></p><button class="field-go" data-action="field-go"></button><button class="field-stop" data-action="field-stop" hidden>Stop</button>
+        <button id="field-dungeon" class="secondary" data-action="dungeon-enter" hidden>Follow the drain below ground ↘</button>
       </section>`;
   }
   reset() { this.selected=null;this.travel=null;this.lastKey=''; }
@@ -68,7 +69,7 @@ export class FieldMap {
     const active=s.phase==='field';this.root.hidden=!active;
     if(!active){this.reset();return;}
     this.updateSelection(s,holdDiscovery);
-    const key=[s.shift,s.player.x,s.player.y,s.exposure,s.inspected.join(','),this.selected,this.style,!!this.travel,paused,s.fieldEvents.journal.length].join(':');
+    const key=[s.shift,s.player.x,s.player.y,s.exposure,s.inspected.join(','),this.selected,this.style,!!this.travel,paused,s.fieldEvents.journal.length,!!s.fieldEvents.pending,!!s.expedition?.active].join(':');
     if(key===this.lastKey)return;this.lastKey=key;
     const q=id=>this.root.querySelector(`#${id}`), complete=investigationComplete(s),site=FIELD_SITES.find(p=>p.id===this.selected),quiet=this.route(s,'quiet'),direct=this.route(s,'direct'),here=nearbySite(s)?.id===site.id;
     const route=this.travel?{steps:this.travel.steps,exposure:this.travel.steps.reduce((total,p)=>total+fieldStepCost(s,p.x,p.y),0)}:this.route(s);
@@ -114,5 +115,10 @@ export class FieldMap {
     go.textContent=here?(site.id==='tower'?(complete?'Debrief ↗':'Choose a landmark'):scene?scene.label:s.inspected.includes(site.id)?'Location searched':'Inspect'):(site.id==='tower'?'Return ↑':'Walk →');
     go.disabled=paused||fatal||(here&&(site.id==='tower'?!complete:s.inspected.includes(site.id)&&!scene));
     const stop=this.root.querySelector('.field-stop');stop.hidden=!this.travel;stop.disabled=paused;
+    // The next suggested landmark can change as soon as the drain is inspected.
+    // Keep its new passage available at the player's actual location.
+    const dungeon=q('field-dungeon');
+    dungeon.hidden=nearbySite(s)?.id!=='drain'||!s.inspected.includes('drain')||!!this.travel;
+    dungeon.disabled=paused||!!s.fieldEvents.pending||!!s.expedition?.active;
   }
 }

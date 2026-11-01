@@ -1,6 +1,16 @@
 // Original outcomes for the optional breaks in protocol. Share captions live
 // separately so the public cards never contain these ending transcripts.
 export const ROGUE_ENDINGS = {
+  dungeon_escape: {
+    code: '23', title: 'Dungeon Crawler Corn.', art: 'drain', stamp: 'SUBTERRANEAN EXIT',
+    text: 'The third brass key turns in the gate. You climb out of the ditch with your rifle slung over a torn uniform. Behind you, the lantern lights three flights of wet steps and the broken roots that guarded them. Ahead is an unfamiliar road. There is no tower. No fence. You check the chamber, put the lantern down, and start walking before anyone can call you back for debrief.',
+    last: 'The drain was never meant to keep things out.'
+  },
+  dungeon_lost: {
+    code: '24', title: 'Below the root line.', art: 'drain', stamp: 'LANTERN RECOVERED',
+    text: 'The lantern rolls into the water. Without it, the corridors are only roots, and the roots are only corridors. You reach for your rifle, but something pins your wrist beneath the water. Above you, your relief shines a flashlight into the drainage channel. You gather everything you have left into one shout. From up there, it sounds like a blocked pipe.',
+    last: 'The next descent begins with a lantern waiting on the steps.'
+  },
   corn_escape: {
     code: '16', title: 'I was the corn.', art: 'corner', stamp: 'SPECIMEN AT LARGE',
     text: 'The last shot cuts a tassel from your head. Then you are in the ditch beyond the road, listening to the guard reload. You remember that sound from the other side of the rifle. At dawn, a truck slows beside you. The driver mistakes your raised leaves for a wave. You climb into the bed among sacks of seed. The county line passes without a checkpoint.',

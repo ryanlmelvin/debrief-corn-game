@@ -446,6 +446,14 @@ export function restore(raw) {
   try {
     const s = JSON.parse(raw);
     if (!s || ![1,SAVE_VERSION].includes(s.version) || !(s.version === 1 ? ['standard','story'] : ['story','hard']).includes(s.mode) || !['briefing','tower','decision','field','debrief','resolution','rogue','guide','ending'].includes(s.phase)) return null;
+    // Keep practice provenance through every save/restore path. A mini game
+    // cannot resume as a different route or as a normal story assignment.
+    if (s.practice !== undefined) {
+      if (!['watch', 'corn', 'broadcast', 'flood', 'dungeon'].includes(s.practice)) return null;
+      if (s.practice === 'watch') {
+        if (s.rogue !== undefined || !['tower', 'field', 'ending'].includes(s.phase) || s.phase === 'ending' && s.ending !== 'breach') return null;
+      } else if (s.rogue?.route !== s.practice || !['rogue', 'ending'].includes(s.phase)) return null;
+    }
     if (!Number.isInteger(s.shift) || s.shift < 0 || s.shift > 2 || !Number.isInteger(s.question) || s.question < 0 || s.question > 3) return null;
     for (const key of ['time','rounds','reserve','reload','kills','shots','breaches','exposure','trust','honesty','rng','nextSpawn','nextId','fieldSteps']) if (!Number.isFinite(s[key])) return null;
     if (s.time < 0 || s.time > SHIFT_LENGTH + 1 || s.rounds < 0 || s.rounds > 6 || s.reserve < 0 || s.exposure < 0 || s.exposure > 100) return null;

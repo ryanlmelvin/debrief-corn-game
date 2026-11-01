@@ -1,0 +1,16 @@
+#paper-dialog:is([data-kind="mini-games"],[data-kind="mini-result"]){width:calc(100% - 28px);max-width:490px;height:fit-content;max-height:calc(100dvh - 28px)}
+#paper-dialog:is([data-kind="mini-games"],[data-kind="mini-result"]) .paper{padding:24px}
+#paper-dialog:is([data-kind="mini-games"],[data-kind="mini-result"]) h2{font-size:34px;margin-bottom:12px}
+#paper-dialog[data-kind="mini-games"] .small{margin:0 0 16px;font-size:11px}
+.mini-game-list{display:grid;gap:8px}
+.mini-game-card{display:flex;align-items:center;gap:14px;text-align:left;padding:9px;background:#e6e2c855;color:#263023;border:1px solid #8e967b;min-height:68px;width:100%}
+.mini-game-card:not(:disabled):hover{background:#f0ecd4}.mini-game-thumb{width:54px;height:54px;background-size:cover;background-position:center;flex-shrink:0;filter:saturate(.7)}
+.mini-game-card>span:nth-child(2){flex:1}.mini-game-card b{font:400 19px/1.2 Georgia,serif}.mini-game-card small{display:block;color:#68705b;font:10px/1.5 ui-monospace,monospace;margin-top:5px}
+.mini-game-status{display:grid;justify-items:center;gap:5px;font-size:21px;color:#6a7656;padding-right:4px}
+.mini-game-status svg{width:16px;height:20px;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linejoin:round}
+.mini-game-status>span{font:9px/1 ui-monospace,monospace;text-transform:uppercase;letter-spacing:.04em}
+.mini-game-card.is-locked{opacity:1;background:#d0d0bb44;border-style:dashed;color:#626a57;cursor:default}
+.mini-game-card.is-locked .mini-game-thumb{filter:grayscale(1);opacity:.5}
+#paper-dialog[data-kind="mini-games"] .paper-actions{justify-content:space-between}#paper-dialog[data-kind="mini-games"] .secondary{margin-top:12px}
+#paper-dialog[data-kind="mini-result"] .paper-actions{gap:8px}#paper-dialog[data-kind="mini-result"] .primary{min-width:130px}
+@media(max-width:400px){#paper-dialog[data-kind="mini-games"] .paper{padding:18px}.mini-game-card{gap:10px;min-height:62px}.mini-game-thumb{width:44px;height:44px}.mini-game-card b{font-size:18px}.mini-game-card small{font-size:9px}}

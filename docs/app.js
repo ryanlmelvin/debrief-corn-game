@@ -19,6 +19,7 @@ import { resolutionMarkup } from './resolution-ui.js';
 import { markSeenEndingChoices } from './seen-endings.js';
 import { startRogue, chooseRogue, moveRogue } from './rogue.js';
 import { RogueUI, rogueMenuMarkup } from './rogue-ui.js';
+import { MINI_GAMES, createMiniGame, miniGameComplete, miniGameResult, getMiniGameUnlocks, normalizeMiniGameUnlocks } from './mini-games.js';
 import { InstallHandoff, recoverInstallHandoff, progressSnapshot, encodeProgress, decodeProgress, storeProgress, MAX_PROGRESS_BYTES } from './progress.js';
 
 const $ = id => document.getElementById(id);
@@ -32,10 +33,15 @@ const menu=$('game-menu');
 const menuOpen=()=>menu.matches(':popover-open');
 menu.addEventListener('toggle',()=>{syncAudio();if(menuOpen())save();});
 menu.addEventListener('click',event=>{if(event.target.closest('button')&&!event.target.closest('[popovertarget]'))menu.hidePopover();});
-const HISTORY_KEY=`debrief-history-v1:${new URL('.',location.href).pathname}`;
-const SAVE_KEY=`debrief-save-v1:${new URL('.',location.href).pathname}`;
+const dungeonPreview = ['localhost','127.0.0.1','[::1]'].includes(location.hostname) && new URLSearchParams(location.search).get('preview') === 'dungeon';
+const previewSuffix = dungeonPreview ? ':dungeon-preview' : '';
+$('dungeon-restart').hidden=!dungeonPreview;
+const HISTORY_KEY=`debrief-history-v1:${new URL('.',location.href).pathname}${previewSuffix}`;
+const SAVE_KEY=`debrief-save-v1:${new URL('.',location.href).pathname}${previewSuffix}`;
+const MINI_GAME_KEY=`debrief-mini-game-v1:${new URL('.',location.href).pathname}${previewSuffix}`;
+let storyBeforePractice=null, practiceReturnToGame=false, practiceReturnPaused=false;
 const progressKeys={save:SAVE_KEY,history:HISTORY_KEY};
-const progressPath=new URL('.',location.href).pathname;
+const progressPath=new URL('.',location.href).pathname + (dungeonPreview ? 'dungeon-preview/' : '');
 const isInstalled = () => window.matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
 const installHandoff=new InstallHandoff(document,progressPath,isInstalled);
 let game=null, paused=false, modalKind='', lastModalKey='', lastControlsKey='', lastLog='', lastFrame=0, lastSave=0, lastUI=0, toastTimer, installPrompt=null;
@@ -44,9 +50,9 @@ const soundEvents=new SoundEvents();
 const esc = value => String(value).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 let carriedProgress=false;
 try { if(isInstalled())carriedProgress=await recoverInstallHandoff(document,progressPath,localStorage,progressKeys); } catch {}
-function readSave() { try { return restore(localStorage.getItem(SAVE_KEY)); } catch { return null; } }
-let history={ collected: [], runs: [] };
-try { const stored=JSON.parse(localStorage.getItem(HISTORY_KEY)); if(stored && Array.isArray(stored.collected) && Array.isArray(stored.runs)){history.collected=stored.collected.filter(id=>Object.hasOwn(ENDINGS,id));history.runs=stored.runs.filter(r=>r&&typeof r.id==='string'&&Object.hasOwn(ENDINGS,r.ending)&&Array.isArray(r.reports)).slice(0,30);} } catch {}
+function readSave() { try { const saved=restore(localStorage.getItem(SAVE_KEY));return saved?.practice||(dungeonPreview&&saved?.rogue?.route==='dungeon')?null:saved; } catch { return null; } }
+let history={ collected: [], runs: [], miniGames: [] }, miniGameUnlocksDirty=false;
+try { const stored=JSON.parse(localStorage.getItem(HISTORY_KEY)); if(stored && Array.isArray(stored.collected) && Array.isArray(stored.runs)){history.collected=stored.collected.filter(id=>Object.hasOwn(ENDINGS,id));history.runs=stored.runs.filter(r=>r&&typeof r.id==='string'&&Object.hasOwn(ENDINGS,r.ending)&&Array.isArray(r.reports)).slice(0,30);history.miniGames=normalizeMiniGameUnlocks(stored.miniGames);} } catch {}
 const legacyGuideRuns=history.runs.filter(run=>run.ending==='guide');
 if(legacyGuideRuns.length)history.collected=history.collected.filter(id=>id!=='guide');
 for(const run of history.runs){
@@ -56,10 +62,20 @@ for(const run of history.runs){
   }
   if(!history.collected.includes(run.ending))history.collected.push(run.ending);
 }
+function recordMiniGameUnlocks(state) {
+  const reached=getMiniGameUnlocks(state);
+  const fresh=reached.filter(id=>!history.miniGames.includes(id));
+  if(!fresh.length)return false;
+  history.miniGames=normalizeMiniGameUnlocks([...history.miniGames,...fresh]);
+  miniGameUnlocksDirty=true;
+  return true;
+}
+if(!dungeonPreview)for(const state of [...history.runs,readSave()])recordMiniGameUnlocks(state);
+if(miniGameUnlocksDirty)try{localStorage.setItem(HISTORY_KEY,JSON.stringify(history));miniGameUnlocksDirty=false;}catch{}
 function updateHistoryCount(){ $('records').textContent=`Endings · ${history.collected.length}/${Object.keys(ENDINGS).length}`; }
 updateHistoryCount();
 function archiveRun(){
-  if(!game || game.phase!=='ending')return;
+  if(!game || game.practice || game.phase!=='ending')return;
   const e=getEnding(game);
   const id=endingId(game);
   const existing=history.runs.find(r=>r.id===game.runId);
@@ -91,14 +107,19 @@ installHandoff.update(saved,history);
 if(carriedProgress)toast('Your browser progress is ready. Continue your game or open Endings.');
 function save() {
   if(!game)return;
-  try { localStorage.setItem(SAVE_KEY,serialize(game));saved=game;$('save-status').textContent='PROGRESS SAVED ON THIS DEVICE';installHandoff.update(game,history); }
+  if(game.practice){
+    try{localStorage.setItem(MINI_GAME_KEY,JSON.stringify({game:serialize(game),returnToGame:practiceReturnToGame,returnPaused:practiceReturnPaused}));$('save-status').textContent='PRACTICE SAVED';}
+    catch{$('save-status').textContent='PRACTICE SAVING UNAVAILABLE';}
+    return;
+  }
+  try { recordMiniGameUnlocks(game);if(miniGameUnlocksDirty){localStorage.setItem(HISTORY_KEY,JSON.stringify(history));miniGameUnlocksDirty=false;}localStorage.setItem(SAVE_KEY,serialize(game));saved=game;$('save-status').textContent='PROGRESS SAVED ON THIS DEVICE';installHandoff.update(game,history); }
   catch { $('save-status').textContent='SAVING UNAVAILABLE';if(!storageWarned){toast('Your browser is blocking local saves. Keep this tab open to retain your progress.');storageWarned=true;} }
 }
 function toast(message) { $('toast').textContent=message;$('toast').hidden=false;clearTimeout(toastTimer);toastTimer=setTimeout(()=>$('toast').hidden=true,5000); }
 const compulsionNotice=$('compulsion-notice');
 let compulsionTimer;
 function showCompulsionNotice() {
-  const available=game?.phase==='field'&&!paused&&!dialog.open&&!menuOpen();
+  const available=!game?.practice&&game?.phase==='field'&&!paused&&!dialog.open&&!menuOpen();
   if(!available){if(compulsionNotice.matches(':popover-open'))compulsionNotice.hidePopover();return;}
   if(!game.compulsionNotice||compulsionNotice.matches(':popover-open'))return;
   $('compulsion-message').textContent=COMPULSION_NOTICE;
@@ -122,6 +143,7 @@ function showModal(kind,html,art=null) {
   if(menuOpen())menu.hidePopover();
   modalKind=kind;$('dialog-content').innerHTML=html;
   dialog.dataset.kind=kind;
+  if(['dungeon-help','mini-games','mini-result'].includes(kind))dialog.classList.remove('paged-dialog');
   const artwork=dialogArtwork(kind,game?.shift,art);
   if(artwork)$('dialog-content').querySelector('.paper')?.insertAdjacentHTML('afterbegin',artwork);
   if(kind==='debrief')$('dialog-content').querySelector('.interview-scene')?.insertAdjacentHTML('beforeend',interviewRecord(game));
@@ -132,12 +154,61 @@ function showModal(kind,html,art=null) {
   $('dialog-title')?.focus({preventScroll:true});
   syncAudio();
 }
-function closeModal() {dialog.close();modalKind='';if(game?.phase==='field')fieldMap.render(game,paused);syncAudio();const target=modalReturnFocus||(game?.phase==='field'?$('field-exploration').querySelector('button.field-go:not([hidden]),button.field-stop:not([hidden])'):canvas);target?.focus({preventScroll:true});modalReturnFocus=null;}
-function begin(mode,fromSave=false) {
+function closeModal() {dialog.close();modalKind='';if(game?.phase==='field')fieldMap.render(game,paused);syncAudio();const target=modalReturnFocus||(game?.phase==='rogue'?$('rogue-play'):game?.phase==='field'?$('field-exploration').querySelector('button.field-go:not([hidden]),button.field-stop:not([hidden])'):canvas);target?.focus({preventScroll:true});modalReturnFocus=null;}
+function readMiniGame() {
+  try{
+    const session=JSON.parse(localStorage.getItem(MINI_GAME_KEY));
+    const restored=restore(session?.game);
+    if(!restored?.practice||(!history.miniGames.includes(restored.practice)&&!(dungeonPreview&&restored.practice==='dungeon')))return null;
+    return {game:restored,returnToGame:session.returnToGame===true,returnPaused:session.returnPaused===true};
+  }catch{return null;}
+}
+function miniGamePaper(title,body) {
+  return paper(title,body).replace('<article','<section').replace('</article>','</section>');
+}
+function showMiniGames() {
+  save();
+  const art={watch:'watch-corn',corn:'field-corner',broadcast:'encounter-radio',flood:'field-pump',dungeon:'field-drain'};
+  const cards=MINI_GAMES.map(entry=>{
+    const unlocked=history.miniGames.includes(entry.id);
+    const status=unlocked?'<span class="mini-game-status" aria-hidden="true">↗</span>':'<span class="mini-game-status"><svg viewBox="0 0 20 24" aria-hidden="true"><path d="M5 10V6a5 5 0 0 1 10 0v4M2 10h16v12H2z"/><path d="M10 14v4"/></svg><span>Locked</span></span>';
+    return `<button class="mini-game-card${unlocked?'':' is-locked'}" data-action="mini-game-start" data-value="${entry.id}"${unlocked?'':' disabled'}><span class="mini-game-thumb" style="background-image:url('./assets/${art[entry.id]}.webp')" aria-hidden="true"></span><span><b>${esc(entry.title)}</b><small>${unlocked?esc(entry.description):'Reach it in the story to unlock.'}</small></span>${status}</button>`;
+  }).join('');
+  showModal('mini-games',miniGamePaper('Mini games',`<p class="small">Reach games in the story to unlock practice. Practice doesn’t award endings.</p><div class="mini-game-list">${cards}</div><div class="paper-actions">${game?.practice?'<button class="secondary" data-action="mini-game-return">Return to story</button>':''}<button class="secondary" data-action="close">${game?.practice&&!miniGameComplete(game)?'Back to practice':'Close'}</button></div>`));
+}
+function launchMiniGame(id,preview=false) {
+  if(!history.miniGames.includes(id)&&!(preview&&dungeonPreview&&id==='dungeon'))return;
+  const next=createMiniGame(id,game?.mode||$('difficulty').value);
+  if(!next)return;
+  if(!game?.practice){
+    save();storyBeforePractice=game;practiceReturnToGame=!!game;practiceReturnPaused=paused;
+  }
+  begin(next.mode,false,next);
+}
+function returnToStory() {
+  if(!game?.practice)return;
+  const next=practiceReturnToGame?(storyBeforePractice||readSave()):null, wasPaused=practiceReturnPaused;
+  try{localStorage.removeItem(MINI_GAME_KEY);}catch{}
+  storyBeforePractice=null;practiceReturnToGame=false;practiceReturnPaused=false;
+  if(dialog.open)closeModal();
+  if(menuOpen())menu.hidePopover();
+  if(next){begin(next.mode,false,next);if(wasPaused){paused=true;updateUI(true);}}
+  else{
+    game=null;paused=false;lastModalKey='';lastControlsKey='';
+    document.body.classList.remove('playing','dungeon-playing');delete document.body.dataset.phase;
+    $('welcome').hidden=false;$('sidebar').hidden=true;$('pause').hidden=true;$('pause-layer').hidden=true;
+    $('stats').hidden=true;$('tower-hud').hidden=true;$('watch-scoreboard').hidden=true;$('watch-radio').hidden=true;$('investigation-pressure').hidden=true;
+    $('mini-game-return').hidden=true;$('dungeon-restart').hidden=true;
+    for(const id of ['notebook','menu-radio','assignment','protocol-menu','watch-record'])$(id).hidden=true;
+    fieldMap.reset();$('field-exploration').hidden=true;rogueUI.render(null);canvas.hidden=false;canvas.tabIndex=0;canvas.setAttribute('aria-hidden','false');
+    saved=readSave();$('resume').hidden=!saved;$('save-status').textContent='STORY PROGRESS PRESERVED';syncAudio();$('new-game').focus({preventScroll:true});
+  }
+}
+function begin(mode,fromSave=false,supplied=null) {
   if(compulsionNotice.matches(':popover-open'))compulsionNotice.hidePopover();
   clearTimeout(compulsionTimer);
   if($('guide-aftermath').matches(':popover-open'))$('guide-aftermath').hidePopover();
-  game=fromSave?readSave():createGame(mode);
+  game=supplied||(fromSave?readSave():createGame(mode));
   if(!game){toast('The saved game could not be read. You can start a new game.');return;}
   soundEvents.reset(game);
   paused=false;lastModalKey='';lastControlsKey='';lastLog='';
@@ -149,6 +220,14 @@ function begin(mode,fromSave=false) {
 }
 function sceneDialog() {
   if(!game)return;
+  if(game.practice){
+    const result=miniGameResult(game);
+    if(result){
+      const key=`practice:${game.runId}:${result.id}:${game.ending}:${game.rogue?.stage}`;
+      if(key!==lastModalKey){lastModalKey=key;showModal('mini-result',miniGamePaper(result.success?'Run complete.':'Try again.',`<p class="eyebrow">${esc(result.title)} · PRACTICE</p><p>${esc(result.message)}</p><p class="small">Endings unlock only through normal story play.</p><div class="paper-actions"><button class="primary" data-action="mini-game-retry">Play again</button><button class="secondary" data-action="mini-games">Mini games</button><button class="secondary" data-action="mini-game-return">Return to story</button></div>`));save();}
+    }
+    return;
+  }
   const pending=game.fieldEvents.pending;
   const key=`${game.phase}:${game.shift}:${game.question}:${game.ending}:${game.incident}:${sightingPromptReady(game)}:${pending?.id}:${pending?.choice}:${game.guide?.stage}:${game.guide?.debriefQuestion}:${game.resolution?.route}:${game.resolution?.step}`;
   if(key===lastModalKey)return;
@@ -186,11 +265,14 @@ function stat(label,value,sub='',percent=null,warning=false) {return `<div class
 function updateUI(force=false) {
   if(!game)return;
   document.body.dataset.phase=game.phase;
+  document.body.classList.toggle('dungeon-playing',game.phase==='rogue'&&game.rogue?.route==='dungeon'&&game.rogue.stage==='play');
   const aftermath=isGuideAftermath(game);
   $('stats').hidden=aftermath||game.phase==='resolution'||game.phase==='rogue';
   $('pause').hidden=game.phase==='ending';
   const phase=game.phase,field=phase==='field',site=nearbySite(game),active=phase==='tower';
-  $('protocol-menu').hidden=!field;
+  $('protocol-menu').hidden=!field||!!game.practice;
+  $('mini-game-return').hidden=!game.practice;
+  $('dungeon-restart').hidden=!(dungeonPreview&&game.practice==='dungeon');
   $('date-label').textContent=`${DATES[game.shift]}, ████`;
   $('station-status').textContent=field?'RADIO SIGNAL WEAK':phase==='ending'?'FILE CLOSED':'PERIMETER ACTIVE';
   $('phase-label').textContent=field?'FIELD INVESTIGATION':phase==='debrief'?'RECORDED INTERVIEW':phase==='resolution'?'AFTER THE WATCH':'WATCHTOWER';
@@ -199,7 +281,7 @@ function updateUI(force=false) {
   $('objective-detail').textContent=field?(investigationComplete(game)?'Return to the watchtower.':'Follow the unread markers.'):'Shoot any that try to escape.';
   $('stats').innerHTML=field?stat('EXPOSURE',Math.floor(game.exposure),' / 100',game.exposure,game.exposure>=70)+stat('SEARCHED',['corner','pump','drain'].filter(id=>game.inspected.includes(id)).length,'/ 3'):stat('RELIEF IN',Math.max(0,Math.ceil(SHIFT_LENGTH-game.time)),'sec',(SHIFT_LENGTH-game.time)/SHIFT_LENGTH*100)+stat('BREACHES',game.breaches,'/ 6',game.breaches/6*100,game.breaches>=3);
   const pressure=investigationPressure(game), pressureLayer=$('investigation-pressure');
-  pressureLayer.hidden=!pressure||paused;
+  pressureLayer.hidden=!pressure||paused||!!game.practice;
   pressureLayer.classList.toggle('pressure-held',dialog.open||menuOpen());
   if(pressure){
     pressureLayer.style.setProperty('--growth',String(Math.max(0,(pressure.strength-.22)/.78)));
@@ -238,10 +320,11 @@ function updateUI(force=false) {
   rogueUI.render(game,paused||dialog.open||menuOpen());
   if(phase==='rogue'&&['intro','choice'].includes(game.rogue.stage))markSeenEndingChoices($('rogue-play'),game,history.collected);
   if(phase==='rogue'){
-    $('objective').textContent={corn:'Reach the road.',broadcast:'Find the carrier.',flood:'Reverse the flow.'}[game.rogue.route];
+    $('objective').textContent={corn:'Reach the road.',broadcast:'Find the carrier.',flood:'Reverse the flow.',dungeon:'Find a way through the roots.'}[game.rogue.route];
     $('objective-detail').textContent=game.rogue.message;
     $('phase-label').textContent='BEYOND PROTOCOL';
-    $('station-status').textContent='SIGNAL LOST';
+    $('station-status').textContent=dungeonPreview?'LOCAL PLAYTEST':'SIGNAL LOST';
+    if(game.rogue.route==='dungeon')$('control-hint').textContent='ARROWS / WASD · F / SPACE FIRE · R RELOAD · PERIOD WAIT';
   }
   canvas.hidden=field;
   canvas.setAttribute('aria-hidden',String(phase==='rogue'));
@@ -296,6 +379,22 @@ function updateGuideUI() {
   if(progress)progress.style.width=`${route.progress*100}%`;
 }
 function act(action,value) {
+  if(action==='mini-games'){showMiniGames();return;}
+  if(action==='mini-game-start'){launchMiniGame(value);return;}
+  if(action==='mini-game-retry'){if(game?.practice)launchMiniGame(game.practice,dungeonPreview);return;}
+  if(action==='mini-game-return'){returnToStory();return;}
+  if(game?.practice&&miniGameComplete(game)&&!['close','records','record-run','share-record','select-share-link','restart','export','notebook-page','watch-record'].includes(action))return;
+  if(game?.practice&&['confirm-enter','enter','rogue-start','dungeon-enter','answer','debrief','inspect','resolution-answer','guide-answer','guide-travel'].includes(action))return;
+  if(action==='dungeon-help'){
+    if(game?.phase!=='rogue'||game.rogue.route!=='dungeon'||dialog.open)return;
+    showModal('dungeon-help',paper('Below the field.',`<p>Find the key. Reach the stairs. Keep moving.</p><p class="small">Move with <b>arrows / WASD</b> or tap a neighboring square. Move into a root to strike with your rifle butt.<br><b>F / Space</b> fires at the root in your sights. <b>R</b> reloads. <b>Period</b> waits.<br>Red squares are struck next turn. The roots only move when you act.</p><button class="primary" data-action="close">Back to the dungeon</button>`).replace('<article','<section').replace('</article>','</section>'));return;
+  }
+  if(action==='dungeon-enter'){
+    if(!game||game.phase!=='field'||paused||dialog.open||menuOpen())return;
+    if(!startRogue(game,'dungeon'))return;
+    fieldMap.stop(game);lastModalKey='';save();updateUI(true);
+    $('rogue-play').focus({preventScroll:true});return;
+  }
   if(action==='rogue-menu'){
     if(!game||game.phase!=='field'||paused||dialog.open||game.fieldEvents.pending)return;
     fieldMap.stop(game);
@@ -311,6 +410,7 @@ function act(action,value) {
     if(!game||game.phase!=='rogue'||paused||dialog.open||menuOpen())return;
     const changed=action==='rogue-choice'?chooseRogue(game,value):moveRogue(game,...String(value).split(',').map(Number));
     if(!changed)return;
+    if(game.rogue?.route==='dungeon'&&action==='rogue-choice'&&value==='fire')shotSound('hit');
     lastModalKey='';save();updateUI(true);return;
   }
   if(action==='watch-record'){
@@ -321,7 +421,7 @@ function act(action,value) {
   }
   if(['reload','flare','bell','focus'].includes(action)&&(!game||game.phase!=='tower'||paused||dialog.open||menuOpen()))return;
   if(action==='select-share-link'){const input=dialog.querySelector('.share-link');input?.focus();input?.select();return;}
-  if(action==='share-ending'){if(game?.phase==='ending')shareDisposition(endingId(game),getEnding(game).stamp);return;}
+  if(action==='share-ending'){if(game?.phase==='ending'&&!game.practice)shareDisposition(endingId(game),getEnding(game).stamp);return;}
   if(action==='share-record'){const run=history.runs[Number(value)];if(run)shareDisposition(run.ending,run.stamp);return;}
   if(action==='resolution-answer'){
     if(!game||game.phase!=='resolution'||!['resolution','resolution-menu'].includes(modalKind))return;
@@ -387,7 +487,7 @@ function act(action,value) {
     else {game.guide.focused=null;toast(game.guide.fired?'They have reached cover. Someone is calling for help.':'The lights have reached cover. You can let them leave.');}
   }
   if(action==='guide-fire'){const t=game?.guide?.team.find(t=>t.id===game.guide.focused&&t.status==='running');const p=t&&visibleGuideTarget(game.guide,t,renderer.view);if(t&&!p){game.guide.focused=null;toast(game.guide.fired?'They have reached cover. Someone is calling for help.':'The lights have reached cover. You can let them leave.');return;}if(p)renderer.pointer={x:p.x,y:p.y-p.height*.5};fire(renderer.pointer);}
-  if(action==='close'){closeModal();if(game&&(['briefing','debrief','resolution','ending'].includes(game.phase)||game.guide?.stage==='debrief')){lastModalKey='';updateUI(true);}return;}
+  if(action==='close'){closeModal();if(game?.practice&&miniGameComplete(game)){lastModalKey='';sceneDialog();return;}if(game&&(['briefing','debrief','resolution','ending'].includes(game.phase)||game.guide?.stage==='debrief')){lastModalKey='';updateUI(true);}return;}
   if(action==='start'){closeModal();startShift(game);canvas.focus({preventScroll:true});}
   if(action==='answer'){closeModal();answer(game,value);}
   if(action==='reload')reload(game);
@@ -406,9 +506,9 @@ function act(action,value) {
     if(id){const e=evidenceForState(game,id),scene=currentSiteScene(game);showModal('evidence',paper(esc(e.title),`<p class="eyebrow">${esc(e.code)}${e.variant?` · ${esc(e.canonicalTitle)}`:''} / ${esc(e.where.toUpperCase())}</p>${evidenceMount(id,game)}<p>${esc(e.text)}</p>${scene?`<p>${esc(scene.cue)}</p><button class="primary" data-action="site-scene">${esc(scene.label)}</button>`:''}<button class="primary" data-action="close">Close notebook ↗</button>`,'PRIVATE OBSERVATION'));}
   }
   if(action==='debrief')beginDebrief(game);
-  if(action==='restart'){closeModal();begin(game.mode);return;}
+  if(action==='restart'){if(game?.practice){launchMiniGame(game.practice,dungeonPreview);return;}closeModal();begin(game.mode);return;}
   if(action==='new-confirm'){closeModal();begin($('difficulty').value);return;}
-  if(action==='export'){exportRecord();return;}
+  if(action==='export'){if(!game?.practice)exportRecord();return;}
   save();updateUI(true);syncAudio();
   if(action==='confirm-enter'&&game?.phase==='field')$('field-exploration').querySelector('.field-go')?.focus({preventScroll:true});
 }
@@ -420,7 +520,7 @@ $('new-game').addEventListener('click',()=>{
 $('resume').addEventListener('click',()=>begin(null,true));
 function togglePause(force) {if(!game||game.phase==='ending'||dialog.open)return;paused=typeof force==='boolean'?force:!paused;updateUI();save();syncAudio();}
 $('pause').addEventListener('click',()=>togglePause());$('unpause').addEventListener('click',()=>{togglePause(false);(game?.phase==='rogue'?$('rogue-play'):canvas).focus({preventScroll:true});});
-dialog.addEventListener('cancel',event=>{if(modalKind==='resolution-menu'){event.preventDefault();act('resolution-answer','back');}else if(['briefing','debrief','guide-debrief','resolution','ending','encounter'].includes(modalKind))event.preventDefault();else{event.preventDefault();closeModal();}});
+dialog.addEventListener('cancel',event=>{if(modalKind==='mini-result'){event.preventDefault();showMiniGames();}else if(modalKind==='resolution-menu'){event.preventDefault();act('resolution-answer','back');}else if(['briefing','debrief','guide-debrief','resolution','ending','encounter'].includes(modalKind))event.preventDefault();else{event.preventDefault();act('close');}});
 $('manual').addEventListener('click',()=>showModal('manual',paper('Field manual',`<ol class="orders"><li><span>01</span>Watch the corn. Shoot any that try to escape.</li><li><span>02</span>Remain in the watchtower.</li><li><span>03</span>Do not consume the crop.</li><li><span>04</span>Remember any irregularities for your debrief at the end of the night.</li></ol><p class="watch-tips"><b>Runners</b> move fast. <b>Husks</b> take two hits. Five clean containments earn a replacement flare. Misses and breaches break the chain.</p><p class="small"><b>R / Reload:</b> tap again as the marker reaches gold to finish early. Waiting always completes a normal reload.<br><b>F / Flare:</b> slows all crops for 4.5 seconds. Start with two; earn more through streaks and bell rushes. Carry up to two.<br><b>B / Ring bell:</b> optional risk. Clear three marked crops in ten seconds for +600 points, +6 reserve rounds, and a flare. Any escape or timeout loses the bonus; the crops remain a threat. Two attempts per watch, available until 39 seconds.</p><button class="primary" data-action="close">Close</button>`)));
 
 $('about').addEventListener('click',()=>showModal('about',paper('About Debrief.', '<p>An interactive adaptation of the short story by Ryan L. Melvin.</p><p>Three shifts. About ten minutes. Headphones optional.</p><p>Debrief is open source, licensed under <a href="https://github.com/ryanlmelvin/debrief-corn-game/blob/main/LICENSE" target="_blank" rel="noopener">GPLv3</a>. <a href="https://github.com/ryanlmelvin/debrief-corn-game" target="_blank" rel="noopener">View the source code on GitHub</a>.</p><p class="small">Music: <a href="https://opengameart.org/content/lost-in-a-bad-place-horror-ambience-loop" target="_blank" rel="noopener">Lost in a Bad Place</a> by congusbongus · <a href="https://creativecommons.org/publicdomain/zero/1.0/" target="_blank" rel="noopener">CC0</a>.</p><p class="small">Field sounds (CC0): <a href="https://opengameart.org/content/crickets-ambient-noise-loopable" target="_blank" rel="noopener">crickets by Ted Kerr</a>; <a href="https://opengameart.org/content/random-sounds-samples" target="_blank" rel="noopener">footsteps and leaves by Brandon Morris</a>; <a href="https://opengameart.org/content/static" target="_blank" rel="noopener">radio static by xhunterko</a>.</p><p>The goal is to find your way through every possible ending. New endings added all the time.</p><p class="small">Your saved game, achieved endings, and transcripts stay in this browser or app, on this device. Clearing site data deletes them; installation is not a backup.</p><button class="primary" data-action="close">Back ↗</button>', 'STATION 04')));
@@ -457,8 +557,10 @@ document.addEventListener('keydown',event=>{
   if(paused)return;
   if(game.phase==='rogue'){
     const directions={arrowup:'0,-1',w:'0,-1',arrowdown:'0,1',s:'0,1',arrowleft:'-1,0',a:'-1,0',arrowright:'1,0',d:'1,0'};
-    if(game.rogue.route==='corn'&&game.rogue.stage==='play'&&directions[k]){
-      event.preventDefault();act('rogue-move',directions[k]);
+    if(['corn','dungeon'].includes(game.rogue.route)&&game.rogue.stage==='play'&&directions[k]){
+      event.preventDefault();if(game.rogue.route!=='dungeon'||!event.repeat)act('rogue-move',directions[k]);
+    }else if(game.rogue.route==='dungeon'&&game.rogue.stage==='play'&&['f',' ','r','.'].includes(k)){
+      event.preventDefault();if(!event.repeat)act('rogue-choice',k==='r'?'reload':k==='.'?'wait':'fire');
     }else if(game.rogue.route==='broadcast'&&game.rogue.stage==='play'&&k===' '&&(!['BUTTON','A'].includes(event.target.tagName)||event.target.closest('.rogue-lock'))){
       event.preventDefault();if(!event.repeat)act('rogue-choice','lock');
     }
@@ -548,7 +650,7 @@ function shotSound(result) {
 function showProgressTransfer() {
   save();archiveRun();
   showModal('progress',paper('Move saved progress.',`
-    <p class="small">Carry your saved game, achieved endings, and transcripts between the browser and installed app.</p>
+    <p class="small">Carry your saved game, mini-game unlocks, endings, and transcripts between the browser and installed app.</p>
     <p class="small">In the browser with your progress, copy it or save a backup. Then open the app’s <b>Menu → Move saved progress</b> and paste the code or open that backup.</p>
     <div class="paper-actions"><button id="copy-progress" class="secondary" disabled>Copy progress</button><button id="download-progress" class="secondary" disabled>Save backup ↓</button></div>
     <p id="progress-export-status" class="small" role="status">Preparing progress…</p>
@@ -560,7 +662,7 @@ function showProgressTransfer() {
   const exportStatus=$('progress-export-status'),importStatus=$('progress-import-status');
   let code='';
   try {
-    const snapshot=progressSnapshot(game||readSave(),history);
+    const snapshot=progressSnapshot(game?.practice?readSave():(game||readSave()),history);
     encodeProgress(snapshot).then(value=>{
       if(!copy.isConnected)return;
       code=value;copy.disabled=false;download.disabled=false;
@@ -581,17 +683,19 @@ function showProgressTransfer() {
     try {
       const snapshot=await decodeProgress(value);
       if(!importStatus.isConnected)return;
-      const summary=snapshot.save?`Shift ${snapshot.save.shift+1} of 3 · ${snapshot.save.mode==='hard'?'Hard':'Story'}`:'Achieved endings and transcripts';
+      const summary=snapshot.save?`Shift ${snapshot.save.shift+1} of 3 · ${snapshot.save.mode==='hard'?'Hard':'Story'}`:'Unlocks, endings and transcripts';
       const replacement=snapshot.save && (game||readSave())?'This replaces the current saved game in this app. ':'';
-      showModal('progress-confirm',paper('Restore this progress?',`<p>${esc(summary)}<br>${snapshot.history.collected.length} achieved endings · ${snapshot.history.runs.length} completed games</p><p class="small">${replacement}Achieved endings are combined. Transcripts from the latest 30 completed games are kept.</p><p id="progress-restore-status" class="small" role="status"></p><div class="paper-actions"><button id="confirm-progress" class="primary">Restore progress ↗</button><button id="cancel-progress" class="secondary">Cancel</button></div>`, 'SAVED PROGRESS'));
+      showModal('progress-confirm',paper('Restore this progress?',`<p>${esc(summary)}<br>${snapshot.history.collected.length} achieved endings · ${snapshot.history.runs.length} completed games<br>${snapshot.history.miniGames.length} mini games unlocked</p><p class="small">${replacement}Endings and mini-game unlocks are combined. Transcripts from the latest 30 completed games are kept.</p><p id="progress-restore-status" class="small" role="status"></p><div class="paper-actions"><button id="confirm-progress" class="primary">Restore progress ↗</button><button id="cancel-progress" class="secondary">Cancel</button></div>`, 'SAVED PROGRESS'));
       $('cancel-progress').addEventListener('click',showProgressTransfer);
       $('confirm-progress').addEventListener('click',()=>{
         try {
           history=storeProgress(localStorage,progressKeys,snapshot,history);
+          storyBeforePractice=null;
+          if(snapshot.save){try{localStorage.removeItem(MINI_GAME_KEY);}catch{}practiceReturnToGame=false;practiceReturnPaused=false;}
           updateHistoryCount();saved=readSave();$('resume').hidden=!saved;
           if(snapshot.save){game=null;begin('story',true);}else closeModal();
-          installHandoff.update(game||saved,history);
-          toast('Progress restored. Your endings and transcripts are ready.');
+          installHandoff.update(game?.practice?saved:(game||saved),history);
+          toast('Progress restored. Your unlocks, endings, and transcripts are ready.');
         } catch {$('progress-restore-status').textContent='This browser could not save the transfer. Your existing progress has been kept. Try allowing site storage.';}
       });
     } catch {if(importStatus.isConnected)importStatus.textContent='That progress could not be read. Copy the full code again, or open a Debrief progress backup.';}
@@ -605,6 +709,19 @@ function showProgressTransfer() {
   });
 }
 $('move-progress').addEventListener('click',showProgressTransfer);
+const resumedMiniGame=readMiniGame();
+if(resumedMiniGame){
+  practiceReturnToGame=resumedMiniGame.returnToGame;practiceReturnPaused=resumedMiniGame.returnPaused;
+  begin(resumedMiniGame.game.mode,false,resumedMiniGame.game);
+}else if(dungeonPreview){
+  document.title='Dungeon Crawler Corn — Local playtest';
+  let legacyPreview=null;
+  try{legacyPreview=restore(localStorage.getItem(SAVE_KEY));}catch{}
+  if(legacyPreview?.rogue?.route==='dungeon'){
+    legacyPreview.practice='dungeon';begin(legacyPreview.mode,false,legacyPreview);
+  }else launchMiniGame('dungeon',true);
+}
+
 function refreshInstallGuide() {
   if(modalKind !== 'install' || !dialog.open)return;
   const button=$('install-now');
@@ -634,7 +751,7 @@ function showInstallGuide() {
   $('install-transfer').addEventListener('click',showProgressTransfer);
   const progressStatus=$('install-progress-status');
   if(isInstalled())progressStatus.textContent='Missing browser progress? Use Move saved progress in both places to bring it here.';
-  else installHandoff.update(game||readSave(),history).then(ready=>{
+  else installHandoff.update(game?.practice?readSave():(game||readSave()),history).then(ready=>{
     if(!progressStatus.isConnected)return;
     progressStatus.textContent=ready?'Your progress is prepared for installation. Recent Safari versions carry it into the new app; if it is missing, use Move saved progress.':'Use Move saved progress to keep a copy before installing. This browser could not prepare an automatic transfer.';
   });
@@ -730,10 +847,10 @@ if ('serviceWorker' in navigator && ['https:', 'http:'].includes(location.protoc
 
 function frame(now) {
   const dt=lastFrame?Math.min((now-lastFrame)/1000,.1):0;lastFrame=now;
-  if(game&&!paused&&!dialog.open&&!menuOpen()&&!document.hidden){
+  if(game&&!paused&&!dialog.open&&!menuOpen()&&!document.hidden&&(!game.practice||!miniGameComplete(game))){
     advance(game,dt);
     if(game.phase==='tower')updateReloadUI(game, false);
-    if(game.phase==='field')fieldMap.tick(game,dt,(dx,dy)=>move(game,dx,dy),()=>{
+    if(game.phase==='field'&&!game.practice)fieldMap.tick(game,dt,(dx,dy)=>move(game,dx,dy),()=>{
       const site=nearbySite(game);
       if(site?.id==='tower'&&investigationComplete(game))act('debrief');
       else if(site&&site.id!=='tower'&&!game.inspected.includes(site.id))act('inspect');

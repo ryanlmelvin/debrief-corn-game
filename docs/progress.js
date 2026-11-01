@@ -1,4 +1,5 @@
 import { restore, serialize, ENDINGS } from './engine.js';
+import { MINI_GAMES, getMiniGameUnlocks, normalizeMiniGameUnlocks } from './mini-games.js';
 
 export const MAX_PROGRESS_BYTES = 512 * 1024;
 const COOKIE = 'debrief_install_v1';
@@ -6,22 +7,33 @@ const COOKIE = 'debrief_install_v1';
 // for other projects on the same host. Never silently drop archived assignments.
 const COOKIE_LIMIT = 6000;
 const CHUNK_SIZE = 3000;
+const MINI_GAME_IDS = new Set(MINI_GAMES.map(game => game.id));
+
+function miniGameUnlocks(value) {
+  if (value === undefined) return [];
+  if (!Array.isArray(value) || !value.every(id => MINI_GAME_IDS.has(id))) throw Error('Invalid mini game unlocks.');
+  return normalizeMiniGameUnlocks(value);
+}
 
 export function validateHistory(value) {
   if (!value || !Array.isArray(value.collected) || !Array.isArray(value.runs) || value.runs.length > 30) throw Error('Invalid ending collection.');
   if (!value.collected.every(id => Object.hasOwn(ENDINGS, id))) throw Error('Unknown ending.');
   for (const run of value.runs) {
+    if (run && (Object.hasOwn(run, 'practice') || Object.hasOwn(run, 'preview') || String(run.id).startsWith('practice-'))) throw Error('Practice results cannot be added to your ending collection.');
     if (!run || !Object.hasOwn(ENDINGS, run.ending) || !['id', 'title', 'text', 'last', 'date'].every(key => typeof run[key] === 'string') || !Number.isFinite(Date.parse(run.date))) throw Error('Invalid completed game.');
     if (run.stamp !== undefined && typeof run.stamp !== 'string') throw Error('Invalid outcome.');
     if (!Array.isArray(run.reports) || run.reports.length > 200 || !run.reports.every(report => report && typeof report.question === 'string' && typeof report.answer === 'string')) throw Error('Invalid transcript.');
   }
-  return { collected: [...new Set(value.collected)], runs: value.runs };
+  const miniGames = normalizeMiniGameUnlocks([...miniGameUnlocks(value.miniGames), ...value.runs.flatMap(getMiniGameUnlocks)]);
+  return { collected: [...new Set(value.collected)], runs: value.runs, miniGames };
 }
 
 export function progressSnapshot(save, history) {
+  if (save && Object.hasOwn(save, 'practice')) throw Error('Practice games cannot be transferred as story progress. Return to your assignment first.');
   const snapshot = { format: 'debrief-progress', version: 1, save: save ? restore(serialize(save)) : null, history: validateHistory(history) };
   if (save && !snapshot.save) throw Error('The saved game could not be read.');
-  if (!snapshot.save && !snapshot.history.collected.length && !snapshot.history.runs.length) throw Error('No progress to transfer yet.');
+  snapshot.history.miniGames = normalizeMiniGameUnlocks([...snapshot.history.miniGames, ...getMiniGameUnlocks(snapshot.save)]);
+  if (!snapshot.save && !snapshot.history.collected.length && !snapshot.history.runs.length && !snapshot.history.miniGames.length) throw Error('No progress to transfer yet.');
   return snapshot;
 }
 
@@ -74,16 +86,21 @@ export function mergeHistory(current, incoming) {
   for (const run of [...current.runs, ...incoming.runs]) if (!runs.has(run.id)) runs.set(run.id, run);
   return {
     collected: [...new Set([...current.collected, ...incoming.collected])],
-    runs: [...runs.values()].sort((a, b) => Date.parse(b.date) - Date.parse(a.date)).slice(0, 30)
+    runs: [...runs.values()].sort((a, b) => Date.parse(b.date) - Date.parse(a.date)).slice(0, 30),
+    // Read legacy receipts before the archive cap can discard an older run.
+    miniGames: normalizeMiniGameUnlocks([...miniGameUnlocks(current.miniGames), ...miniGameUnlocks(incoming.miniGames), ...current.runs.flatMap(getMiniGameUnlocks), ...incoming.runs.flatMap(getMiniGameUnlocks)])
   };
 }
 
 export function storeProgress(storage, keys, snapshot, currentHistory) {
-  const history = mergeHistory(currentHistory, snapshot.history);
+  // Validate at the write boundary as well as decoding. A practice session must
+  // never replace an assignment, even if a caller supplies a snapshot directly.
+  const incoming = progressSnapshot(snapshot.save, snapshot.history);
+  const history = mergeHistory(currentHistory, incoming.history);
   const before = [storage.getItem(keys.save), storage.getItem(keys.history)];
   try {
     storage.setItem(keys.history, JSON.stringify(history));
-    if (snapshot.save) storage.setItem(keys.save, serialize(snapshot.save));
+    if (incoming.save) storage.setItem(keys.save, serialize(incoming.save));
   } catch (error) {
     for (const [index, key] of [keys.save, keys.history].entries()) {
       try { before[index] === null ? storage.removeItem(key) : storage.setItem(key, before[index]); } catch {}

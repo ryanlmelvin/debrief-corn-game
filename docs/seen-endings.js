@@ -22,7 +22,7 @@ const outsideRecovery = new Set([
   'consumption', 'witness', 'compliance', 'dissent', 'breach', 'assimilation',
   'relief', 'witness_present', 'rescue', 'vacancy', 'transmission',
   'corn_escape', 'corn_uprising', 'radio_ghost', 'field_voice', 'flood',
-  'corn_contained', 'roadkill'
+  'corn_contained', 'roadkill', 'dungeon_escape', 'dungeon_lost'
 ]);
 
 function decisionKey(s) {
@@ -47,9 +47,11 @@ function continuations(s) {
 
 export function possibleChoiceEndings(game, action, value) {
   const transition = transitions.get(action);
-  if (!game || game.phase === 'ending' || !transition) return null;
-  // Live minigame inputs depend on the time of the click. A preview of a shot,
-  // signal lock or movement cannot establish its later result safely.
+  // Practice has no ending-collection provenance, even when it uses the same
+  // scenes and terminal transitions as an assignment.
+  if (!game || game.practice || game.phase === 'ending' || !transition) return null;
+  // Minigame inputs include both timed controls and turn-based combat. Do not
+  // infer the remaining crawl (or a later timed click) from one rendered input.
   if (action === 'rogue-choice' && !['intro', 'choice'].includes(game.rogue?.stage)) return null;
   try {
     const next = clone(game);

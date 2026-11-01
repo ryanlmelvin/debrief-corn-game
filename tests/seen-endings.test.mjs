@@ -4,8 +4,9 @@ import { createGame, answer, advance, ENDINGS, FIELD_SITES, inspect, chooseField
 import { ENCOUNTERS, freshFieldEvents, encounterAfterStep } from '../docs/encounters.js';
 import { startResolution, chooseResolution, getResolution } from '../docs/alternate-endings.js';
 import { guideTravel, guideRouteStatus, inspectGuide, focusGuide, fireGuide, spareGuide, guideDebrief, answerGuideDebrief } from '../docs/guide.js';
-import { startRogue, chooseRogue, validRogue, broadcastCursor, broadcastWindow, floodConnections } from '../docs/rogue.js';
-import { possibleChoiceEndings, hasSeenChoiceEndings } from '../docs/seen-endings.js';
+import { startRogue, chooseRogue, moveRogue, validRogue, broadcastCursor, broadcastWindow, floodConnections } from '../docs/rogue.js';
+import { createMiniGame } from '../docs/mini-games.js';
+import { possibleChoiceEndings, hasSeenChoiceEndings, markSeenEndingChoices } from '../docs/seen-endings.js';
 import { REVIEWED_ENDING_HINTS } from '../scripts/check-ending-hints.mjs';
 
 const guideEndings = ['guide', 'guide_arrested', 'guide_interrupted', 'guide_shot'];
@@ -253,33 +254,181 @@ test('field previews recognize immediate endings without treating ordinary explo
   assert.equal(hasSeenChoiceEndings(next, 'encounter-choice', 'record', Object.keys(ENDINGS)), false, 'a repeated, no-longer-available choice is never marked');
 });
 
-function rogueField() {
+function rogueField(route) {
   const game = createGame('story', 42);
   Object.assign(game, { phase: 'field', entered: true, departure: 'chosen', exposure: 75, player: { x: 3, y: 3 } });
   game.inspected.push('pump');
+  if (route === 'dungeon') {
+    game.player = { x: 7, y: 5 };
+    assert.ok(inspect(game));
+  }
   return game;
 }
 
 test('rogue entry and reversible introductions retain every unknown field outcome', () => {
-  for (const route of ['corn', 'broadcast', 'flood']) {
-    const game = rogueField(), before = structuredClone(game), all = sorted(Object.keys(ENDINGS));
+  for (const route of ['corn', 'broadcast', 'flood', 'dungeon']) {
+    const game = rogueField(route), before = structuredClone(game), all = sorted(Object.keys(ENDINGS));
     assert.deepEqual(possibleChoiceEndings(game, 'rogue-start', route), all);
     for (const ending of all) {
       assert.equal(hasSeenChoiceEndings(game, 'rogue-start', route, historyExcept(ending)), false);
       if (REVIEWED_ENDING_HINTS[ending]?.coverage === 'conservative') conservativeFixtures.add(ending);
     }
+    assert.equal(hasSeenChoiceEndings(game, 'rogue-start', route, all), true);
     assert.deepEqual(game, before);
     assert.equal(startRogue(game, route), true);
     assert.deepEqual(possibleChoiceEndings(game, 'rogue-choice', 'begin'), all);
+    for (const ending of all) assert.equal(hasSeenChoiceEndings(game, 'rogue-choice', 'begin', historyExcept(ending)), false);
+    assert.equal(hasSeenChoiceEndings(game, 'rogue-choice', 'begin', all), true);
     if (route !== 'corn') {
       assert.deepEqual(possibleChoiceEndings(game, 'rogue-choice', 'back'), all);
-      assert.equal(hasSeenChoiceEndings(game, 'rogue-choice', 'back', historyExcept('witness')), false);
-      assert.equal(hasSeenChoiceEndings(game, 'rogue-choice', 'back', historyExcept('corn_escape')), false);
+      for (const ending of all) assert.equal(hasSeenChoiceEndings(game, 'rogue-choice', 'back', historyExcept(ending)), false);
+      assert.equal(hasSeenChoiceEndings(game, 'rogue-choice', 'back', all), true);
     } else {
       assert.equal(possibleChoiceEndings(game, 'rogue-choice', 'back'), null);
       assertTerminalHint(game, 'rogue-choice', 'root', 'assimilation');
     }
   }
+});
+
+test('the drain requires inspection and an idle arrival; locked choices never receive a hint', () => {
+  const all = Object.keys(ENDINGS), unlocked = rogueField('dungeon');
+  for (const change of [
+    game => { game.inspected = game.inspected.filter(id => id !== 'drain'); },
+    game => { game.player.x--; },
+    game => { game.player.y--; },
+    game => { game.fieldEvents.pending = { id: 'first-call' }; },
+    game => { game.expedition = { active: true }; }
+  ]) {
+    const game = structuredClone(unlocked);
+    change(game);
+    const before = structuredClone(game);
+    assert.equal(possibleChoiceEndings(game, 'rogue-start', 'dungeon'), null);
+    assert.equal(hasSeenChoiceEndings(game, 'rogue-start', 'dungeon', all), false);
+    assert.equal(startRogue(game, 'dungeon'), false);
+    assert.deepEqual(game, before);
+  }
+});
+
+test('drain previews and repeated withdrawals preserve saves, transcripts, history and randomness', () => {
+  const game = rogueField('dungeon'), original = structuredClone(game);
+  const history = { collected: Object.keys(ENDINGS), runs: [{ id: 'prior-run', reports: [] }] };
+  const saved = JSON.stringify(game), priorHistory = JSON.stringify(history), random = Math.random;
+  let randomCalls = 0;
+  try {
+    Math.random = () => { randomCalls++; return .5; };
+    for (let visit = 0; visit < 8; visit++) {
+      assert.equal(hasSeenChoiceEndings(game, 'rogue-start', 'dungeon', history.collected), true);
+      assert.equal(JSON.stringify(game), saved);
+      assert.equal(startRogue(game, 'dungeon'), true);
+      const introduction = JSON.stringify(game);
+      for (const choice of ['begin', 'back']) {
+        possibleChoiceEndings(game, 'rogue-choice', choice);
+        for (const id of ['dungeon_escape', 'dungeon_lost', 'witness']) {
+          assert.equal(hasSeenChoiceEndings(game, 'rogue-choice', choice, historyExcept(id)), false);
+        }
+        assert.equal(JSON.stringify(game), introduction);
+      }
+      assert.equal(chooseRogue(game, 'back'), true);
+      assert.deepEqual(game, original);
+      assert.equal(JSON.stringify(history), priorHistory);
+    }
+  } finally {
+    Math.random = random;
+  }
+  assert.equal(randomCalls, 0, 'neither preview nor reversible dungeon entry consumes ambient randomness');
+});
+
+test('the drain conservatively retains both endings reached by actual dungeon turns', () => {
+  // A player input replay through all three floors: movement, rifle shots and a
+  // reload, with no edited combat state, keys, health, ammunition or outcome.
+  const escape = 'RRRFRDDRRUURRFRRDDDDDDDDRRFRRDDRRDDFFRRRRDDLLRRDDRRRFADDRRFUURRRRRDDDDDDDD';
+  const directions = { R: [1, 0], L: [-1, 0], U: [0, -1], D: [0, 1] };
+  const rifle = { F: 'fire', A: 'reload' };
+  for (const ending of ['dungeon_escape', 'dungeon_lost']) {
+    const field = rogueField('dungeon'), game = structuredClone(field);
+    assert.equal(startRogue(game, 'dungeon'), true);
+    const introduction = structuredClone(game);
+    assert.equal(chooseRogue(game, 'begin'), true);
+    if (ending === 'dungeon_escape') {
+      for (const input of escape) {
+        assert.equal(game.phase, 'rogue');
+        const action = rifle[input] ? 'rogue-choice' : 'rogue-move';
+        const value = rifle[input] || directions[input].join(',');
+        assert.equal(hasSeenChoiceEndings(game, action, value, Object.keys(ENDINGS)), false);
+        assert.equal(rifle[input] ? chooseRogue(game, rifle[input]) : moveRogue(game, ...directions[input]), true);
+        assert.equal(validRogue(game), true);
+      }
+    } else {
+      for (let turn = 0; game.phase === 'rogue' && turn < 100; turn++) {
+        assert.equal(hasSeenChoiceEndings(game, 'rogue-choice', 'wait', Object.keys(ENDINGS)), false);
+        assert.equal(chooseRogue(game, 'wait'), true);
+        assert.equal(validRogue(game), true);
+      }
+    }
+    assert.equal(game.phase, 'ending');
+    assert.equal(endingId(game), ending);
+    if (ending === 'dungeon_escape') assert.deepEqual([game.rounds, game.reserve], [5, 18], 'the human guard used the carried rifle and reloaded along the way');
+    for (const [state, action, value] of [
+      [field, 'rogue-start', 'dungeon'],
+      [introduction, 'rogue-choice', 'begin'],
+      [introduction, 'rogue-choice', 'back']
+    ]) {
+      assert.ok(possibleChoiceEndings(state, action, value).includes(ending));
+      assert.equal(hasSeenChoiceEndings(state, action, value, historyExcept(ending)), false);
+      assert.equal(hasSeenChoiceEndings(state, action, value, Object.keys(ENDINGS)), true);
+    }
+    conservativeFixtures.add(ending);
+  }
+});
+
+test('rifle supplies never narrow drain entry hints or let previews spend ammunition', () => {
+  const all = Object.keys(ENDINGS);
+  for (const [rounds, reserve] of [[0, 0], [0, 6], [1, 0], [6, 24]]) {
+    const game = rogueField('dungeon');
+    Object.assign(game, { rounds, reserve });
+    const before = structuredClone(game);
+    assert.deepEqual(possibleChoiceEndings(game, 'rogue-start', 'dungeon'), sorted(all));
+    assert.deepEqual(game, before);
+    assert.equal(startRogue(game, 'dungeon'), true);
+    const introduction = structuredClone(game);
+    for (const choice of ['begin', 'back']) {
+      for (const ending of all) assert.equal(hasSeenChoiceEndings(game, 'rogue-choice', choice, historyExcept(ending)), false);
+      assert.equal(hasSeenChoiceEndings(game, 'rogue-choice', choice, all), true);
+    }
+    assert.deepEqual(game, introduction);
+    assert.equal(chooseRogue(game, 'begin'), true);
+    const active = structuredClone(game);
+    for (const choice of ['fire', 'reload', 'wait', 'burst']) {
+      assert.equal(possibleChoiceEndings(game, 'rogue-choice', choice), null);
+      assert.equal(hasSeenChoiceEndings(game, 'rogue-choice', choice, all), false);
+    }
+    assert.deepEqual(game, active, 'previews cannot reload, fire, spend ammunition, move roots or record testimony');
+  }
+});
+
+test('committed recovery cannot reach the drain, including after interview choices with ammunition', () => {
+  const search = ready();
+  assert.equal(answer(search, 'guide'), true);
+  const scenes = [search, escapeScene(), interview('spared'), interview('secured'), interview('arrested')];
+  for (const game of scenes) {
+    // Give the location and inspection prerequisites every advantage. The actual
+    // recovery phase must still reject dungeon entry; guide actions never return
+    // to the field, and the existing recovery fixtures exercise all four endings.
+    game.player = { x: 7, y: 5 };
+    if (!game.inspected.includes('drain')) game.inspected.push('drain');
+    const before = structuredClone(game);
+    assert.equal(startRogue(game, 'dungeon'), false);
+    assert.equal(possibleChoiceEndings(game, 'rogue-start', 'dungeon'), null);
+    assert.deepEqual(game, before);
+    if (game.guide.stage === 'debrief') {
+      const first = guideDebrief(game).options[0];
+      assert.equal(answerGuideDebrief(game, first.id), true);
+      assert.equal(startRogue(game, 'dungeon'), false);
+      const remaining = possibleChoiceEndings(game, 'guide-answer', guideDebrief(game).options[0].id);
+      assert.ok(remaining.every(id => !['dungeon_escape', 'dungeon_lost'].includes(id)));
+    }
+  }
+  assert.deepEqual(sorted(possibleChoiceEndings(ready(), 'answer', 'guide')), guideEndings);
 });
 
 test('stable corn and broadcast finales identify their own ending without hiding an unseen alternative', () => {
@@ -313,8 +462,8 @@ test('stable corn and broadcast finales identify their own ending without hiding
 
 test('live rogue controls stay unmarked even when every ending has been collected', () => {
   const all = Object.keys(ENDINGS);
-  for (const [route, choices] of [['broadcast', ['lock']], ['flood', ['tile-0', 'tile-8', 'release']]]) {
-    const game = rogueField();
+  for (const [route, choices] of [['broadcast', ['lock']], ['flood', ['tile-0', 'tile-8', 'release']], ['dungeon', ['wait', 'fire', 'reload', 'burst']]]) {
+    const game = rogueField(route);
     assert.equal(startRogue(game, route), true);
     assert.equal(chooseRogue(game, 'begin'), true);
     if (route === 'flood') {
@@ -327,6 +476,11 @@ test('live rogue controls stay unmarked even when every ending has been collecte
     for (const choice of choices) {
       assert.equal(possibleChoiceEndings(game, 'rogue-choice', choice), null);
       assert.equal(hasSeenChoiceEndings(game, 'rogue-choice', choice, all), false);
+    }
+    if (route === 'dungeon') {
+      assert.equal(possibleChoiceEndings(game, 'rogue-move', '1,0'), null);
+      assert.equal(hasSeenChoiceEndings(game, 'rogue-move', '1,0', all), false);
+      assert.equal(chooseRogue(game, 'burst'), false, 'the retired salt ability is unsupported');
     }
     assert.deepEqual(game, before);
   }
@@ -361,6 +515,36 @@ test('collection membership uses identities, and analysis preserves the game and
   hasSeenChoiceEndings(game, 'answer', 'follow-lead', Object.keys(ENDINGS));
   assert.deepEqual(game, before);
   assert.deepEqual(collection, copy);
+});
+
+test('practice finales carry no collection hints and preview preserves their provenance', () => {
+  const game = createMiniGame('broadcast', 'story', 902);
+  if (game.rogue.stage === 'intro') assert.equal(chooseRogue(game, 'begin'), true);
+  for (let lock = 0; lock < 3; lock++) {
+    let ticks = 0;
+    do {
+      advance(game, .01);
+      assert.ok(ticks++ < 1000);
+    } while (game.rogue.time < game.rogue.lockReadyAt || broadcastCursor(game) < broadcastWindow(game).min + .01 || broadcastCursor(game) > broadcastWindow(game).max - .01);
+    assert.equal(chooseRogue(game, 'lock'), true);
+  }
+  assert.equal(game.rogue.stage, 'choice');
+  assert.equal(game.practice, 'broadcast');
+  const before = structuredClone(game), collection = Object.keys(ENDINGS), history = [...collection];
+  for (const choice of ['warn', 'command']) {
+    assert.equal(possibleChoiceEndings(game, 'rogue-choice', choice), null);
+    assert.equal(hasSeenChoiceEndings(game, 'rogue-choice', choice, collection), false);
+  }
+  let removed = 0;
+  const previousNote = { remove() { removed++; } };
+  const button = { disabled: false, dataset: { action: 'rogue-choice', value: 'warn' }, classList: { contains: () => false }, querySelector: () => previousNote };
+  markSeenEndingChoices({ querySelectorAll: () => [button] }, game, collection);
+  assert.equal(removed, 1, 'an existing assignment hint must disappear when rendering a practice choice');
+  assert.deepEqual(game, before);
+  assert.deepEqual(collection, history);
+  assert.equal(chooseRogue(game, 'warn'), true);
+  assert.equal(endingId(game), 'radio_ghost');
+  assert.equal(game.practice, 'broadcast', 'the real ending transition retains practice provenance');
 });
 
 test('a future ending cannot be silently dropped from conservative nonterminal bounds', () => {

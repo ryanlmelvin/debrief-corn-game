@@ -1,0 +1,54 @@
+/* Keep the crawl on screen; explanations live behind the help button. */
+#field-dungeon{width:100%;margin-top:8px;min-height:44px}
+#rogue-play[data-route="dungeon"][data-stage="play"]{padding:60px max(14px,env(safe-area-inset-right)) max(10px,env(safe-area-inset-bottom)) max(14px,env(safe-area-inset-left));overflow:auto}
+.dungeon-playing .masthead .wordmark{font-size:12px;letter-spacing:2px;opacity:.6}
+.dungeon-playing .masthead .wordmark svg{height:20px;width:15px}
+.dungeon-playing .sidebar{display:none}
+.dungeon-game{height:100%;max-width:1100px;margin:auto;display:grid;grid-template-rows:auto minmax(0,1fr) 24px auto;gap:6px}
+.dungeon-hud{display:flex;align-items:center;justify-content:space-between;gap:14px;min-height:34px;font:11px/1.4 ui-monospace,monospace;color:#bec7a5}
+.dungeon-vitals{display:flex;align-items:center;gap:18px}
+#dungeon-health{display:flex;gap:4px;color:#526147;white-space:nowrap}
+#dungeon-health i{font:14px/1 sans-serif;font-style:normal}
+#dungeon-health .full{color:#b7c696}#dungeon-health.critical .full{color:#dfad82}
+#dungeon-key{width:27px;height:27px;opacity:.25}#dungeon-key.found{opacity:1}
+#dungeon-key svg{width:100%;height:100%}
+#dungeon-ammo{display:flex;align-items:center;gap:6px;color:#e3cd90;font:17px/1 ui-monospace,monospace;white-space:nowrap}
+#dungeon-ammo svg{height:18px;width:8px}
+#dungeon-ammo small{color:#adb89a;font-size:10px}
+.dungeon-map-wrap{min-height:0;display:flex;align-items:center;justify-content:center}
+#dungeon-map{display:block;width:100%;height:100%;max-height:100%;overflow:hidden;filter:drop-shadow(0 8px 22px #0004);touch-action:manipulation}
+.dungeon-step{cursor:pointer}.dungeon-step:hover{fill:#d8bb7b1a;stroke:#d8bb7b55;stroke-width:1}
+.dungeon-message{margin:0;text-align:center;color:#d2c39a;font:italic 13px/24px Georgia,serif;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.dungeon-inputs{display:flex;align-items:center;justify-content:center;gap:24px}
+.dungeon-game .rogue-dpad{grid-template-columns:repeat(3,44px);grid-template-rows:repeat(2,44px);gap:4px;margin:0}
+.dungeon-game .rogue-dpad button{font-size:22px;background:#223223bb;border-color:#79876588}
+.dungeon-abilities{display:grid;grid-template-columns:96px 76px;gap:6px}
+.dungeon-abilities button{padding:10px;font:11px/1.3 ui-monospace,monospace;min-height:44px;justify-content:center}
+#dungeon-fire{grid-row:1 / 3;font-size:15px;min-height:92px}
+.dungeon-help-button{border:1px solid #6e7e5988;border-radius:50%;width:36px;min-height:36px!important;font:16px Georgia,serif;color:#bec7a5;padding:0}
+@media(max-width:600px){
+ #rogue-play[data-route="dungeon"][data-stage="play"]{padding:60px 10px max(10px,env(safe-area-inset-bottom))}
+ .dungeon-hud{flex-wrap:wrap;gap:5px;font-size:10px;padding:0 4px}
+ #dungeon-floor{font-size:9px}.dungeon-vitals{gap:10px}#dungeon-health{gap:2px}#dungeon-health i{font-size:12px}
+ #dungeon-key{width:23px;height:23px}#dungeon-ammo{font-size:15px;gap:4px}#dungeon-ammo small{font-size:9px}
+ .dungeon-inputs{gap:12px;position:relative;padding-right:26px}
+ .dungeon-help-button{position:absolute;right:0;top:0;width:24px;min-height:24px!important;font-size:13px}
+ .dungeon-abilities{grid-template-columns:76px 58px;gap:5px}.dungeon-abilities button{font-size:10px;padding:6px}
+ #dungeon-fire{font-size:13px}.dungeon-message{font-size:11px}
+}
+@media(max-width:350px){.dungeon-game .rogue-dpad{grid-template-columns:repeat(3,40px)}.dungeon-inputs{gap:8px}.dungeon-abilities{grid-template-columns:62px 51px}.dungeon-vitals{gap:8px}}
+@media(max-height:500px) and (min-width:600px){
+ #rogue-play[data-route="dungeon"][data-stage="play"]{padding-top:52px;padding-bottom:8px}
+ .dungeon-game{grid-template-columns:minmax(0,1fr) 166px;grid-template-rows:28px minmax(0,1fr) 20px;gap:4px 12px}
+ .dungeon-hud{grid-column:1 / -1;min-height:28px}.dungeon-map-wrap{grid-row:2 / 4}
+ .dungeon-message{grid-column:2;grid-row:3;font-size:10px;line-height:20px}
+ .dungeon-inputs{grid-column:2;grid-row:2;flex-direction:column;gap:8px;padding:0;align-self:center}
+ .dungeon-abilities{grid-template-columns:82px 68px}.dungeon-help-button{position:absolute;right:0;bottom:0;top:auto;transform:translateX(7px)}
+ .dungeon-game .rogue-dpad{grid-template-columns:repeat(3,42px);grid-template-rows:repeat(2,42px)}
+ #dungeon-fire{min-height:92px}
+}
+
+#paper-dialog[data-kind="dungeon-help"]{max-width:440px;height:fit-content}
+#paper-dialog[data-kind="dungeon-help"] .paper{padding:26px}
+#paper-dialog[data-kind="dungeon-help"] h2{font-size:30px}
+#paper-dialog[data-kind="dungeon-help"] .small{font-size:12px;line-height:1.9}

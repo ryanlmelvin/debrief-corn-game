@@ -1,10 +1,13 @@
+import { createDungeon, moveDungeon, chooseDungeon, validDungeon, migrateDungeon } from './dungeon.js';
+
 // Deliberately broken protocol: self-contained simulations, safe to save mid-step.
-const ROUTES = ['corn', 'broadcast', 'flood'];
-const NEW_ENDINGS = ['corn_escape', 'corn_uprising', 'radio_ghost', 'field_voice', 'flood', 'corn_contained', 'roadkill'];
+const ROUTES = ['corn', 'broadcast', 'flood', 'dungeon'];
+const NEW_ENDINGS = ['corn_escape', 'corn_uprising', 'radio_ghost', 'field_voice', 'flood', 'corn_contained', 'roadkill', 'dungeon_escape', 'dungeon_lost'];
 const RESULT = {
   corn: ['corn_escape', 'corn_uprising', 'assimilation', 'corn_contained', 'roadkill'],
   broadcast: ['radio_ghost', 'field_voice', 'assimilation'],
-  flood: ['flood', 'breach']
+  flood: ['flood', 'breach'],
+  dungeon: ['dungeon_escape', 'dungeon_lost']
 };
 const LANES = [1, 2, 3, 5, 6, 7];
 const PIPE_KINDS = ['elbow', 'straight', 'elbow', 'elbow', 'elbow', 'elbow', 'straight', 'elbow', 'straight'];
@@ -16,11 +19,13 @@ const idleField = s => s.phase === 'field' && !s.fieldEvents?.pending && !s.expe
 
 export function rogueOptions(s) {
   const idle = idleField(s);
+  const atDrain = s.player.x === 7 && s.player.y === 5 && s.inspected.includes('drain');
   const atPump = s.player.x === 3 && s.player.y === 3 && s.inspected.includes('pump');
   return [
     { id: 'corn', label: 'Stop resisting the field.', detail: s.exposure >= 70 ? '100 exposure. No way back.' : 'The roots are waiting. Requires 70 exposure.', disabled: !idle || s.exposure < 70 },
     { id: 'broadcast', label: 'Transmit on every frequency.', detail: 'Something beneath the static knows your voice.', disabled: !idle },
-    { id: 'flood', label: 'Reverse the treatment pumps.', detail: atPump ? 'The pipes run both ways.' : 'Return to the pump house after inspecting it.', disabled: !idle || !atPump }
+    { id: 'flood', label: 'Reverse the treatment pumps.', detail: atPump ? 'The pipes run both ways.' : 'Return to the pump house after inspecting it.', disabled: !idle || !atPump },
+    { id: 'dungeon', label: 'Climb into the drainage channel.', detail: atDrain ? 'Dungeon Crawler Corn. Something has built stairs beneath the field.' : 'Return to the drainage channel after inspecting it.', disabled: !idle || !atDrain }
   ];
 }
 
@@ -52,6 +57,8 @@ export function startRogue(s, route) {
     Object.assign(s.rogue, { x: 5, y: 8, crossing: 0, patternVersion: 2, lastHit: null, refuge: 8, moveReadyAt: 0, immuneUntil: 0 });
   } else if (route === 'broadcast') {
     Object.assign(s.rogue, { locks: 0, lockReadyAt: 0 });
+  } else if (route === 'dungeon') {
+    s.rogue.dungeon = createDungeon();
   } else {
     let seed = (s.rng ^ 0x51a1ce) >>> 0;
     const tiles = PIPE_KINDS.map(() => { seed = (Math.imul(1664525, seed) + 1013904223) >>> 0; return seed >>> 30; });
@@ -74,6 +81,11 @@ export function getRogueScene(s) {
       title: 'Hold the transmit switch.',
       text: 'Every radio in the field answers with your breathing. Three carrier signals slide through the receiver. Somewhere beneath the static, your voice is asking to be let out.',
       options: [{ id: 'begin', label: 'Open every channel.', detail: 'This ends your assignment.' }, { id: 'back', label: 'Release the switch. Return to the map.' }]
+    };
+    if (r.route === 'dungeon') return {
+      title: 'Dungeon Crawler Corn',
+      text: 'The drain has steps. You sling your rifle, lift the lantern from its hook, and climb below the waterline. Your uniform catches on the brickwork. Three locked floors lie between you and a breath of outside air. Down here, nothing moves until you do.',
+      options: [{ id: 'begin', label: 'Take the lantern. Enter the dungeon.', detail: 'This ends your assignment. Keep your rifle and remaining ammunition. Find each brass key, then the stairs.' }, { id: 'back', label: 'Leave the drain. Return to the map.' }]
     };
     return {
       title: 'Give it all back.',
@@ -113,7 +125,8 @@ export function chooseRogue(s, id) {
     if (id === 'root') { end(s, 'assimilation', id, option.label); return true; }
     record(s, id, scene.title, option.label);
     r.stage = 'play';
-    r.message = r.route === 'corn' ? (r.patternVersion === 2 ? "The guard has your rifle and switched it to full auto. Bet you didn't know you could do that, huh?" : 'The guard has your rifle.') : r.route === 'broadcast' ? 'Your breathing answers from every receiver.' : 'The pipes are warm beneath your hands.';
+    if (r.route === 'dungeon') s.reload = 0;
+    r.message = r.route === 'corn' ? (r.patternVersion === 2 ? "The guard has your rifle and switched it to full auto. Bet you didn't know you could do that, huh?" : 'The guard has your rifle.') : r.route === 'broadcast' ? 'Your breathing answers from every receiver.' : r.route === 'dungeon' ? 'Find the brass key, then the stairs. Red squares show where roots will strike next turn.' : 'The pipes are warm beneath your hands.';
     return true;
   }
   if (r.stage === 'choice') {
@@ -123,6 +136,11 @@ export function chooseRogue(s, id) {
     return true;
   }
   if (r.stage !== 'play') return false;
+  if (r.route === 'dungeon') {
+    const changed = chooseDungeon(s, id);
+    if (changed) finishDungeon(s);
+    return changed;
+  }
   if (r.route === 'broadcast' && id === 'lock') {
     if (r.time < r.lockReadyAt) return false;
     r.lockReadyAt = r.time + .35;
@@ -231,8 +249,19 @@ function checkCorn(s) {
   r.message = hazard.kind === 'car' ? 'A wheel tears through the husk.' : 'A layer of husk tears away.';
 }
 
+function finishDungeon(s) {
+  const status = s.rogue.dungeon.status;
+  if (status === 'escaped') end(s, 'dungeon_escape', 'surface', 'I found the three keys and climbed out beneath a different sky.');
+  else if (status === 'lost') end(s, 'dungeon_lost', 'lost', 'The roots dragged me under the drainage channel before I could reach the surface.');
+}
+
 export function moveRogue(s, dx, dy) {
   const r = s.rogue;
+  if (s.phase === 'rogue' && r?.route === 'dungeon' && r.stage === 'play') {
+    const changed = moveDungeon(s, dx, dy);
+    if (changed) finishDungeon(s);
+    return changed;
+  }
   if (s.phase !== 'rogue' || r?.route !== 'corn' || r.stage !== 'play' || !Number.isInteger(dx) || !Number.isInteger(dy) || Math.abs(dx) + Math.abs(dy) !== 1 || r.time < r.moveReadyAt) return false;
   const x = r.x + dx, y = r.y + dy;
   if (x < 0 || x > 10 || y < 0 || y > 8) return false;
@@ -287,7 +316,7 @@ export function floodConnections(s) {
 
 export function advanceRogue(s, dt) {
   const r = s.rogue;
-  if (s.phase !== 'rogue' || !r || r.stage !== 'play' || r.route === 'flood' || !Number.isFinite(dt) || dt <= 0) return;
+  if (s.phase !== 'rogue' || !r || r.stage !== 'play' || ['flood', 'dungeon'].includes(r.route) || !Number.isFinite(dt) || dt <= 0) return;
   // Bound frame catch-up, and subdivide to prevent a bullet skipping the player.
   let left = Math.min(dt, 1);
   while (left > 0 && s.phase === 'rogue' && r.stage === 'play') {
@@ -309,7 +338,7 @@ export function validRogue(s) {
     r.patternVersion = 1;
     if (r.lastHit === undefined) r.lastHit = r.hits > 0 ? 'bullet' : null;
   }
-  const keys = ['route', 'stage', 'time', 'hits', 'message', 'outcome', ...(r.route === 'corn' ? ['x', 'y', 'crossing', 'patternVersion', 'lastHit', 'refuge', 'moveReadyAt', 'immuneUntil'] : r.route === 'broadcast' ? ['locks', 'lockReadyAt'] : ['tiles', 'turns'])];
+  const keys = ['route', 'stage', 'time', 'hits', 'message', 'outcome', ...(r.route === 'corn' ? ['x', 'y', 'crossing', 'patternVersion', 'lastHit', 'refuge', 'moveReadyAt', 'immuneUntil'] : r.route === 'broadcast' ? ['locks', 'lockReadyAt'] : r.route === 'dungeon' ? ['dungeon'] : ['tiles', 'turns'])];
   if (Object.keys(r).some(key => !keys.includes(key)) || !finite(r.time, 0, MAX_TIME) || !integer(r.hits, 0, 3) || typeof r.message !== 'string' || r.message.length > 300) return false;
   if (s.targets.length || s.fieldEvents.pending || s.fieldEvents.journey || s.compulsionNotice) return false;
   if (r.stage === 'done') {
@@ -320,7 +349,7 @@ export function validRogue(s) {
   if (r.stage !== 'intro') {
     const rootedWithoutRunning = r.route === 'corn' && r.outcome === 'assimilation' && r.hits === 0;
     if (r.stage === 'done') {
-      const choice = rootedWithoutRunning ? 'root' : ({ corn_escape: 'escape', corn_uprising: 'gate', corn_contained: 'rooted', roadkill: 'rooted', radio_ghost: 'warn', field_voice: 'command', flood: 'release', breach: 'rupture' }[r.outcome] || (r.route === 'corn' ? 'rooted' : 'signal-lost'));
+      const choice = rootedWithoutRunning ? 'root' : ({ corn_escape: 'escape', corn_uprising: 'gate', corn_contained: 'rooted', roadkill: 'rooted', radio_ghost: 'warn', field_voice: 'command', flood: 'release', breach: 'rupture', dungeon_escape: 'surface', dungeon_lost: 'lost' }[r.outcome] || (r.route === 'corn' ? 'rooted' : 'signal-lost'));
       if (!matchesReport(s.reports.at(-1), choice) || !rootedWithoutRunning && !matchesReport(s.reports.at(-2), 'begin')) return false;
     } else if (!matchesReport(s.reports.at(-1), 'begin')) return false;
   }
@@ -339,6 +368,8 @@ export function validRogue(s) {
     if (r.stage === 'intro' && (r.locks || r.lockReadyAt)) return false;
     if ((r.stage === 'choice' || ['radio_ghost', 'field_voice'].includes(r.outcome)) && (r.locks !== 3 || r.hits === 3)) return false;
     if (r.stage === 'play' && r.locks === 3 || r.outcome === 'assimilation' && (r.hits !== 3 || r.locks === 3)) return false;
+  } else if (r.route === 'dungeon') {
+    if (r.hits !== 0 || r.time !== 0 || !integer(s.rounds, 0, 6) || !integer(s.reserve, 0, Number.MAX_SAFE_INTEGER) || !migrateDungeon(s) || !validDungeon(r.dungeon, r.stage, r.outcome)) return false;
   } else {
     if (!Array.isArray(r.tiles) || r.tiles.length !== 9 || !r.tiles.every(tile => integer(tile, 0, 3)) || !integer(r.turns, 0, 1000000) || r.time !== 0 || r.stage === 'choice') return false;
     if (r.stage === 'intro' && r.turns !== 0 || r.outcome === 'flood' && (r.hits === 3 || !floodConnections(s).connected) || r.outcome === 'breach' && (r.hits !== 3 || floodConnections(s).connected)) return false;

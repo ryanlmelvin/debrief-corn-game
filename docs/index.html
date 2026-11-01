@@ -17,6 +17,8 @@
   <link rel="stylesheet" href="./image-viewer.css">
   <link rel="stylesheet" href="./watch-play.css">
   <link rel="stylesheet" href="./rogue.css">
+  <link rel="stylesheet" href="./dungeon.css">
+  <link rel="stylesheet" href="./mini-games.css">
   <script type="module" src="./app.js"></script>
 </head>
 <body>
@@ -32,6 +34,8 @@
         <div class="menu-heading">GAME MENU <button class="quiet" popovertarget="game-menu" popovertargetaction="hide" aria-label="Close game menu">✕</button></div>
         <button id="sound" class="quiet" aria-pressed="false">Sound: OFF · Turn on</button>
         <button id="records" class="quiet">Endings</button>
+        <button id="mini-games" class="quiet" data-action="mini-games">Mini games</button>
+        <button id="mini-game-return" class="quiet" data-action="mini-game-return" hidden>Return to story</button>
         <button id="manual" class="quiet">Field manual</button>
         <button id="about" class="quiet">About Debrief</button>
         <button id="install" class="quiet">Install on device</button>
@@ -41,6 +45,7 @@
         <button id="watch-record" class="quiet" data-action="watch-record" hidden>Watch record</button>
         <button id="notebook" class="notebook-button" hidden>Notebook <span id="evidence-count">00</span></button>
         <button id="menu-radio" class="quiet" hidden>Recent events</button>
+        <button id="dungeon-restart" class="quiet" data-action="restart" hidden>Restart dungeon</button>
       </div>
     </nav>
   </header>

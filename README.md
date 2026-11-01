@@ -4,7 +4,7 @@ A playable rural horror game based on **Debrief**, the short story by **Ryan L. 
 
 Work three watchtower shifts. Shoot corn that tries to escape, distinguish human figures from moving crops, try to resist an intrusive urge to investigate, and choose what goes into the official debrief. After the sighting, roots gradually fill the stationary word “investigate” across the watchtower view. Holding your post until relief leads straight to the map with a brief notice that you could no longer resist; your later testimony remembers whether you chose to leave or were compelled. Inspect all three locations and return to the tower for debrief; your evidence changes your answers and available endings.
 
-This is a first playable adaptation, with original additional scenes and twenty-two endings. The source manuscript has not been copied into the project. The application records and environmental anomalies are fictional story elements.
+This is a first playable adaptation, with original additional scenes and twenty-four endings. The source manuscript has not been copied into the project. The application records and environmental anomalies are fictional story elements.
 
 ## Play locally
 
@@ -15,6 +15,12 @@ npm start
 ```
 
 Open **http://localhost:4317**. To use another port: `PORT=4321 npm start`.
+
+**Mini games:** Open **Menu → Mini games** to see Watchtower, Corn Escape, Radio Tuning, Pump Puzzle, and Dungeon Crawler Corn. Each stays locked until you start playing it in the story; winning is not required. Unlocks persist across runs and move with saved progress. Once unlocked, practice sessions save separately, survive reloads, and leave your story assignment, ending collection, transcripts, and watch records untouched. Use **Return to story** to continue your assignment. Endings are awarded only when reached through normal story play.
+
+**Local playtest: Dungeon Crawler Corn.** Open **http://localhost:4317/?preview=dungeon** to jump straight to the new drainage-channel route. This localhost-only shortcut has its own save and ending collection; reload to resume or choose Menu → Restart dungeon to try again. To discover it normally, inspect the drainage channel, then choose **Follow the drain below ground** on the map or in **Break protocol**.
+
+Explore three turn-based dungeon floors as the human guard, carrying your rifle and ammunition from the watch. Find each brass key and the stairs, shoot roots in clear sight or strike with your rifle butt by moving into them, and dodge their marked next strike. Arrows/WASD move, **F** or **Space** fires at the marked root, **R** reloads, and **period** waits a turn; touch controls are also available. Medical supplies restore health and ammunition boxes replenish your reserve. Escape or be lost below the root line for two new endings. Progress saves after every action.
 
 The recovery detail ends with a recorded interview. If any of its six rounds remain, either interview question lets you grab the rifle and try to shoot the interviewer. The attempt spends one round and cuts to its own interrupted-tape ending; it never establishes who was hit or who survives. This outcome has its own Endings entry and spoiler-free share card.
 
