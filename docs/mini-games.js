@@ -11,7 +11,8 @@ export const MINI_GAMES = Object.freeze([
   { id: 'broadcast', title: 'Radio Tuning', description: 'Catch three moving signals inside the gold band.' },
   { id: 'flood', title: 'Pump Puzzle', description: 'Rotate the pipes to connect the treatment pump to the field outlet.' },
   { id: 'dungeon', title: 'Dungeon Crawler Corn', description: 'Take your rifle beneath the drain. Find three keys and climb back out.' },
-  { id: 'rescue', title: 'Roots & Recordings', description: 'Match the two voices. Pull while the roots loosen and free both boots.' }
+  { id: 'rescue', title: 'Roots & Recordings', description: 'Match the two voices. Pull while the roots loosen and free both boots.' },
+  { id: 'transmission', title: 'The Other Tower', description: 'Guide your earlier self through moving rows with delayed radio commands.' }
 ].map(game => Object.freeze(game)));
 
 /** Keep persisted unlocks small, unique, and in the menu's stable display order. */
@@ -32,7 +33,7 @@ export function getMiniGameUnlocks(state) {
     .map(report => report.rogueRoute).filter(id => id !== 'watch');
   for (const report of reports) {
     if (report?.kind === 'resolution' && report.resolutionGame === report.resolutionRoute &&
-        report.resolutionStep === 1 && report.choice === { rescue: 'rescue-carry' }[report.resolutionGame] &&
+        report.resolutionStep === 1 && report.choice === { rescue: 'rescue-carry', transmission: 'transmission-listen' }[report.resolutionGame] &&
         RESOLUTION_GAMES.includes(report.resolutionGame)) unlocked.push(report.resolutionGame);
   }
   // All genuine story states beyond the first briefing have entered a watch.
@@ -53,14 +54,16 @@ export function createMiniGame(id, mode = 'story', seed = Date.now()) {
     Object.assign(s, { phase: 'debrief', shift: 2, question: 2, targets: [] });
     // Practice supplies the route's actual journal prerequisites, then enters
     // through the same scenes/actions as a normal assignment.
-    for (const requirement of ENDING_PATHS[id].requirements) for (const event of requirement.events || []) {
+    const events = ENDING_PATHS[id].requirements.flatMap(requirement => requirement.events || []);
+    if (id === 'transmission') events.unshift({ id: 'first-call', choices: ['record'] });
+    for (const event of events) {
       const selected = ENCOUNTERS.find(entry => entry.id === event.id).choices.find(choice => event.choices.includes(choice.id));
       s.fieldEvents.seen.push(event.id);
       s.fieldEvents.journal.push({ id: event.id, choice: selected.id, delta: selected.delta, x: 4, y: 4 });
       if (selected.flag && !s.fieldEvents.flags.includes(selected.flag)) s.fieldEvents.flags.push(selected.flag);
     }
     if (!startResolution(s) || !chooseResolution(s, id)) return null;
-    for (const action of { rescue: ['rescue-radio', 'rescue-carry'] }[id]) if (!chooseResolution(s, action)) return null;
+    for (const action of { rescue: ['rescue-radio', 'rescue-carry'], transmission: ['transmission-tower', 'transmission-listen'] }[id]) if (!chooseResolution(s, action)) return null;
   } else if (id !== 'watch') {
     // Practice skips the assignment, while route setup and every playable action
     // still pass through the same transition functions used by the story.
@@ -109,6 +112,10 @@ export function miniGameResult(s) {
     success = true;
     title = 'Both boots are free.';
     message = 'The voices hold the roots loose. In the story, carrying the person out means leaving the recordings behind.';
+  } else if (id === 'transmission') {
+    success = true;
+    title = 'You found your way back.';
+    message = `All three crossings cleared · ${s.resolution.activity.state.commands} commands sent · ${s.resolution.activity.state.setbacks} crossings retried.`;
   } else {
     success = s.ending === 'dungeon_escape';
     title = success ? 'Back above ground.' : 'The roots closed in.';

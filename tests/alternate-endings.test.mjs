@@ -221,6 +221,7 @@ test('the time-loop payoff uses the actual first-night response, including the n
     chooseResolution(s, 'transmission-tower');
     chooseResolution(s, 'transmission-listen');
     assert.match(getResolution(s).context, scenePattern);
+    solveResolutionGame(s);
     chooseResolution(s, 'transmission-broadcast');
     assert.match(resolutionEnding(s).text, endingPattern);
     assert.equal(validResolution(s), true);

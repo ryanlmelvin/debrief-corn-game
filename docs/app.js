@@ -37,7 +37,7 @@ const menuOpen=()=>menu.matches(':popover-open');
 menu.addEventListener('toggle',()=>{if(menuOpen()){releaseResolutionGame(game);save();}syncAudio();});
 menu.addEventListener('click',event=>{if(event.target.closest('button')&&!event.target.closest('[popovertarget]'))menu.hidePopover();});
 const previewRequested=new URLSearchParams(location.search).get('preview');
-const previewGame=['localhost','127.0.0.1','[::1]'].includes(location.hostname)&&['dungeon','rescue'].includes(previewRequested)?previewRequested:null;
+const previewGame=['localhost','127.0.0.1','[::1]'].includes(location.hostname)&&['dungeon','rescue','transmission'].includes(previewRequested)?previewRequested:null;
 const dungeonPreview=previewGame==='dungeon';
 const previewSuffix=previewGame?`:${previewGame}-preview`:'';
 $('dungeon-restart').hidden=!dungeonPreview;
@@ -174,7 +174,7 @@ function miniGamePaper(title,body) {
 }
 function showMiniGames() {
   save();
-  const art={watch:'watch-corn',corn:'field-corner',broadcast:'encounter-radio',flood:'field-pump',dungeon:'field-drain',rescue:'ending-rescue'};
+  const art={watch:'watch-corn',corn:'field-corner',broadcast:'encounter-radio',flood:'field-pump',dungeon:'field-drain',rescue:'ending-rescue',transmission:'ending-transmission'};
   const cards=MINI_GAMES.map(entry=>{
     const unlocked=history.miniGames.includes(entry.id);
     const status=unlocked?'<span class="mini-game-status" aria-hidden="true">↗</span>':'<span class="mini-game-status"><svg viewBox="0 0 20 24" aria-hidden="true"><path d="M5 10V6a5 5 0 0 1 10 0v4M2 10h16v12H2z"/><path d="M10 14v4"/></svg><span>Locked</span></span>';
@@ -347,8 +347,9 @@ function updateUI(force=false) {
   }
   resolutionUI.render(game,paused||dialog.open||menuOpen());
   if(resolutionGameActive(game)){
-    $('objective').textContent='Free the person at the lantern.';
-    $('objective-detail').textContent='Match the recorded breath to the radio. Pull only while the roots loosen.';
+    const rescue=game.resolution.activity.kind==='rescue';
+    $('objective').textContent=rescue?'Free the person at the lantern.':'Guide your earlier self.';
+    $('objective-detail').textContent=rescue?'Match the recorded breath to the radio. Pull only while the roots loosen.':'Watch the moving rows. Radio commands take a moment to reach the light.';
     $('station-status').textContent=previewGame?'LOCAL PLAYTEST':'AFTER THE WATCH';
   }
   canvas.hidden=field;
@@ -612,7 +613,7 @@ document.addEventListener('keydown',event=>{
   if(resolutionGameActive(game)){
     const onButton=['BUTTON','A'].includes(event.target.tagName);
     const stage=game.resolution.activity.state.stage;
-    const action=stage==='align'?{arrowleft:'earlier',arrowright:'later',...(!onButton?{enter:'align'}:{})}[k]:(k===' '&&(!onButton||event.target.closest('[data-hold]'))?'pull':null);
+    const action=game.resolution.activity.kind==='transmission'?{w:'wait',a:'advance',t:'turn'}[k]:stage==='align'?{arrowleft:'earlier',arrowright:'later',...(!onButton?{enter:'align'}:{})}[k]:(k===' '&&(!onButton||event.target.closest('[data-hold]'))?'pull':null);
     if(action){event.preventDefault();if(!event.repeat)act('resolution-game',action);}
     return;
   }
@@ -775,7 +776,7 @@ if(resumedMiniGame){
   practiceReturnToGame=resumedMiniGame.returnToGame;practiceReturnPaused=resumedMiniGame.returnPaused;
   begin(resumedMiniGame.game.mode,false,resumedMiniGame.game);
 }else if(previewGame&&!dungeonPreview){
-  document.title='Roots & Recordings — Local playtest';
+  document.title=`${previewGame==='rescue'?'Roots & Recordings':'The Other Tower'} — Local playtest`;
   launchMiniGame(previewGame,true);
 }else if(dungeonPreview){
   document.title='Dungeon Crawler Corn — Local playtest';

@@ -20,14 +20,14 @@ function result(s, success) {
 }
 
 test('the mini-game catalog starts every playable activity directly with durable practice provenance', () => {
-  assert.deepEqual(MINI_GAMES.map(game=>game.id),['watch','corn','broadcast','flood','dungeon','rescue']);
+  assert.deepEqual(MINI_GAMES.map(game=>game.id),['watch','corn','broadcast','flood','dungeon','rescue','transmission']);
   for(const mode of ['story','hard']) for(const entry of MINI_GAMES) {
     const s=createMiniGame(entry.id,mode,42);
     assert.equal(s.practice,entry.id);
     assert.match(s.runId,new RegExp(`^practice-${entry.id}-`));
     assert.equal(s.mode,mode);
-    assert.equal(s.phase,entry.id==='watch'?'tower':entry.id==='rescue'?'resolution':'rogue');
-    if(!['watch','rescue'].includes(entry.id))assert.equal(s.rogue.stage,'play');
+    assert.equal(s.phase,entry.id==='watch'?'tower':['rescue','transmission'].includes(entry.id)?'resolution':'rogue');
+    if(!['watch','rescue','transmission'].includes(entry.id))assert.equal(s.rogue.stage,'play');
     assert.equal(miniGameComplete(s),false);assert.equal(miniGameResult(s),null);
     roundTrip(s);
   }

@@ -10,6 +10,7 @@ import { possibleChoiceEndings, hasSeenChoiceEndings, markSeenEndingChoices } fr
 import { REVIEWED_ENDING_HINTS } from '../scripts/check-ending-hints.mjs';
 import { resolutionGameAction, resolutionGameActive } from '../docs/resolution-games.js';
 import { rescueStatus } from '../docs/rescue.js';
+import { transmissionStatus } from '../docs/transmission.js';
 import { solveResolutionGame } from './helpers/resolution-play.mjs';
 
 const guideEndings = ['guide', 'guide_arrested', 'guide_interrupted', 'guide_shot'];
@@ -226,12 +227,12 @@ function alignRescue(game) {
   assert.equal(resolutionGameAction(game, 'align'), true);
 }
 
-function finishAfterRescueWithdrawal(game, ending) {
+function finishAfterResolutionWithdrawal(game, ending) {
   if (game.phase === 'resolution') assert.equal(chooseResolution(game, 'back'), true);
   assert.equal(game.phase, 'debrief');
   if (ending === 'dissent' || ending === 'witness') {
     assert.equal(answer(game, ending === 'witness' ? 'expose' : 'sign'), true);
-  } else if (ending === 'rescue' || ending === 'relief') {
+  } else if (Object.hasOwn(paths, ending)) {
     enter(ending, game);
     for (const choice of paths[ending]) {
       solveResolutionGame(game);
@@ -261,7 +262,7 @@ test('rescue entry and withdrawals retain every ending demonstrated by real cont
     for (const ending of reachable) {
       const actual = structuredClone(game);
       assert.equal(action === 'answer' ? answer(actual, value) : chooseResolution(actual, value), true);
-      finishAfterRescueWithdrawal(actual, ending);
+      finishAfterResolutionWithdrawal(actual, ending);
       assert.equal(hasSeenChoiceEndings(game, action, value, historyExcept(ending)), false,
         `${action}/${value} must retain its real ${ending} continuation`);
     }
@@ -363,6 +364,182 @@ test('locked rescue leads and practice rescue controls cannot receive collection
   }
   solveResolutionGame(practice);
   assert.equal(hasSeenChoiceEndings(practice, 'resolution-answer', 'rescue-leave', all), false);
+});
+
+function transmissionAtRadio(firstCall = 'record') {
+  const game = ready('transmission', 'rescue', 'relief', 'vacancy');
+  if (firstCall !== 'record') {
+    // Preserve support for older saved first-call variants. The normal current
+    // route records the first call; its later comparison is already in this
+    // historical journal, and every action below still uses the real gate.
+    const entry = game.fieldEvents.journal.find(item => item.id === 'first-call');
+    const selected = ENCOUNTERS.find(event => event.id === 'first-call').choices.find(option => option.id === firstCall);
+    Object.assign(entry, { choice: firstCall, delta: selected.delta });
+  }
+  enter('transmission', game);
+  assert.equal(chooseResolution(game, 'transmission-tower'), true);
+  assert.equal(chooseResolution(game, 'transmission-listen'), true);
+  assert.equal(resolutionGameActive(game), true);
+  return game;
+}
+
+function waitForTransmission(game, condition) {
+  for (let frame = 0; !condition(); frame++) {
+    assert.ok(frame < 1000, 'the real transmission clock must reach the requested state');
+    advance(game, .05);
+  }
+}
+
+function transmissionChoices() {
+  const game = ready('transmission', 'rescue', 'relief', 'vacancy'), choices = [];
+  const record = (action, value) => choices.push({ game: structuredClone(game), action, value });
+  record('answer', 'follow-lead');
+  assert.equal(answer(game, 'follow-lead'), true);
+  record('resolution-answer', 'transmission');
+  assert.equal(chooseResolution(game, 'transmission'), true);
+  record('resolution-answer', 'transmission-tower');
+  assert.equal(chooseResolution(game, 'transmission-tower'), true);
+  record('resolution-answer', 'transmission-listen');
+  assert.equal(chooseResolution(game, 'transmission-listen'), true);
+  record('resolution-answer', 'back');
+  const t = game.resolution.activity.state;
+  waitForTransmission(game, () => transmissionStatus(t).canAdvance && !transmissionStatus(t).arrivalSafe);
+  assert.equal(resolutionGameAction(game, 'advance'), true);
+  assert.ok(t.pending);
+  record('resolution-answer', 'back');
+  waitForTransmission(game, () => t.setbacks > 0);
+  assert.equal(game.phase, 'resolution', 'a closed row resets the crossing without deciding an ending');
+  record('resolution-answer', 'back');
+  solveResolutionGame(game);
+  assert.equal(game.phase, 'resolution', 'reaching the radio leaves the final warning undecided');
+  record('resolution-answer', 'back');
+  return choices;
+}
+
+test('transmission entry, delayed commands and setbacks preserve every demonstrated withdrawal destination', () => {
+  const all = Object.keys(ENDINGS);
+  const reachable = ['transmission', 'rescue', 'relief', 'vacancy', 'dissent', ...guideEndings];
+  for (const { game, action, value } of transmissionChoices()) {
+    const before = structuredClone(game);
+    assert.deepEqual(possibleChoiceEndings(game, action, value), sorted(all));
+    for (const ending of reachable) {
+      const actual = structuredClone(game);
+      assert.equal(action === 'answer' ? answer(actual, value) : chooseResolution(actual, value), true);
+      finishAfterResolutionWithdrawal(actual, ending);
+      assert.equal(hasSeenChoiceEndings(game, action, value, historyExcept(ending)), false,
+        `${action}/${value} must retain its real ${ending} continuation`);
+    }
+    for (const ending of all) assert.equal(hasSeenChoiceEndings(game, action, value, historyExcept(ending)), false);
+    assert.equal(hasSeenChoiceEndings(game, action, value, all), true);
+    assert.deepEqual(game, before);
+  }
+});
+
+test('every supported first-call memory reaches the same stable warning through real transmission play', () => {
+  const all = Object.keys(ENDINGS);
+  for (const firstCall of ['record', 'answer', 'leave']) {
+    const game = transmissionAtRadio(firstCall);
+    const journal = structuredClone(game.fieldEvents.journal);
+    const t = game.resolution.activity.state;
+    assert.equal(t.firstCall, firstCall);
+    assert.equal(getResolution(game).options.find(option => option.id === 'transmission-broadcast').disabled, true);
+    assert.equal(chooseResolution(game, 'transmission-broadcast'), false);
+    assert.equal(possibleChoiceEndings(game, 'resolution-answer', 'transmission-broadcast'), null);
+    assert.equal(hasSeenChoiceEndings(game, 'resolution-answer', 'transmission-broadcast', all), false);
+    solveResolutionGame(game);
+    assert.equal(t.stage, 'complete');
+    assert.equal(game.ending, null);
+    assert.deepEqual(game.fieldEvents.journal, journal, 'guiding the light cannot rewrite the earlier watch');
+    assertTerminalHint(game, 'resolution-answer', 'transmission-broadcast', 'transmission');
+    assert.equal(hasSeenChoiceEndings(game, 'resolution-answer', 'back', ['transmission']), false);
+    for (const value of ['wait', 'advance', 'turn']) {
+      assert.equal(resolutionGameAction(game, value), false);
+      assert.equal(hasSeenChoiceEndings(game, 'resolution-game', value, all), false);
+    }
+  }
+});
+
+test('transmission controls remain unmarked before delivery, while moving, at bends and after setbacks', () => {
+  const game = transmissionAtRadio(), t = game.resolution.activity.state, all = Object.keys(ENDINGS);
+  function assertLiveInputs() {
+    const before = structuredClone(game);
+    for (const value of ['wait', 'advance', 'turn', 'complete', 'unknown']) {
+      assert.equal(possibleChoiceEndings(game, 'resolution-game', value), null);
+      assert.equal(hasSeenChoiceEndings(game, 'resolution-game', value, all), false);
+    }
+    assert.equal(possibleChoiceEndings(game, 'resolution-answer', 'transmission-broadcast'), null);
+    assert.equal(resolutionGameAction(game, 'complete'), false);
+    assert.deepEqual(game, before);
+  }
+  assertLiveInputs();
+  waitForTransmission(game, () => !transmissionStatus(t).arrivalSafe);
+  assert.equal(resolutionGameAction(game, 'advance'), true);
+  assert.ok(t.pending);
+  assertLiveInputs();
+  const queued = structuredClone(game);
+  for (const value of ['wait', 'advance', 'turn']) assert.equal(resolutionGameAction(game, value), false);
+  assert.deepEqual(game, queued, 'a queued radio call cannot be overwritten by another control');
+  waitForTransmission(game, () => t.moving);
+  assertLiveInputs();
+  waitForTransmission(game, () => t.setbacks > 0);
+  assertLiveInputs();
+  waitForTransmission(game, () => transmissionStatus(t).arrivalSafe);
+  assert.equal(resolutionGameAction(game, 'advance'), true);
+  waitForTransmission(game, () => transmissionStatus(t).canTurn);
+  assertLiveInputs();
+  assert.equal(resolutionGameAction(game, 'turn'), true);
+  assertLiveInputs();
+  solveResolutionGame(game);
+  assertTerminalHint(game, 'resolution-answer', 'transmission-broadcast', 'transmission');
+});
+
+test('transmission previews leave pending commands, saved history and randomness untouched', () => {
+  const game = transmissionAtRadio();
+  const t = game.resolution.activity.state;
+  assert.equal(resolutionGameAction(game, 'advance'), true);
+  const history = { collected: Object.keys(ENDINGS), runs: [{ id: 'previous', reports: [] }] };
+  const priorHistory = JSON.stringify(history), journal = structuredClone(game.fieldEvents.journal), random = Math.random;
+  let randomCalls = 0;
+  try {
+    Math.random = () => { randomCalls++; return .5; };
+    for (let frame = 0; frame < 6; frame++) {
+      const save = JSON.stringify(game);
+      for (const [action, value] of [['resolution-answer', 'back'], ['resolution-answer', 'transmission-broadcast'], ['resolution-game', 'wait'], ['resolution-game', 'advance'], ['resolution-game', 'turn']]) {
+        possibleChoiceEndings(game, action, value);
+        hasSeenChoiceEndings(game, action, value, history.collected);
+        assert.equal(JSON.stringify(game), save);
+        assert.equal(JSON.stringify(history), priorHistory);
+      }
+      advance(game, .6);
+    }
+  } finally {
+    Math.random = random;
+  }
+  assert.ok(t.setbacks > 0, 'the clock exercised both queued delivery and the real closed-row setback');
+  assert.equal(randomCalls, 0);
+  assert.deepEqual(game.fieldEvents.journal, journal);
+});
+
+test('locked transmission leads and practice never acquire collection hints', () => {
+  const locked = ready(), all = Object.keys(ENDINGS);
+  startResolution(locked);
+  const before = structuredClone(locked);
+  assert.equal(getResolution(locked).options.find(option => option.id === 'transmission').disabled, true);
+  assert.equal(chooseResolution(locked, 'transmission'), false);
+  assert.equal(possibleChoiceEndings(locked, 'resolution-answer', 'transmission'), null);
+  assert.equal(hasSeenChoiceEndings(locked, 'resolution-answer', 'transmission', all), false);
+  assert.equal(resolutionGameAction(locked, 'advance'), false);
+  assert.deepEqual(locked, before);
+  const practice = createMiniGame('transmission', 'story', 42);
+  assert.ok(practice);
+  const untouched = structuredClone(practice);
+  for (const [action, value] of [['resolution-answer', 'back'], ['resolution-answer', 'transmission-broadcast'], ['resolution-game', 'advance']]) {
+    assert.equal(possibleChoiceEndings(practice, action, value), null);
+    assert.equal(hasSeenChoiceEndings(practice, action, value, all), false);
+  }
+  assert.deepEqual(practice, untouched);
+  solveResolutionGame(practice);
+  assert.equal(hasSeenChoiceEndings(practice, 'resolution-answer', 'transmission-broadcast', all), false);
 });
 
 test('committing to the recovery team includes all four separately collected outcomes', () => {

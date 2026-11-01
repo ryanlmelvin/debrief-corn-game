@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { advance } from '../../docs/engine.js';
 import { rescueStatus } from '../../docs/rescue.js';
+import { transmissionStatus } from '../../docs/transmission.js';
 import { resolutionGameAction, resolutionGameActive } from '../../docs/resolution-games.js';
 
 // Replay player controls against the real clock. Never edit progress or inject a
@@ -8,6 +9,17 @@ import { resolutionGameAction, resolutionGameActive } from '../../docs/resolutio
 export function solveResolutionGame(game) {
   if (!resolutionGameActive(game)) return game;
   const activity = game.resolution.activity;
+  if (activity.kind === 'transmission') {
+    for (let frame = 0; resolutionGameActive(game); frame++) {
+      assert.ok(frame < 5000, 'the real transmission replay must finish');
+      const status = transmissionStatus(activity.state);
+      if (status.canTurn) assert.equal(resolutionGameAction(game, 'turn'), true);
+      else if (status.canAdvance && status.arrivalSafe) assert.equal(resolutionGameAction(game, 'advance'), true);
+      advance(game, .05);
+    }
+    assert.equal(activity.state.stage, 'complete');
+    return game;
+  }
   assert.equal(activity.kind, 'rescue', 'the replay must explicitly support each new game');
   let turns = 0;
   while (!rescueStatus(activity.state).aligned) {

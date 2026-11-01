@@ -20,7 +20,7 @@ export const REVIEWED_ENDING_HINTS = Object.freeze({
   witness_present: reviewed('direct', 'Only the final recording choice commits; earlier scenes retain every withdrawal destination.'),
   rescue: reviewed('direct', 'Real tape alignment and timed hold/release inputs free both boots before the stable final sacrifice can commit. Live inputs remain unmarked; entry and withdrawals conservatively retain every ending. Replays verify rescue, alternate leads, outside evidence, signing and all four recovery identities after withdrawal, while previews preserve saves, testimony, history and randomness.'),
   vacancy: reviewed('direct', 'Approval commits; signing the release and refusing approval still allow withdrawal.'),
-  transmission: reviewed('direct', 'Only the final broadcast commits; earlier scenes retain every withdrawal destination.'),
+  transmission: reviewed('direct', 'Real delayed Wait, Advance and Turn controls reach the buried radio before the stable warning can commit, preserving every supported first-call memory. Timed controls remain unmarked; entry, pending commands, setbacks and withdrawal retain all endings conservatively. Actual continuations cover other available resolutions, signing and all recovery identities; previews leave journal, commands, saves, history and randomness unchanged.'),
   corn_escape: reviewed('direct', 'The stable finale choice is simulated; crossings and entry remain conservatively bounded.'),
   corn_uprising: reviewed('direct', 'The stable gate choice is simulated; crossings and entry remain conservatively bounded.'),
   radio_ghost: reviewed('direct', 'The stable final warning is simulated; timed signal locks are never predicted from a render snapshot.'),
