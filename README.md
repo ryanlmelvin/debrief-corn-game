@@ -119,6 +119,22 @@ The game-rule tests cover ammunition, shooting, civilian encounters, timing, con
 | `docs/manifest.webmanifest` | Installable app metadata |
 | `DESIGN.md` | Adaptation choices and proposed next iteration |
 
+## How to contribute
+
+Read `AGENTS.md` before making changes, and run both `npm test` and `npm run check` before publishing. Keep the original short-story manuscript out of the repository and deployment. Preserve the existing background art and color scheme unless a change is requested. For shipped game assets, bump the cache version in `docs/sw.js` and preserve the progress-saving “Update ready. Download?” flow.
+
+### Ending reachability and protection
+
+Every ending must be reachable from a new game. Each fresh assignment must offer a valid path to every ending before the player makes choices; random schedules, scene variants, and replacement encounters must not silently remove those opportunities. Paths can close as a consequence of the player's choices, so a single playthrough does not need to keep every ending available forever. Prove new or changed paths with tests that play through the real game transitions from a fresh state.
+
+The ending protection system keeps encounters and their prerequisite opportunities available while an ending still needs them. Declare those dependencies in the shared rules described below, and test that new content preserves still-possible paths while allowing replacements after a path closes.
+
+### “You've already seen all these endings” hints
+
+This note tells a player that a choice has no new ending paths to offer: every ending reachable after that choice is already in their collection. It covers all continuations, including later withdrawals, alternate actions, ammunition-dependent outcomes, and timed inputs. Protection of an encounter or a route's name is not proof of which endings a choice can reach.
+
+Review `docs/seen-endings.js` whenever changing an ending, action, prerequisite, withdrawal, or timing-dependent outcome. Preview the real transitions without changing saves, transcripts, history, or randomness. If any continuation is uncertain, suppress the hint or retain a conservative superset of endings. Regression tests in `tests/seen-endings.test.mjs` must show that omitting each reachable ending suppresses the hint and collecting every proven possibility enables it; cover locked and unsupported choices, backtracking, guide outcome identities and ammunition, and timed inputs where affected.
+
 ### Adding endings and encounter variety
 
 Ending changes also require a safety review of choice hints. `npm run check` compares the live ending registry with the explicit audit in `scripts/check-ending-hints.mjs` and fails on an unreviewed addition, removal, or rename. Update the audit rationale and `tests/seen-endings.test.mjs` together: removing any reachable ending from the collection must suppress the note, including paths through withdrawals and loaded-rifle interviews. Keep timed controls conservative and preserve the original game state during previews. The complete maintenance rules are in `AGENTS.md`.
