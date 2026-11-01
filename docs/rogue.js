@@ -271,7 +271,12 @@ function finishDungeon(s) {
     s.rogue.debrief ??= { version: 1, answers: [] };
     s.rogue.message = 'You reach the surface. The supervisor is waiting for your report.';
   }
-  else if (status === 'lost') end(s, 'dungeon_lost', 'lost', 'The roots dragged me under the drainage channel before I could reach the surface.');
+  else if (status === 'lost') {
+    if (s.practice) { s.rogue.dungeon.hp = 0; end(s, 'dungeon_lost', 'lost', 'Exposure reached 100 beneath the roots.'); return; }
+    delete s.rogue;
+    s.phase = 'field';
+    startRogue(s, 'corn');
+  }
 }
 
 export function moveRogue(s, dx, dy) {

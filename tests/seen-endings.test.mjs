@@ -1155,7 +1155,7 @@ function reachDungeonDebrief(game) {
 }
 
 test('the drain conservatively retains both endings reached by actual dungeon turns', () => {
-  for (const ending of ['dungeon_escape', 'dungeon_lost']) {
+  for (const ending of ['dungeon_escape', 'assimilation']) {
     const field = rogueField('dungeon'), game = structuredClone(field);
     assert.equal(startRogue(game, 'dungeon'), true);
     const introduction = structuredClone(game);
@@ -1170,7 +1170,7 @@ test('the drain conservatively retains both endings reached by actual dungeon tu
     } else {
       for (let turn = 0; game.phase === 'rogue' && turn < 100; turn++) {
         assert.equal(hasSeenChoiceEndings(game, 'rogue-choice', 'wait', Object.keys(ENDINGS)), false);
-        assert.equal(chooseRogue(game, 'wait'), true);
+        assert.equal(chooseRogue(game, game.rogue.route === 'corn' ? 'root' : 'wait'), true);
         assert.equal(validRogue(game), true);
       }
     }
@@ -1459,4 +1459,33 @@ test('a future ending cannot be silently dropped from conservative nonterminal b
   } finally {
     delete ENDINGS.future_ending;
   }
+});
+
+test('archived dungeon loss remains conservatively bounded', () => {
+ const game = rogueField('dungeon');
+ assert.equal(hasSeenChoiceEndings(game, 'rogue-start', 'dungeon', historyExcept('dungeon_lost')), false);
+ conservativeFixtures.add('dungeon_lost');
+});
+
+test('dungeon exposure thresholds preserve incoming exposure and previews', () => {
+ for (const exposure of [0, 70, 95]) {
+  const game = rogueField('dungeon'); game.exposure = exposure;
+  assert.equal(startRogue(game, 'dungeon'), true);
+  assert.equal(game.exposure, exposure);
+  assert.equal(chooseRogue(game, 'begin'), true);
+  const before = structuredClone(game);
+  assert.equal(possibleChoiceEndings(game, 'rogue-choice', 'wait'), null);
+  assert.deepEqual(game, before);
+  let hits = 0, previous = exposure;
+  for (let turn = 0; game.rogue.route === 'dungeon' && turn < 100; turn++) {
+   assert.equal(chooseRogue(game, 'wait'), true);
+   if (game.exposure !== previous) {
+    hits++; assert.equal(game.exposure, Math.min(100, previous + 10)); previous = game.exposure;
+   }
+  }
+  assert.equal(hits, Math.ceil((100 - exposure) / 10));
+  assert.equal(game.exposure, 100);
+  assert.equal(game.rogue.route, 'corn');
+  assert.equal(validRogue(game), true);
+ }
 });

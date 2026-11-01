@@ -98,14 +98,11 @@ test('enemy strikes are telegraphed and stepping away evades the saved target', 
   roundTrip(s);
 });
 
-test('staying in a marked square can lose the dungeon and records its own ending', () => {
-  let s = begin();
-  for (let turn=0; turn<14; turn++) { step(s,'W');s=roundTrip(s); }
-  assert.equal(s.ending,'dungeon_lost');
-  assert.equal(s.rogue.dungeon.hp,0);
-  assert.equal(s.rogue.dungeon.turn,14);
-  assert.equal(getEnding(s).code,'24');
-  assert.equal(s.reports.at(-1).choice,'lost');
+test('damage carries field exposure into the 100 percent Corn transition', () => {
+ let s = begin(); s.exposure = 70;
+ for (let turn=0; s.rogue.route==='dungeon' && turn<30; turn++) { step(s,'W'); s=roundTrip(s); }
+ assert.equal(s.exposure,100); assert.equal(s.rogue.route,'corn');
+ assert.equal(chooseRogue(s,'root'),true); assert.equal(s.ending,'assimilation');
 });
 
 test('rifle-butt attacks break roots and firing cancels a telegraphed strike', () => {

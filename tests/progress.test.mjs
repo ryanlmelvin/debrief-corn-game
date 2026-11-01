@@ -258,8 +258,8 @@ test('legacy active and archived story routes unlock on beginning, without requi
   assert.equal(active.save.phase,'rogue');
   assert.equal(active.save.ending,null);
   assert.deepEqual(active.history.miniGames,['watch','dungeon'],'an ongoing first attempt is sufficient');
-  for(let turn=0;game.phase==='rogue'&&turn<100;turn++)assert.equal(chooseRogue(game,'wait'),true);
-  assert.equal(game.ending,'dungeon_lost');
+  for(let turn=0;game.phase==='rogue'&&turn<100;turn++)assert.equal(chooseRogue(game,game.rogue.route==='corn'?'root':'wait'),true);
+  assert.equal(game.ending,'assimilation');
   const archived={collected:[game.ending],runs:[{...getEnding(game),id:game.runId,ending:game.ending,date:'2026-10-31T12:00:00Z',reports:game.reports}]};
   assert.deepEqual(progressSnapshot(null,archived).history.miniGames,['watch','dungeon'],'legacy transcripts preserve access after a loss');
   const newer=archive('newer','dissent');

@@ -84,7 +84,7 @@ test('an interrupted interview remains a distinct ending alongside the recovery 
 test('real practice endings never earn collection badges or transcripts, then an ordinary run earns normally',()=>{
   const a=archive(),practice=createMiniGame('dungeon','story',101);
   if(practice.rogue.stage==='intro')assert.equal(chooseRogue(practice,'begin'),true);
-  for(let turn=0;practice.phase==='rogue'&&turn<100;turn++)assert.equal(chooseRogue(practice,'wait'),true);
+  for(let turn=0;practice.phase==='rogue'&&turn<100;turn++)assert.equal(chooseRogue(practice,practice.rogue.route==='corn'?'root':'wait'),true);
   assert.equal(practice.phase,'ending');
   assert.equal(endingId(practice),'dungeon_lost');
   a.context.game=practice;a.run('archiveRun();archiveRun();archiveRun();');
@@ -98,13 +98,13 @@ test('real practice endings never earn collection badges or transcripts, then an
   assert.ok(inspect(ordinary));
   assert.equal(startRogue(ordinary,'dungeon'),true);
   assert.equal(chooseRogue(ordinary,'begin'),true);
-  for(let turn=0;ordinary.phase==='rogue'&&turn<100;turn++)assert.equal(chooseRogue(ordinary,'wait'),true);
-  assert.equal(endingId(ordinary),'dungeon_lost');
+  for(let turn=0;ordinary.phase==='rogue'&&turn<100;turn++)assert.equal(chooseRogue(ordinary,ordinary.rogue.route==='corn'?'root':'wait'),true);
+  assert.equal(endingId(ordinary),'assimilation');
   a.context.game=ordinary;a.run('archiveRun();archiveRun();');
   assert.equal(a.run('history.runs.length'),1);
   assert.equal(a.run('history.collected.length'),1);
   assert.equal(a.run('history.runs[0].id'),ordinary.runId);
-  assert.equal(a.run('history.collected[0]'),'dungeon_lost');
+  assert.equal(a.run('history.collected[0]'),'assimilation');
   const stored=a.storage.get('archive');
   a.context.game=practice;a.run('archiveRun();archiveRun();');
   assert.equal(a.storage.get('archive'),stored,'later practice cannot replace an earned transcript');
@@ -144,8 +144,8 @@ test('legacy loss transcripts recover the mini game but collection badges alone 
   Object.assign(ordinary,{phase:'field',entered:true,departure:'chosen',player:{x:7,y:5}});
   ordinary.fieldEvents.flags.push('lantern');
   inspect(ordinary);startRogue(ordinary,'dungeon');chooseRogue(ordinary,'begin');
-  for(let turn=0;ordinary.phase==='rogue'&&turn<100;turn++)chooseRogue(ordinary,'wait');
-  assert.equal(ordinary.ending,'dungeon_lost');
+  for(let turn=0;ordinary.phase==='rogue'&&turn<100;turn++)chooseRogue(ordinary,ordinary.rogue.route==='corn'?'root':'wait');
+  assert.equal(ordinary.ending,'assimilation');
   const a=archive();a.context.game=ordinary;a.run('archiveRun()');
   const legacy=JSON.parse(a.storage.get('archive'));delete legacy.miniGames;
   const resumed=archive(new Map([['archive',JSON.stringify(legacy)]]));

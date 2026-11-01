@@ -41,7 +41,7 @@ test('practice construction and actions leave a separate story save and its rand
   for(const entry of MINI_GAMES) {
     const s=createMiniGame(entry.id,'story',42);
     advance(s,1);
-    if(entry.id==='dungeon')chooseRogue(s,'wait');
+    if(entry.id==='dungeon')chooseRogue(s,s.rogue.route==='corn'?'root':'wait');
     assert.equal(serialize(story),before);
   }
   assert.deepEqual(createMiniGame('flood','story',42),createMiniGame('flood','story',42),'seeded practice can be reproduced independently');
@@ -96,7 +96,7 @@ test('practice corn loss uses the real collisions and remains practice after res
 
 test('practice dungeon defeat and escape remain practice at both terminal outcomes', () => {
   const lost=createMiniGame('dungeon','story',42);
-  for(let turn=0;turn<14;turn++)assert.equal(chooseRogue(lost,'wait'),true);
+  for(let turn=0;turn<30&&lost.phase!=='ending';turn++)assert.equal(chooseRogue(lost,lost.rogue.route==='corn'?'root':'wait'),true);
   assert.equal(lost.ending,'dungeon_lost');result(lost,false);
   let escaped=createMiniGame('dungeon','story',42);
   const directions={R:[1,0],L:[-1,0],U:[0,-1],D:[0,1]};
@@ -240,7 +240,7 @@ test('real route losses retain unlock evidence in completed transcripts', () => 
     } else if(route==='flood') {
       for(let release=0;release<3;release++)assert.equal(chooseRogue(s,'release'),true);
     } else {
-      for(let turn=0;turn<14;turn++)assert.equal(chooseRogue(s,'wait'),true);
+      for(let turn=0;turn<30&&s.phase!=='ending';turn++)assert.equal(chooseRogue(s,s.rogue.route==='corn'?'root':'wait'),true);
     }
     assert.equal(s.phase,'ending');
     assert.deepEqual(getMiniGameUnlocks(s),['watch',route]);

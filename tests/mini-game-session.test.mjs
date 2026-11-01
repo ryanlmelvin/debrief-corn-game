@@ -126,8 +126,8 @@ test('story starts accumulate independent unlocks before an ending and retain th
   assert.deepEqual([...h.context.history.miniGames],['watch','dungeon']);
   assert.deepEqual(h.context.history.collected,[],'a playable route unlocks independently of earning its ending');
   assert.deepEqual(JSON.parse(h.storage.get('history')).miniGames,['watch','dungeon']);
-  for(let turn=0;story.phase==='rogue'&&turn<100;turn++)chooseRogue(story,'wait');
-  assert.equal(story.ending,'dungeon_lost');h.run('save()');
+  for(let turn=0;story.phase==='rogue'&&turn<100;turn++)chooseRogue(story,story.rogue.route==='corn'?'root':'wait');
+  assert.equal(story.ending,'assimilation');h.run('save()');
   assert.deepEqual(JSON.parse(h.storage.get('history')).miniGames,['watch','dungeon']);
   const persisted=h.storage.get('history');h.run('save()');
   assert.equal(h.storage.get('history'),persisted,'repeated saves do not duplicate unlocks');

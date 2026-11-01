@@ -102,14 +102,15 @@ export function createDungeon() {
   return d;
 }
 
-function enemyTurn(d) {
+function enemyTurn(d, s) {
   const events = [];
   for (const enemy of d.enemies) {
     if (!enemy.hp) continue;
     if (enemy.intent) {
       if (d.x === enemy.intent.x && d.y === enemy.intent.y) {
-        d.hp = Math.max(0, d.hp - 1);
-        events.push('A root catches you. You lose 1 health.');
+        d.hp = Math.max(1, d.hp - 1);
+        s.exposure = Math.min(100, s.exposure + 10);
+        events.push('A root catches you. Exposure increases by 10%.');
       }
       enemy.intent = null;
       continue;
@@ -124,14 +125,15 @@ function enemyTurn(d) {
     if (destination) { enemy.x = destination.x; enemy.y = destination.y; }
     if (distance(enemy, d) === 1) enemy.intent = { x: d.x, y: d.y };
   }
-  if (!d.hp) { d.status = 'lost'; events.push('The last light goes out beneath the roots.'); }
+  if (s.exposure >= 100) { d.status = 'lost'; events.push('The last light goes out beneath the roots.'); }
   return events;
 }
 
-function finishTurn(r, message) {
+function finishTurn(s, message) {
+  const r = s.rogue;
   const d = r.dungeon;
   d.turn = Math.min(MAX_TURNS, d.turn + 1);
-  const events = enemyTurn(d);
+  const events = enemyTurn(d, s);
   reveal(d);
   r.message = [message, ...new Set(events)].join(' ');
   if (d.status === 'active' && d.enemies.some(e => e.hp && e.intent)) r.message += ' A red square will be struck next turn.';
@@ -151,7 +153,7 @@ export function moveDungeon(s, dx, dy) {
   if (enemy) {
     enemy.hp--;
     if (!enemy.hp) { d.kills++; enemy.intent = null; }
-    finishTurn(r, enemy.hp ? 'You strike the root with the rifle butt. One more hit will break it.' : 'The root unravels into the water.');
+    finishTurn(s, enemy.hp ? 'You strike the root with the rifle butt. One more hit will break it.' : 'The root unravels into the water.');
     return true;
   }
   d.x = x; d.y = y;
@@ -160,7 +162,7 @@ export function moveDungeon(s, dx, dy) {
   if (item) {
     d.collected.push(item.id);
     if (item.kind === 'key') { d.key = true; message = 'A brass key. The stair gate on this floor will open.'; }
-    if (item.kind === 'medkit') { const healed = Math.min(3, 6 - d.hp); d.hp += healed; message = `A sealed field dressing. ${healed ? `You bind your wounds and recover ${healed} health.` : 'You have no wounds to treat.'}`; }
+    if (item.kind === 'medkit') { const reduced = Math.min(30, s.exposure); s.exposure -= reduced; d.hp = 6; message = `A sealed field dressing. Exposure reduced by ${reduced}%.`; }
     if (item.kind === 'ammo') { s.reserve = Math.min(Number.MAX_SAFE_INTEGER, s.reserve + 6); message = 'Six rifle rounds, wrapped in a watch report. Added to your reserve.'; }
   }
   if (data.stairs.x === x && data.stairs.y === y) {
@@ -176,19 +178,19 @@ export function moveDungeon(s, dx, dy) {
     }
     return true;
   }
-  finishTurn(r, message);
+  finishTurn(s, message);
   return true;
 }
 
 export function chooseDungeon(s, action) {
   const r = s.rogue, d = r.dungeon;
   if (!d || d.status !== 'active') return false;
-  if (action === 'wait') { finishTurn(r, 'You hold still and listen.'); return true; }
+  if (action === 'wait') { finishTurn(s, 'You hold still and listen.'); return true; }
   if (action === 'reload') {
     if (s.rounds >= 6 || s.reserve <= 0) return false;
     const loaded = Math.min(6 - s.rounds, s.reserve);
     s.rounds += loaded; s.reserve -= loaded; s.reload = 0;
-    finishTurn(r, `You load ${loaded} ${loaded === 1 ? 'round' : 'rounds'}. The roots move while you reload.`);
+    finishTurn(s, `You load ${loaded} ${loaded === 1 ? 'round' : 'rounds'}. The roots move while you reload.`);
     return true;
   }
   if (action !== 'fire' || s.rounds <= 0) return false;
@@ -196,7 +198,7 @@ export function chooseDungeon(s, action) {
   if (!target) return false;
   s.rounds--; s.shots++;
   target.hp = 0; target.intent = null; d.kills++;
-  finishTurn(r, 'The shot breaks the root. The report rolls down the corridor.');
+  finishTurn(s, 'The shot breaks the root. The report rolls down the corridor.');
   return true;
 }
 
@@ -207,7 +209,7 @@ export function dungeonView(s) {
   const tiles = [];
   for (let y = 0; y < HEIGHT; y++) for (let x = 0; x < WIDTH; x++) tiles.push({ x, y, kind: data.rows[y][x] === '#' ? 'wall' : data.rows[y][x] === '>' ? 'stairs' : 'floor', seen: seen.has(cellId(x,y)), visible: visible(d,x,y) });
   const enemies = d.enemies.filter(e => e.hp && visible(d,e.x,e.y)).map(e => ({ ...e, intent: e.intent && { ...e.intent } }));
-  return { width: WIDTH, height: HEIGHT, floor: d.floor + 1, floorName: data.name, turn: d.turn, hp: d.hp, maxHp: 6, rounds: s.rounds, reserve: s.reserve, target: target ? {id:target.id,x:target.x,y:target.y} : null, key: d.key, kills: d.kills, player: { x: d.x, y: d.y }, tiles,
+  return { width: WIDTH, height: HEIGHT, floor: d.floor + 1, floorName: data.name, turn: d.turn, hp: d.hp, maxHp: 6, exposure: s.exposure, rounds: s.rounds, reserve: s.reserve, target: target ? {id:target.id,x:target.x,y:target.y} : null, key: d.key, kills: d.kills, player: { x: d.x, y: d.y }, tiles,
     items: data.items.filter(i => !d.collected.includes(i.id) && visible(d,i.x,i.y)).map(i => ({ ...i })), enemies,
     threats: enemies.filter(e => e.intent).map(e => ({ ...e.intent })), message: r.message, status: d.status };
 }

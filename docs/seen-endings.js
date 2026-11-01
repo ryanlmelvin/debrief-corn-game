@@ -23,7 +23,7 @@ const outsideRecovery = new Set([
   'consumption', 'witness', 'compliance', 'dissent', 'breach', 'assimilation',
   'relief', 'witness_present', 'rescue', 'vacancy', 'transmission',
   'corn_escape', 'corn_uprising', 'radio_ghost', 'field_voice', 'flood',
-  'corn_contained', 'roadkill', 'dungeon_escape', 'dungeon_lost'
+  'corn_contained', 'roadkill', 'dungeon_escape', 'dungeon_lost' // Keep legacy loss in the conservative superset; exposure can now enter Corn.
 ]);
 
 function decisionKey(s) {

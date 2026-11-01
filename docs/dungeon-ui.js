@@ -31,9 +31,9 @@ export function renderDungeon(root, game, paused) {
   if (root.dataset.dungeonRender === renderKey) return;
   root.dataset.dungeonRender = renderKey;
   q('#dungeon-floor').textContent = `${view.floorName} · ${view.floor}/3`;
-  q('#dungeon-health').innerHTML = Array.from({ length: view.maxHp }, (_, i) => `<i class="${i < view.hp ? 'full' : ''}">♥</i>`).join('');
-  q('#dungeon-health').setAttribute('aria-label', `Health ${view.hp} of ${view.maxHp}`);
-  q('#dungeon-health').classList.toggle('critical', view.hp <= 2);
+  q('#dungeon-health').textContent = `Exposure ${view.exposure}%`;
+  q('#dungeon-health').setAttribute('aria-label', `Exposure ${view.exposure}%`);
+  q('#dungeon-health').classList.toggle('critical', view.exposure >= 80);
   q('#dungeon-key').classList.toggle('found', view.key);
   q('#dungeon-key').setAttribute('aria-label', view.key ? 'Brass key found' : 'Find the brass key');
   q('#dungeon-ammo').innerHTML = `<svg viewBox="0 0 10 24" aria-hidden="true"><path d="M2 22V7L5 1L8 7V22Z" fill="currentColor"/></svg>${view.rounds}<small>/ 6 · ${view.reserve}</small>`;
@@ -55,5 +55,5 @@ export function renderDungeon(root, game, paused) {
   q('#dungeon-map').innerHTML = `<defs><radialGradient id="dungeon-lantern"><stop stop-color="#d8bb7b" stop-opacity=".15"/><stop offset="1" stop-color="#d8bb7b" stop-opacity="0"/></radialGradient></defs>${tiles}<circle cx="${x * 40 + 20}" cy="${y * 40 + 20}" r="125" fill="url(#dungeon-lantern)"/>${items}${threats}${enemies}<rect x="${x * 40 + 2}" y="${y * 40 + 2}" width="36" height="36" rx="8" fill="#b4be7a" fill-opacity=".14" stroke="#e2ce8f" stroke-opacity=".65"/>${symbol('guard', x, y)}${target}${steps}`;
   const nearby = view.enemies.map(enemy => `root at column ${enemy.x + 1}, row ${enemy.y + 1}, ${enemy.hp} health`).join('; ');
   const warnings = view.threats.map(t => `column ${t.x + 1}, row ${t.y + 1}`).join('; ');
-  q('#dungeon-map').setAttribute('aria-label', `Floor ${view.floor}: ${view.floorName}. You are at column ${x + 1}, row ${y + 1}. Health ${view.hp} of ${view.maxHp}. Rifle ${view.rounds} loaded, ${view.reserve} spare. ${nearby || 'No roots in sight.'} ${warnings ? `Next strikes: ${warnings}.` : 'No strikes marked.'} ${view.target ? `Aiming at root in column ${view.target.x + 1}, row ${view.target.y + 1}.` : 'No clear rifle target.'}`);
+  q('#dungeon-map').setAttribute('aria-label', `Floor ${view.floor}: ${view.floorName}. You are at column ${x + 1}, row ${y + 1}. Exposure ${view.exposure}%. Rifle ${view.rounds} loaded, ${view.reserve} spare. ${nearby || 'No roots in sight.'} ${warnings ? `Next strikes: ${warnings}.` : 'No strikes marked.'} ${view.target ? `Aiming at root in column ${view.target.x + 1}, row ${view.target.y + 1}.` : 'No clear rifle target.'}`);
 }
