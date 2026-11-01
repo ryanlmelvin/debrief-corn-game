@@ -45,7 +45,7 @@ for (const card of [...Object.values(ENDING_SHARES), GUIDE_TEAM_SHARE]) {
       <h1>${escape(card.line)}</h1>
       <p class="description">Watch the corn. Follow procedure.<br>What will you put on the record?</p>
       <a class="play" href="../../">Find your own ending ↗</a>
-      <p class="credit">A short rural horror game · Based on Debrief by Ryan L. Melvin</p>
+      <p class="credit">A short rural horror game · Based on Debrief by <a href="https://ryanlmelvin.com" target="_blank" rel="noopener">Ryan L. Melvin</a></p>
     </div>
   </main>
 </body>

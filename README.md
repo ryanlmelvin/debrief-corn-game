@@ -1,6 +1,6 @@
 # Debrief
 
-A playable rural horror game based on **Debrief**, the short story by **Ryan L. Melvin**.
+A playable rural horror game based on **Debrief**, the short story by **[Ryan L. Melvin](https://ryanlmelvin.com)**.
 
 Work three watchtower shifts. Shoot corn that tries to escape, distinguish human figures from moving crops, try to resist an intrusive urge to investigate, and choose what goes into the official debrief. After the sighting, roots gradually fill the stationary word “investigate” across the watchtower view. Holding your post until relief leads straight to the map with a brief notice that you could no longer resist; your later testimony remembers whether you chose to leave or were compelled. Inspect all three locations and return to the tower for debrief; your evidence changes your answers and available endings.
 
@@ -167,11 +167,11 @@ The design combines the procedural pressure of *Papers, Please*, the accessible 
 
 ## License and original story
 
-Copyright (C) 2026 Ryan L. Melvin.
+Copyright (C) 2026 [Ryan L. Melvin](https://ryanlmelvin.com).
 
 The game code, assets, and adaptation content distributed in this repository are licensed under the GNU General Public License, version 3 (GPL-3.0-only). See [LICENSE](LICENSE).
 
-The original short story **Debrief** by Ryan L. Melvin is a separate work, is not included in this repository or the deployed site, and is not covered by this license. All rights to the original manuscript are reserved. The license grants no permission to publish or redistribute that manuscript.
+The original short story **Debrief** by [Ryan L. Melvin](https://ryanlmelvin.com) is a separate work, is not included in this repository or the deployed site, and is not covered by this license. All rights to the original manuscript are reserved. The license grants no permission to publish or redistribute that manuscript.
 
 Keep manuscript files outside this repository. Publish only the game adaptation; do not add the original story, excerpts supplied separately, or manuscript attachments.
 
