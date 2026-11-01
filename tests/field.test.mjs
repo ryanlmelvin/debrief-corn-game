@@ -79,8 +79,11 @@ test('travel can stop mid-route, save, resume, and arrive exactly once without t
   for(let i=0;i<30;i++)tick();
   assert.deepEqual(s.player,{x:9,y:1});assert.equal(arrivals,1);assert.deepEqual(s.evidence,['dress']);assert.equal(c.travel,null);
 });
-test('travel refuses a fatal route and clears when a step fails or the phase changes',()=>{
-  const s=field(),c=controller();s.exposure=99;assert.equal(c.start(s),false);
+test('travel permits an exposure crossing and clears when a step fails or the phase changes',()=>{
+  const s=field(),c=controller();s.exposure=99.9;assert.equal(c.start(s),true);
+  c.tick(s,.4,(dx,dy)=>move(s,dx,dy),()=>assert.fail('must enter corn route before arrival'));
+  assert.equal(s.exposure,100);assert.equal(s.phase,'rogue');assert.equal(c.travel,null);
+  s.phase='field';
   s.exposure=0;assert.equal(c.start(s),true);c.tick(s,.4,()=>false,()=>assert.fail('must not arrive'));assert.equal(c.travel,null);
   assert.equal(c.start(s),true);c.tick(s,.4,()=>{s.phase='ending';return true;},()=>assert.fail('must not arrive'));assert.equal(c.travel,null);
   assert.equal(planFieldRoute(s,site('tower')),null);

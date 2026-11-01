@@ -38,7 +38,7 @@ export class FieldMap {
   start(s) {
     if(this.travel||s.fieldEvents.pending)return false;
     const route=this.route(s);
-    if(!route||s.exposure+route.exposure>=100)return false;
+    if(!route)return false;
     s.fieldEvents.journey={destination:this.selected,style:this.style};
     this.travel={steps:[...route.steps],elapsed:0,interval:this.style==='direct'?.22:.38};this.lastKey='';return true;
   }
@@ -109,12 +109,12 @@ export class FieldMap {
     q('field-direct-cost').textContent=`+${cost(direct.exposure)} exposure`;
     this.root.querySelectorAll('[data-action="field-style"]').forEach(b=>{b.setAttribute('aria-pressed',String(b.dataset.value===this.style));b.disabled=paused||!!this.travel;});
     this.root.querySelector('.field-route-options').hidden=here;
-    q('field-risk').textContent=fatal?'Route blocked: exposure would reach 100.':unsafeReturn?'Too much exposure to make it back.':site.id==='tower'&&!complete?'Search all three sites before debrief.':'';
+    q('field-risk').textContent=fatal?'Exposure will reach 100. The field will change you.':unsafeReturn?'Too much exposure to make it back.':site.id==='tower'&&!complete?'Search all three sites before debrief.':'';
     q('field-risk').hidden=!q('field-risk').textContent;
     q('field-risk').classList.toggle('risky',fatal||unsafeReturn);
     const go=this.root.querySelector('.field-go');go.hidden=!!this.travel;
     go.textContent=here?(site.id==='tower'?(complete?'Debrief ↗':'Choose a landmark'):scene?scene.label:s.inspected.includes(site.id)?'Location searched':'Inspect'):(site.id==='tower'?'Return ↑':'Walk →');
-    go.disabled=paused||fatal||(here&&(site.id==='tower'?!complete:s.inspected.includes(site.id)&&!scene));
+    go.disabled=paused||(here&&(site.id==='tower'?!complete:s.inspected.includes(site.id)&&!scene));
     const stop=this.root.querySelector('.field-stop');stop.hidden=!this.travel;stop.disabled=paused;
     // The next suggested landmark can change as soon as the drain is inspected.
     // Keep its new passage available at the player's actual location.

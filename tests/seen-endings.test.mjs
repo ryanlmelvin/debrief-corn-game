@@ -241,6 +241,7 @@ test('field previews recognize immediate endings without treating ordinary explo
   }
   const overwhelmed = structuredClone(game);
   assert.equal(chooseFieldEncounter(overwhelmed, 'record'), true);
+  assert.equal(overwhelmed.exposure, 100, 'conversation choices may cross the exposure threshold');
   assert.equal(overwhelmed.phase, 'rogue');
   assert.equal(overwhelmed.rogue.route, 'corn');
   assert.equal(overwhelmed.rogue.stage, 'intro');
