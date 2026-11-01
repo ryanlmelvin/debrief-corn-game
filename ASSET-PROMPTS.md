@@ -1,5 +1,20 @@
 # Debrief asset sources
 
+## Transmission path horror
+
+`docs/assets/transmission-horror.webp` was generated with the built-in image-generation tool and encoded as transparent WebP with its original alpha preserved. The downward-facing creature rotates to face the lantern from each outgoing path, ahead of the bend and before the moving row. The existing timing, exposure cost, and permanent disappearance after a successful turn are unchanged.
+
+### transmission-horror.webp
+
+Use case: stylized-concept
+Asset type: single transparent overhead creature sprite for DEBRIEF, a rural ecological horror game.
+Primary request: Create a custom eldritch shape that blocks a narrow path through a cornfield. A compact crouching watcher made from black fibrous roots, weathered olive husk membranes and unnaturally jointed limbs. Four asymmetric bent limbs brace around a dense hunched central body, with a few fine root tendrils, no round octopus shape. A narrow pale seam suggests a hidden face near the bottom of the silhouette; obscure and unsettling, not a recognizable person or animal.
+Style/medium: naturalistic painted game illustration, etched graphite grain and matte photographic material detail, matching a worn rural field notebook. Strong silhouette readable when displayed at only 60 pixels wide. Dense body with restrained clear texture, not thin line art.
+Composition/framing: nearly square compact silhouette, steep overhead three-quarter view looking down, creature front/head toward the bottom edge of the image, back toward top. Whole creature fully visible and centered with small transparent margin on every side. This will be rotated for two path directions.
+Lighting/mood: faint warm lantern light grazes the top edges of roots and folded husk, enough pale worn highlights to read against a very dark green map; shaded dense body. Quiet threatening presence, grounded and organic.
+Color palette: dark peat and charcoal green, muted olive, desaturated old-brass and dirty parchment highlights. No saturated color.
+Constraints: ONE creature only, genuinely transparent alpha around it and between limbs. No background, soil patch, ground plane, scenery, border, text, symbols, logo, watermark, cast shadow, fog, halo or glow. No props, clothing, armor, wings, skull, blood, or gore. No cartoon eyes, cute proportions, glossy toy finish or purple fantasy colors.
+
 ## Rescue work boots
 
 `docs/assets/rescue-boot.webp` was generated with the built-in image-generation tool and encoded as transparent WebP with the original alpha preserved. Rescue uses the sprite for both boots, mirroring the left boot. The existing root bindings remain a separate animated layer, and the boots retain their independent pull and release movement. The background artwork and game palette are unchanged.

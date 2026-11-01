@@ -388,3 +388,109 @@ test('the tutorial presents one action at a time and shows only the radio delive
   assert.equal(node('#transmission-exposure').value, 99.5);
   assert.equal(node('#transmission-exposure-value').textContent, '99', 'the display must not claim the failure threshold before it is reached');
 });
+
+test('custom horror sprites occupy the outgoing path between each bend and its moving row', async () => {
+  const { transmissionMarkup } = await import('../docs/transmission-ui.js');
+  const markup = transmissionMarkup();
+  const figures = [...markup.matchAll(/<g\b[^>]*data-horror="(\d+)"[^>]*transform="translate\(([\d.]+) ([\d.]+)\) rotate\(([\d.]+)\)"[^>]*>([\s\S]*?)<\/g>/g)];
+  assert.equal(figures.length, 2);
+  assert.deepEqual(figures.map(figure => figure[1]), ['1', '2']);
+  for (const [, id, rawX, rawY, rawRotation, content] of figures) {
+    assert.match(content, /<image\b[^>]*href="\.\/assets\/transmission-horror\.webp"/);
+    const image = content.match(/<image\b[^>]*>/)[0];
+    const attribute = name => Number(image.match(new RegExp(`\\b${name}="(-?[\\d.]+)"`))[1]);
+    const x = Number(rawX), y = Number(rawY), rotation = Number(rawRotation);
+    const localX = attribute('x'), localY = attribute('y'), width = attribute('width'), height = attribute('height');
+    if (id === '1') {
+      assert.equal(y, 50, 'the first shape stands on the eastward path');
+      assert.equal(rotation, 90, 'the shape faces the light approaching from the west');
+      assert.ok(x - localY - height > 18 + 2.9, 'the sprite clears the bend marker');
+      assert.ok(x - localY < 44 - 2.5, 'the sprite remains before the moving row');
+    } else {
+      assert.equal(x, 70, 'the second shape stands on the northward path');
+      assert.equal(rotation, 0, 'the shape faces the light approaching from the south');
+      assert.ok(y + localY > 32 + 2.5, 'the sprite remains before the moving row');
+      assert.ok(y + localY + height < 50 - 2.9, 'the sprite clears the bend marker');
+    }
+    assert.ok(localX <= 0 && localX + width >= 0, 'the sprite straddles the path center');
+  }
+});
+
+test('each bend horror stays gone after its real Turn, including reloads and later row setbacks', async () => {
+  const { TransmissionUI } = await import('../docs/transmission-ui.js');
+  function harness() {
+    const nodes = new Map();
+    const node = key => {
+      if (!nodes.has(key)) {
+        const classes = new Set();
+        nodes.set(key, {
+          hidden: false, disabled: false, textContent: '', style: {}, dataset: {}, attributes: new Map(),
+          classList: { toggle(name, enabled) { if (enabled) classes.add(name); else classes.delete(name); }, contains(name) { return classes.has(name); } },
+          setAttribute(name, value) { this.attributes.set(name, value); }, getAttribute(name) { return this.attributes.get(name); },
+          querySelector(selector) { return node(`${key} ${selector}`); }
+        });
+      }
+      return nodes.get(key);
+    };
+    return { ui: new TransmissionUI({ querySelector: node, querySelectorAll: () => [], innerHTML: '' }), node };
+  }
+  let t = createTransmission(35);
+  let view = harness();
+  const render = () => view.ui.render(t);
+  const hidden = crossing => {
+    const classes = view.node(`[data-horror="${crossing}"]`).classList;
+    assert.equal(classes.contains('is-present'), false, `bend ${crossing} must not reappear`);
+    assert.equal(classes.contains('is-warning'), false, `bend ${crossing} must not warn after it is cleared`);
+  };
+  function waitUntil(condition) {
+    for (let frame = 0; !condition(); frame++) {
+      assert.ok(frame < 600, 'the requested state must be reachable through the real clock');
+      advanceTransmission(t, .05);
+    }
+  }
+  render();hidden(1);hidden(2);
+  assert.equal(transmissionAction(t, 'advance'), true);
+  waitUntil(() => t.crossing === 1);
+  for (const crossing of [1, 2]) {
+    assert.equal(t.crossing, crossing);
+    assert.equal(transmissionStatus(t).needsTurn, true);
+    const observed = new Set();
+    for (let frame = 0; frame < 220; frame++) {
+      render();
+      const horror = transmissionHorror(t), classes = view.node(`[data-horror="${crossing}"]`).classList;
+      assert.equal(classes.contains('is-present'), horror.present);
+      assert.equal(classes.contains('is-warning'), horror.warning);
+      observed.add(horror.present ? 'present' : horror.warning ? 'warning' : 'absent');
+      hidden(crossing === 1 ? 2 : 1);
+      advanceTransmission(t, .05);
+    }
+    assert.deepEqual([...observed].sort(), ['absent', 'present', 'warning']);
+    waitUntil(() => !transmissionHorror(t, crossing, t.time + TRANSMISSION_DELAY).present);
+    assert.equal(transmissionAction(t, 'turn'), true);
+    advanceTransmission(t, TRANSMISSION_DELAY);
+    assert.equal(t.heading, crossing);
+    assert.equal(transmissionStatus(t).needsTurn, false);
+    // The underlying apparition keeps cycling, but its completed bend must stay
+    // clear in both the current renderer and a fresh renderer after restoring.
+    const clearedPhases = new Set();
+    for (let frame = 0; frame < 220; frame++) {
+      const horror = transmissionHorror(t);
+      clearedPhases.add(horror.present ? 'present' : horror.warning ? 'warning' : 'absent');
+      render();hidden(1);hidden(2);
+      if (frame === 110) { t = roundTrip(t);view = harness();render();hidden(1);hidden(2); }
+      advanceTransmission(t, .05);
+    }
+    assert.deepEqual([...clearedPhases].sort(), ['absent', 'present', 'warning']);
+    waitUntil(() => !transmissionStatus(t).arrivalSafe);
+    const setbacks = t.setbacks;
+    assert.equal(transmissionAction(t, 'advance'), true);
+    waitUntil(() => t.setbacks > setbacks);
+    assert.equal(t.progress, 0);
+    assert.equal(t.heading, crossing, 'a row collision does not undo the successful turn');
+    t = roundTrip(t);view = harness();render();hidden(1);hidden(2);
+    waitUntil(() => transmissionStatus(t).arrivalSafe);
+    assert.equal(transmissionAction(t, 'advance'), true);
+    waitUntil(() => t.crossing === crossing + 1);
+  }
+  assert.equal(t.stage, 'complete');render();hidden(1);hidden(2);
+});

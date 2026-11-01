@@ -3,6 +3,8 @@ import { TRANSMISSION_DELAY, TRANSMISSION_EXPOSURE_COST, transmissionGate, trans
 const COMMAND_LABELS = { wait: 'Wait', advance: 'Advance', turn: 'Turn' };
 const MARKERS = [[18, 84], [18, 50], [70, 50], [70, 16]];
 const GATES = [[18, 66, 0], [44, 50, 90], [70, 32, 0]];
+// Each creature faces the lantern from the outgoing path, beyond the bend.
+const HORRORS = [[30, 50, 90], [70, 41, 0]];
 
 export function transmissionMarkup() {
   return `<div class="transmission-game">
@@ -16,7 +18,7 @@ export function transmissionMarkup() {
         <path d="M18 84V50H70V16" fill="none" stroke="#b5a26b" stroke-width=".65" stroke-dasharray="1.1 1.3"/>
         ${GATES.map(([x,y,rotation], i) => `<g class="transmission-row" data-crossing="${i}" transform="translate(${x} ${y}) rotate(${rotation})" aria-hidden="true"><path class="transmission-row-shadow" d="M-12 0H12"/><path class="transmission-row-roots" d="M-12 0H12"/></g>`).join('')}
         ${MARKERS.map(([x,y], i) => `<g class="transmission-marker" data-marker="${i}" transform="translate(${x} ${y})" aria-hidden="true"><circle r="2.9"/><text x="0" y=".9">${i === 3 ? 'R' : String(i + 1)}</text></g>`).join('')}
-        ${MARKERS.slice(1,3).map(([x,y],i)=>`<g class="transmission-horror" data-horror="${i+1}" transform="translate(${x} ${y})" aria-hidden="true"><ellipse class="transmission-horror-shadow" cy="-2" rx="8" ry="9"/><path class="transmission-horror-body" d="M-2-8Q0-12 2-8L3-4Q8-7 7-2L4 1Q7 2 9 0Q8 5 3 3L1 1Q1 6 5 7Q0 8-1 3Q-5 7-8 3Q-3 4-3 0Q-8 1-7-4Q-4-2-3-4Z"/><path class="transmission-horror-tendrils" d="M-2-5Q-6-9-7-6M2-5Q5-10 7-7M-3 0Q-10-1-8-5M3 1Q10 6 11 2M-1 2Q-5 9-7 7"/><path class="transmission-horror-eyes" d="M-1.6-6.5h.8M.8-6.5h.8"/></g>`).join('')}
+        ${HORRORS.map(([x,y,rotation],i)=>`<g class="transmission-horror" data-horror="${i+1}" transform="translate(${x} ${y}) rotate(${rotation})" aria-hidden="true"><image href="./assets/transmission-horror.webp" x="-6" y="-6" width="12" height="12" preserveAspectRatio="xMidYMid meet"/></g>`).join('')}
         <g id="transmission-light" aria-hidden="true"><circle r="8" fill="url(#transmission-lantern-glow)"/><circle r="1.7" fill="#fff2bf" stroke="#171e16" stroke-width=".5"/><path id="transmission-facing" d="M0-2.5L-1-4.6H1Z" fill="#fff2bf"/></g>
         <text x="24" y="88" class="transmission-map-label">YOUR LIGHT</text><text x="70" y="9" text-anchor="middle" class="transmission-map-label">RADIO</text>
       </svg></div>
@@ -95,7 +97,7 @@ export class TransmissionUI {
     q('#transmission-message').hidden = !message;
     if (this.lastMessage !== message) { q('#transmission-message').textContent = message; this.lastMessage = message; }
     const horror = transmissionHorror(t);
-    const description = status.complete ? 'All three crossings cleared. Your earlier self has reached the buried radio.' : `Crossing ${t.crossing + 1} of 3. Your light is ${status.needsTurn ? 'at the bend, waiting to turn' : t.moving ? 'moving' : 'waiting'}. The next row is ${status.gate.open ? 'open' : 'closed'}.${status.needsTurn && t.version === 2 ? horror.present ? ' A horror blocks the bend.' : horror.warning ? ' A shadow is forming at the bend.' : ' The horror has vanished.' : ''} ${t.pending ? `${COMMAND_LABELS[t.pending.action]} is on the air.` : 'The radio is ready.'}`;
+    const description = status.complete ? 'All three crossings cleared. Your earlier self has reached the buried radio.' : `Crossing ${t.crossing + 1} of 3. Your light is ${status.needsTurn ? 'at the bend, waiting to turn' : t.moving ? 'moving' : 'waiting'}. The next row is ${status.gate.open ? 'open' : 'closed'}.${status.needsTurn && t.version === 2 ? horror.present ? ' A horror blocks the path ahead.' : horror.warning ? ' A shadow is forming on the path ahead.' : ' The horror has vanished.' : ''} ${t.pending ? `${COMMAND_LABELS[t.pending.action]} is on the air.` : 'The radio is ready.'}`;
     if (q('#transmission-map').getAttribute('aria-label') !== description) q('#transmission-map').setAttribute('aria-label', description);
   }
 }
