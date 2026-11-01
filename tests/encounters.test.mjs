@@ -2,6 +2,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createGame, move, chooseFieldEncounter, continueFieldEncounter, restore, serialize, startShift, beginDebrief, getQuestion, answer, inspect, FIELD_SITES } from '../docs/engine.js';
 import { ENCOUNTERS, currentEncounter, encounterAfterStep, freshFieldEvents } from '../docs/encounters.js';
+import { ENCOUNTER_FLAVORS } from '../docs/encounter-flavors.js';
+import { rogueOptions, startRogue, chooseRogue } from '../docs/rogue.js';
 import { FieldMap } from '../docs/field-ui.js';
 import { planFieldRoute } from '../docs/field.js';
 import { encounterMarkup, notebookMarkup } from '../docs/art.js';
@@ -88,5 +90,31 @@ test('complete campaigns encounter all twelve beats without repeats, in both wal
       if(night<2){startShift(s);s.phase='field';s.entered=true;}
     }
     assert.equal(s.ending,'dissent');assert.equal(s.fieldEvents.journal.length,12);assert.equal(new Set(s.fieldEvents.journal.map(j=>j.id)).size,12);assert.equal(s.evidence.length,9);assert.ok(restore(serialize(s)));
+  }
+});
+
+test('only taking the lantern unlocks the drain, across every lamp presentation and saved night',()=>{
+  for(let variant=0;variant<=ENCOUNTER_FLAVORS['unattended-lamp'].length;variant++)for(const choice of ['pass','search','wait','take']) {
+    let s=field();s.fieldEvents=freshFieldEvents(42);
+    s.fieldEvents.plan.find(p=>p.id==='unattended-lamp').variant=variant;
+    trigger(s,'unattended-lamp');
+    assert.ok(currentEncounter(s).choices.some(option=>option.id==='take'));
+    assert.equal(chooseFieldEncounter(s,choice),true);
+    assert.equal(s.fieldEvents.flags.includes('lantern'),choice==='take');
+    assert.equal(s.fieldEvents.flags.includes('compass'),choice==='search','the lantern does not silently replace or also grant the compass');
+    assert.equal(continueFieldEncounter(s),true);
+    s=restore(serialize(s));assert.ok(s,'the acquired item and selected presentation survive reload');
+    s.player={x:7,y:5};assert.ok(inspect(s));
+    assert.equal(rogueOptions(s).find(option=>option.id==='dungeon').disabled,choice!=='take');
+    assert.equal(startRogue(s,'dungeon'),choice==='take');
+    if(choice==='take') {
+      assert.equal(chooseRogue(s,'back'),true);
+      assert.ok(s.fieldEvents.flags.includes('lantern'),'backing out retains the acquired light');
+    }
+    // A new shift keeps chosen equipment but does not award a missed lantern.
+    s.phase='briefing';s.shift=1;assert.equal(startShift(s),true);
+    s.phase='field';s.entered=true;s.player={x:7,y:5};assert.ok(inspect(s));
+    assert.equal(rogueOptions(s).find(option=>option.id==='dungeon').disabled,choice!=='take');
+    assert.ok(restore(serialize(s)));
   }
 });

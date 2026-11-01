@@ -11,6 +11,7 @@ function field(mode = 'story') {
   const s = createGame(mode, 42);
   Object.assign(s, { phase: 'field', entered: true, departure: 'chosen', player: { x:7, y:5 } });
   s.inspected.push('drain');
+  s.fieldEvents.flags.push('lantern');
   return s;
 }
 function start(mode) { const s = field(mode); assert.equal(startRogue(s,'dungeon'),true); return s; }
@@ -32,8 +33,12 @@ function walkTo(s, target) {
   assert.fail('target must be reachable');
 }
 
-test('dungeon entry requires an inspected drain and leaves the player free to back out', () => {
+test('dungeon entry requires a lantern and an inspected drain and leaves the player free to back out', () => {
   const s = field(), before = structuredClone(s);
+  s.fieldEvents.flags = [];
+  assert.equal(rogueOptions(s).find(o=>o.id==='dungeon').disabled,true);
+  assert.equal(startRogue(s,'dungeon'),false);
+  s.fieldEvents.flags.push('lantern');
   s.inspected = [];
   assert.equal(startRogue(s,'dungeon'),false);
   s.inspected.push('drain');s.player.x--;
@@ -45,6 +50,7 @@ test('dungeon entry requires an inspected drain and leaves the player free to ba
   roundTrip(s);
   assert.equal(chooseRogue(s,'back'),true);
   assert.deepEqual(s,before,'backtracking does not consume exposure, RNG, or testimony');
+  assert.equal(startRogue(s,'dungeon'),true,'the acquired lantern permits returning after backing out');
 });
 
 for (const mode of ['story','hard']) test(`all three dungeon floors can be escaped in ${mode} through real actions and saves`, () => {

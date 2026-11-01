@@ -25,6 +25,7 @@ export const ENCOUNTERS=[
     report:'An unattended lantern was moving in still air beside an old supply tin.',choices:[
       choice('pass','Pass without leaving the path.',0,'The lantern stops as soon as you pass it. Your shadow takes another step.'),
       choice('search','Search the tin beneath the light.',5,'You find an old survey compass inside the supply tin beneath the lantern. Its needle points toward the tower. For a moment, all the leaves point that way too. You pocket it.','compass'),
+      choice('take','Take the lantern from its hook.',3,'You lift the lantern free. Its flame leans toward the drainage channel, though the air is still. A scratched label reads: LOWER STEPS. You keep it.','lantern'),
       choice('wait','Wait and watch the lantern.',-2,'You slow your breathing. The hanging lantern swings in time with your breaths. You hold your breath. The lantern stops.','listened')
     ]},
   {id:'extra-step',night:0,step:23,art:'extra-step',title:'One more footstep.',

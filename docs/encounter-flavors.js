@@ -61,6 +61,7 @@ export const ENCOUNTER_FLAVORS = {
       choices: {
         pass: response('Walk past the hanging light.', 'You pass the lantern without looking into the tin. Your shadow catches up with you at the next stalk.'),
         search: response('Search the supply tin.', 'An old survey compass sits inside the tin beneath the lantern. Its needle points toward the tower. When you pocket it, the lantern goes dim enough to show a thumbprint inside the glass.'),
+        take: response('Lift the lantern from its hook.', 'The lantern brightens before you touch it. You take it down. A scratched label reads: LOWER STEPS. Its flame leans toward the drainage channel, waiting for you to follow.'),
         wait: response('Stand still and watch.', 'You hold your light steady and breathe slowly. The lantern gradually settles to an ordinary flame. You wait until your shoulders relax.')
       }
     },
@@ -72,6 +73,7 @@ export const ENCOUNTER_FLAVORS = {
       choices: {
         pass: response('Leave the tin where it is.', 'You stay on the path. The flakes fall normally once you have passed, making a sound like heavy rain.'),
         search: response('Look inside the supply tin.', 'Beneath the flakes is an old survey compass. Its needle turns toward the tower and holds there. You pocket it. The cold metal leaves a clean circle on your palm.'),
+        take: response('Take the lantern with you.', 'You lift the lantern clear of the falling ash. The handle is cold. Beneath it, a scratched label reads: LOWER STEPS. Its flame leans toward the drainage channel.'),
         wait: response('Watch until your breathing settles.', 'You count the flakes as they rise. They grow slower with your breathing. By the time your hands are steady, nothing is moving between the tin and the glass.')
       }
     }

@@ -2,8 +2,9 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import vm from 'node:vm';
 import { readFileSync } from 'node:fs';
-import { createGame, move, inspect, FIELD_SITES, beginDebrief, answer, startShift, restore, serialize, chooseFieldEncounter, continueFieldEncounter } from '../docs/engine.js';
+import { createGame, move, inspect, nearbySite, investigationComplete, FIELD_SITES, beginDebrief, answer, startShift, restore, serialize, chooseFieldEncounter, continueFieldEncounter } from '../docs/engine.js';
 import { fieldStepCost, planFieldRoute } from '../docs/field.js';
+import { rogueOptions } from '../docs/rogue.js';
 import { FieldMap } from '../docs/field-ui.js';
 import { resolutionGameActive } from '../docs/resolution-games.js';
 
@@ -114,4 +115,44 @@ test('encounters pause the chosen walk and continue its remaining steps',()=>{
   c.tick(s,1,()=>true,()=>{});
   assert.equal(travel.steps.length,remaining-1);
   assert.deepEqual(s.fieldEvents.journey,{destination:'corner',style:'direct'});
+});
+
+test('arriving at an already inspected drain only reopens a card when the lantern unlocks it',()=>{
+  const source=readFileSync(new URL('../docs/app.js',import.meta.url),'utf8');
+  const frame=source.slice(source.indexOf('function frame(now)'));
+  for(const id of ['drain','pump','corner'])for(const inspected of [false,true])for(const lantern of [false,true]) {
+    const game=field(),location=site(id),actions=[];
+    game.player={x:location.x,y:location.y};
+    if(inspected)inspect(game);
+    if(lantern)game.fieldEvents.flags.push('lantern');
+    const context={game,paused:false,dialog:{open:false},menuOpen:()=>false,document:{hidden:false},lastFrame:0,lastUI:0,lastSave:0,advance(){},
+      fieldMap:{tick(_game,_dt,_step,arrive){arrive();}},act(action){actions.push(action);},nearbySite,investigationComplete,rogueOptions,
+      updateUI(){},save(){},renderer:{draw(){}},requestAnimationFrame(){},resolutionGameActive};
+    vm.createContext(context);vm.runInContext(frame,context);vm.runInContext('frame(1000)',context);
+    assert.deepEqual(actions,!inspected||id==='drain'&&lantern?['inspect']:[],`${id}: inspected=${inspected}, lantern=${lantern}`);
+  }
+});
+
+test('the map shows the tunnel at an inspected drain and locks it without the lantern',()=>{
+  function node() {
+    const children=new Map(),attributes=new Map();
+    return {style:{},dataset:{},classList:{toggle(){}},setAttribute(key,value){attributes.set(key,value);},getAttribute(key){return attributes.get(key);},
+      querySelector(key){if(!children.has(key))children.set(key,node());return children.get(key);},querySelectorAll(){return [];}};
+  }
+  for(const lantern of [false,true])for(const inspected of [false,true])for(const location of ['drain','pump']) {
+    const game=field(),point=site(location),root=node();
+    game.player={x:point.x,y:point.y};if(inspected)inspect(game);
+    if(lantern)game.fieldEvents.flags.push('lantern');
+    const map=new FieldMap(root);map.selected=location;map.render(game);
+    const button=root.querySelector('#field-dungeon');
+    assert.equal(button.hidden,!(inspected&&location==='drain'));
+    if(inspected&&location==='drain') {
+      assert.equal(button.disabled,!lantern);
+      assert.match(button.innerHTML,/Acquired lantern/);
+      assert.ok(button.innerHTML.includes(lantern?'requirement-met':'requirement-unmet'));
+      assert.ok(button.innerHTML.includes(lantern?'✓':'✗'));
+      assert.equal(button.innerHTML.includes('Too dark without a lantern.'),!lantern);
+      assert.doesNotMatch(button.innerHTML,/unattended|off the path|find and take/i);
+    }
+  }
 });

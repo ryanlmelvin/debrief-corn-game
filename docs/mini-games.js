@@ -69,6 +69,7 @@ export function createMiniGame(id, mode = 'story', seed = Date.now()) {
     // still pass through the same transition functions used by the story.
     s.incident = true;
     enterField(s);
+    if (id === 'dungeon') s.fieldEvents.flags.push('lantern');
     if (id === 'corn') s.exposure = 100;
     if (id === 'flood' || id === 'dungeon') {
       s.player = id === 'flood' ? { x: 3, y: 3 } : { x: 7, y: 5 };

@@ -347,3 +347,9 @@ dialog[data-kind="debrief"] .choice:disabled .response-key { border-style: dashe
   .field-north svg { width: 15px; height: 20px; }
 }
 @media(prefers-reduced-motion:reduce) { .field-kit, .field-go, .field-stop { transition: none; } }
+
+#field-dungeon { text-align: left; }
+#field-dungeon:disabled { opacity: 1; color: #565d4a; }
+#field-dungeon small { display: block; margin-top: 6px; font-size: 11px; line-height: 1.45; }
+#field-dungeon .requirement-unmet { color: #843d2b; font-weight: bold; }
+#field-dungeon .requirement-met { color: #435b35; font-weight: bold; }

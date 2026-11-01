@@ -22,11 +22,12 @@ export function rogueOptions(s) {
   const idle = idleField(s);
   const atDrain = s.player.x === 7 && s.player.y === 5 && s.inspected.includes('drain');
   const atPump = s.player.x === 3 && s.player.y === 3 && s.inspected.includes('pump');
+  const lantern = s.fieldEvents?.flags.includes('lantern');
   return [
     { id: 'corn', label: 'Stop resisting the field.', detail: s.exposure >= 70 ? '100 exposure.' : 'The roots are waiting. Requires 70 exposure.', disabled: !idle || s.exposure < 70 },
     { id: 'broadcast', label: 'Transmit on every frequency.', detail: 'Something beneath the static knows your voice.', disabled: !idle },
     { id: 'flood', label: 'Reverse the treatment pumps.', detail: atPump ? 'The pipes run both ways.' : 'Return to the pump house after inspecting it.', disabled: !idle || !atPump },
-    { id: 'dungeon', label: 'Climb into the drainage channel.', detail: atDrain ? 'Dungeon Crawler Corn. Something has built stairs beneath the field.' : 'Return to the drainage channel after inspecting it.', disabled: !idle || !atDrain }
+    { id: 'dungeon', label: 'Climb into the drainage channel.', detail: !lantern ? 'Too dark without a lantern.' : atDrain ? 'Your lantern reveals stairs beneath the waterline.' : 'Bring your lantern to the drainage channel and inspect it.', disabled: !idle || !atDrain || !lantern }
   ];
 }
 
@@ -89,8 +90,8 @@ export function getRogueScene(s) {
     };
     if (r.route === 'dungeon') return {
       title: 'Dungeon Crawler Corn',
-      text: 'The drain has steps. You sling your rifle, lift the lantern from its hook, and climb below the waterline. Your uniform catches on the brickwork. Three locked floors lie between you and a breath of outside air. Down here, nothing moves until you do.',
-      options: [{ id: 'begin', label: 'Take the lantern. Enter the dungeon.', detail: 'This ends your assignment. Keep your rifle and remaining ammunition. Find each brass key, then the stairs.' }, { id: 'back', label: 'Leave the drain. Return to the map.' }]
+      text: 'By the light of the lantern you took from the field, steps appear beneath the waterline. Beyond them, three locked floors lie between you and a breath of outside air. You sling your rifle and hold the lantern over the first step. Down here, nothing moves until you do.',
+      options: [{ id: 'begin', label: 'Raise the lantern. Enter the dungeon.', detail: 'This ends your assignment. Keep your rifle and remaining ammunition. Find each brass key, then the stairs.' }, { id: 'back', label: 'Leave the drain. Return to the map.' }]
     };
     return {
       title: 'Give it all back.',

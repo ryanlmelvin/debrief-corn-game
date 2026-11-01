@@ -248,6 +248,7 @@ test('legacy active and archived story routes unlock on beginning, without requi
   assert.deepEqual(progressSnapshot(game,empty()).history.miniGames,['watch']);
   game.incident=true;
   assert.equal(enterField(game),true);
+  game.fieldEvents.flags.push('lantern');
   game.player={x:7,y:5};assert.ok(inspect(game));
   assert.equal(startRogue(game,'dungeon'),true);
   assert.deepEqual(progressSnapshot(game,empty()).history.miniGames,['watch'],'merely reading the introduction does not claim the minigame has been played');

@@ -1,3 +1,5 @@
+import { drainEntryContent } from './drain-entry.js';
+import { rogueOptions } from './rogue.js';
 import { FIELD_SITES, investigationComplete, nearbySite, currentSiteScene } from './engine.js';
 import { FIELD_PATHS, fieldStepCost, planFieldRoute } from './field.js';
 import { FIELD_ART, landmarkDrawing } from './art.js';
@@ -116,6 +118,7 @@ export class FieldMap {
     // Keep its new passage available at the player's actual location.
     const dungeon=q('field-dungeon');
     dungeon.hidden=nearbySite(s)?.id!=='drain'||!s.inspected.includes('drain')||!!this.travel;
-    dungeon.disabled=paused||!!s.fieldEvents.pending||!!s.expedition?.active;
+    dungeon.innerHTML=drainEntryContent(s);
+    dungeon.disabled=paused||rogueOptions(s).find(option=>option.id==='dungeon').disabled;
   }
 }

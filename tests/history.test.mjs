@@ -94,6 +94,7 @@ test('real practice endings never earn collection badges or transcripts, then an
 
   const ordinary=createGame('story',102);
   Object.assign(ordinary,{phase:'field',entered:true,departure:'chosen',player:{x:7,y:5}});
+  ordinary.fieldEvents.flags.push('lantern');
   assert.ok(inspect(ordinary));
   assert.equal(startRogue(ordinary,'dungeon'),true);
   assert.equal(chooseRogue(ordinary,'begin'),true);
@@ -127,6 +128,7 @@ test('mini-game access survives archive writes independently of collected ending
 test('startup recovers reached mini games from the active story without requiring an ending',()=>{
   const ordinary=createGame('story',104);
   Object.assign(ordinary,{phase:'field',entered:true,departure:'chosen',player:{x:7,y:5}});
+  ordinary.fieldEvents.flags.push('lantern');
   assert.ok(inspect(ordinary));assert.equal(startRogue(ordinary,'dungeon'),true);
   const introductory=archive(new Map(),ordinary);
   assert.equal(introductory.run('history.miniGames.includes("dungeon")'),false);
@@ -140,6 +142,7 @@ test('startup recovers reached mini games from the active story without requirin
 test('legacy loss transcripts recover the mini game but collection badges alone do not',()=>{
   const ordinary=createGame('story',105);
   Object.assign(ordinary,{phase:'field',entered:true,departure:'chosen',player:{x:7,y:5}});
+  ordinary.fieldEvents.flags.push('lantern');
   inspect(ordinary);startRogue(ordinary,'dungeon');chooseRogue(ordinary,'begin');
   for(let turn=0;ordinary.phase==='rogue'&&turn<100;turn++)chooseRogue(ordinary,'wait');
   assert.equal(ordinary.ending,'dungeon_lost');

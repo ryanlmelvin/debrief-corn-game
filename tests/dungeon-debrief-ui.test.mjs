@@ -13,7 +13,7 @@ const actionCode=source.slice(source.indexOf('function act('),source.indexOf("do
 function escaped(practice) {
   const s=practice?createMiniGame('dungeon','story',42):createGame('story',42);
   if(!practice){
-    startShift(s);s.incident=true;enterField(s);s.player={x:7,y:5};inspect(s);
+    startShift(s);s.incident=true;enterField(s);s.fieldEvents.flags.push('lantern');s.player={x:7,y:5};inspect(s);
     assert.equal(startRogue(s,'dungeon'),true);assert.equal(chooseRogue(s,'begin'),true);
   }
   const directions={R:[1,0],L:[-1,0],U:[0,-1],D:[0,1]};

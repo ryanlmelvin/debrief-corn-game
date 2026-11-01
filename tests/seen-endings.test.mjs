@@ -1,7 +1,7 @@
 import test, { after } from 'node:test';
 import assert from 'node:assert/strict';
-import { createGame, answer, advance, ENDINGS, FIELD_SITES, inspect, chooseFieldEncounter, eatCrop, endingId } from '../docs/engine.js';
-import { ENCOUNTERS, freshFieldEvents, encounterAfterStep } from '../docs/encounters.js';
+import { createGame, answer, advance, ENDINGS, FIELD_SITES, inspect, chooseFieldEncounter, continueFieldEncounter, eatCrop, endingId } from '../docs/engine.js';
+import { ENCOUNTERS, freshFieldEvents, encounterAfterStep, currentEncounter } from '../docs/encounters.js';
 import { startResolution, chooseResolution, getResolution } from '../docs/alternate-endings.js';
 import { guideTravel, guideRouteStatus, inspectGuide, focusGuide, fireGuide, spareGuide, guideDebrief, answerGuideDebrief } from '../docs/guide.js';
 import { startRogue, chooseRogue, moveRogue, getRogueScene, validRogue, broadcastCursor, broadcastWindow, floodConnections } from '../docs/rogue.js';
@@ -816,8 +816,75 @@ test('field previews recognize immediate endings without treating ordinary explo
   assert.equal(hasSeenChoiceEndings(next, 'encounter-choice', 'record', Object.keys(ENDINGS)), false, 'a repeated, no-longer-available choice is never marked');
 });
 
+function lanternEncounter(seed = 42) {
+  const game = createGame('story', seed);
+  Object.assign(game, { phase: 'field', entered: true, departure: 'chosen', player: { x: 4, y: 4 }, fieldSteps: 24 });
+  // Reach the real first-night encounter in order; never manufacture the lantern
+  // flag or a journal receipt for the prerequisite under test.
+  while (encounterAfterStep(game)) {
+    if (game.fieldEvents.pending.id === 'unattended-lamp') return game;
+    assert.equal(chooseFieldEncounter(game, currentEncounter(game).choices[0].id), true);
+    assert.equal(continueFieldEncounter(game), true);
+  }
+  assert.fail('The first-night lantern encounter must be reachable.');
+}
+
+test('acquiring the lantern keeps every open continuation and leaves preview state untouched', () => {
+  const all = Object.keys(ENDINGS);
+  for (const seed of [42, 101, 202, 303]) {
+    const game = lanternEncounter(seed), saved = JSON.stringify(game);
+    const history = { collected: all, runs: [{ reports: [{ answer: 'Prior testimony.' }] }] };
+    const priorHistory = JSON.stringify(history), random = Math.random;
+    let randomCalls = 0;
+    try {
+      Math.random = () => { randomCalls++; return .5; };
+      assert.deepEqual(possibleChoiceEndings(game, 'encounter-choice', 'take'), sorted(all));
+      for (const ending of all) {
+        assert.equal(hasSeenChoiceEndings(game, 'encounter-choice', 'take', historyExcept(ending)), false);
+      }
+      assert.equal(hasSeenChoiceEndings(game, 'encounter-choice', 'take', history.collected), true);
+      assert.equal(JSON.stringify(game), saved, 'preview preserves saves, flags, journal, testimony and RNG state');
+      assert.equal(JSON.stringify(history), priorHistory);
+    } finally {
+      Math.random = random;
+    }
+    assert.equal(randomCalls, 0);
+    assert.equal(chooseFieldEncounter(game, 'take'), true);
+    assert.ok(game.fieldEvents.flags.includes('lantern'));
+    assert.equal(possibleChoiceEndings(game, 'encounter-choice', 'take'), null, 'a resolved encounter cannot offer another acquisition');
+    assert.equal(continueFieldEncounter(game), true);
+    game.player = { x: 7, y: 5 };
+    assert.ok(inspect(game));
+    assert.equal(startRogue(game, 'dungeon'), true);
+    assert.equal(chooseRogue(game, 'back'), true);
+    assert.ok(game.fieldEvents.flags.includes('lantern'), 'withdrawal keeps the acquired lantern');
+    assert.equal(startRogue(game, 'dungeon'), true);
+  }
+});
+
+test('other lantern encounter choices do not unlock the drain or invent entry hints', () => {
+  for (const choice of ['pass', 'search', 'wait']) {
+    const game = lanternEncounter();
+    assert.equal(chooseFieldEncounter(game, choice), true);
+    assert.equal(continueFieldEncounter(game), true);
+    game.player = { x: 7, y: 5 };
+    assert.ok(inspect(game));
+    assert.equal(game.fieldEvents.flags.includes('lantern'), false);
+    const before = structuredClone(game);
+    assert.equal(startRogue(game, 'dungeon'), false);
+    assert.equal(possibleChoiceEndings(game, 'rogue-start', 'dungeon'), null);
+    assert.equal(hasSeenChoiceEndings(game, 'rogue-start', 'dungeon', Object.keys(ENDINGS)), false);
+    assert.equal(possibleChoiceEndings(game, 'dungeon-enter'), null, 'the unsupported UI action remains unmarked');
+    assert.deepEqual(game, before);
+  }
+});
+
 function rogueField(route) {
-  const game = createGame('story', 42);
+  const game = route === 'dungeon' ? lanternEncounter() : createGame('story', 42);
+  if (route === 'dungeon') {
+    assert.equal(chooseFieldEncounter(game, 'take'), true);
+    assert.equal(continueFieldEncounter(game), true);
+  }
   Object.assign(game, { phase: 'field', entered: true, departure: 'chosen', exposure: 75, player: { x: 3, y: 3 } });
   game.inspected.push('pump');
   if (route === 'dungeon') {
@@ -852,9 +919,10 @@ test('rogue entry and reversible introductions retain every unknown field outcom
   }
 });
 
-test('the drain requires inspection and an idle arrival; locked choices never receive a hint', () => {
+test('the drain requires a lantern, inspection and an idle arrival; locked choices never receive a hint', () => {
   const all = Object.keys(ENDINGS), unlocked = rogueField('dungeon');
   for (const change of [
+    game => { game.fieldEvents.flags = game.fieldEvents.flags.filter(flag => flag !== 'lantern'); },
     game => { game.inspected = game.inspected.filter(id => id !== 'drain'); },
     game => { game.player.x--; },
     game => { game.player.y--; },
@@ -945,6 +1013,7 @@ test('the drain conservatively retains both endings reached by actual dungeon tu
     assert.equal(endingId(game), ending);
     if (ending === 'dungeon_escape') assert.deepEqual([game.rounds, game.reserve], [5, 18], 'the human guard used the carried rifle and reloaded along the way');
     for (const [state, action, value] of [
+      [lanternEncounter(), 'encounter-choice', 'take'],
       [field, 'rogue-start', 'dungeon'],
       [introduction, 'rogue-choice', 'begin'],
       [introduction, 'rogue-choice', 'back']
@@ -1077,9 +1146,10 @@ test('committed recovery cannot reach the drain, including after interview choic
   assert.equal(answer(search, 'guide'), true);
   const scenes = [search, escapeScene(), interview('spared'), interview('secured'), interview('arrested')];
   for (const game of scenes) {
-    // Give the location and inspection prerequisites every advantage. The actual
+    // Give the acquired lantern, location and inspection prerequisites every advantage. The actual
     // recovery phase must still reject dungeon entry; guide actions never return
     // to the field, and the existing recovery fixtures exercise all four endings.
+    game.fieldEvents = structuredClone(rogueField('dungeon').fieldEvents);
     game.player = { x: 7, y: 5 };
     if (!game.inspected.includes('drain')) game.inspected.push('drain');
     const before = structuredClone(game);

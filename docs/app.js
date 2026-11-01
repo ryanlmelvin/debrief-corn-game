@@ -1,3 +1,4 @@
+import { drainEntryMarkup } from './drain-entry.js';
 import { evidenceAtSite } from './evidence-scenes.js';
 import './image-viewer.js';
 import { watchNight, sightingPromptReady } from './watch-story.js';
@@ -20,7 +21,7 @@ import { resolutionMarkup } from './resolution-ui.js';
 import { resolutionGameActive, resolutionGameAction, releaseResolutionGame } from './resolution-games.js';
 import { ResolutionGamesUI } from './resolution-games-ui.js';
 import { markSeenEndingChoices } from './seen-endings.js';
-import { startRogue, chooseRogue, moveRogue, getRogueScene } from './rogue.js';
+import { startRogue, chooseRogue, moveRogue, getRogueScene, rogueOptions } from './rogue.js';
 import { RogueUI, rogueMenuMarkup } from './rogue-ui.js';
 import { MINI_GAMES, createMiniGame, miniGameComplete, miniGameResult, getMiniGameUnlocks, normalizeMiniGameUnlocks } from './mini-games.js';
 import { InstallHandoff, recoverInstallHandoff, progressSnapshot, encodeProgress, decodeProgress, storeProgress, MAX_PROGRESS_BYTES } from './progress.js';
@@ -564,8 +565,8 @@ function act(action,value) {
   }
   if(action==='eat-crop' && eatCrop(game))closeModal();
   if(action==='inspect'){
-    const id=inspect(game)||(nearbySite(game)?.id==='drain'&&game.inspected.includes('drain')?evidenceAtSite('drain',game.shift):null);
-    if(id){const e=evidenceForState(game,id),scene=currentSiteScene(game);showModal('evidence',paper(esc(e.title),`<p class="eyebrow">${esc(e.code)}${e.variant?` · ${esc(e.canonicalTitle)}`:''} / ${esc(e.where.toUpperCase())}</p>${evidenceMount(id,game)}<p>${esc(e.text)}</p>${scene?`<p>${esc(scene.cue)}</p><button class="primary" data-action="site-scene">${esc(scene.label)}</button>`:''}${nearbySite(game)?.id==='drain'?'<button class="primary" data-action="dungeon-enter">Follow the drain below ground ↘</button>':''}<button class="primary" data-action="close">Close notebook ↗</button>`,'PRIVATE OBSERVATION'));}
+    const id=inspect(game)||(!rogueOptions(game).find(option=>option.id==='dungeon').disabled?evidenceAtSite('drain',game.shift):null);
+    if(id){const e=evidenceForState(game,id),scene=currentSiteScene(game);showModal('evidence',paper(esc(e.title),`<p class="eyebrow">${esc(e.code)}${e.variant?` · ${esc(e.canonicalTitle)}`:''} / ${esc(e.where.toUpperCase())}</p>${evidenceMount(id,game)}<p>${esc(e.text)}</p>${scene?`<p>${esc(scene.cue)}</p><button class="primary" data-action="site-scene">${esc(scene.label)}</button>`:''}${drainEntryMarkup(game)}<button class="primary" data-action="close">Close notebook ↗</button>`,'PRIVATE OBSERVATION'));}
   }
   if(action==='debrief')beginDebrief(game);
   if(action==='restart'){if(game?.practice){launchMiniGame(game.practice,!!previewGame);return;}closeModal();begin(game.mode);return;}
@@ -948,7 +949,7 @@ function frame(now) {
     if(game.phase==='field'&&!game.practice)fieldMap.tick(game,dt,(dx,dy)=>move(game,dx,dy),()=>{
       const site=nearbySite(game);
       if(site?.id==='tower'&&investigationComplete(game))act('debrief');
-      else if(site&&site.id!=='tower'&&(!game.inspected.includes(site.id)||site.id==='drain'))act('inspect');
+      else if(site&&site.id!=='tower'&&(!game.inspected.includes(site.id)||!rogueOptions(game).find(option=>option.id==='dungeon').disabled))act('inspect');
       else {updateUI(true);save();}
     });
     const focused=game.targets.find(t=>t.id===game.focused);if(focused)renderer.pointer={x:focused.x,y:focused.y-34};

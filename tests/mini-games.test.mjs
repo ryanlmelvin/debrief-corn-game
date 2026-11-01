@@ -172,6 +172,7 @@ function storyAtRoute(route) {
   const s=createGame('story',42);startShift(s);advance(s,13);
   assert.equal(enterField(s),true);
   if(route==='corn')s.exposure=100;
+  if(route==='dungeon')s.fieldEvents.flags.push('lantern');
   if(route==='flood'||route==='dungeon') {
     s.player=route==='flood'?{x:3,y:3}:{x:7,y:5};
     assert.ok(inspect(s));

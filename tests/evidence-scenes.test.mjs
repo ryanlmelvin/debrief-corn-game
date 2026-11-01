@@ -7,6 +7,8 @@ import {
   getQuestion, answer, getEnding, restore, serialize
 } from '../docs/engine.js';
 import { evidenceAtSite, freshEvidenceScenes, validEvidenceScenes } from '../docs/evidence-scenes.js';
+import { rogueOptions } from '../docs/rogue.js';
+import { drainEntryMarkup } from '../docs/drain-entry.js';
 import { witnessRequirements } from '../docs/ending-requirements.js';
 import { availableResolutions } from '../docs/alternate-endings.js';
 import { FIELD_ART, evidenceMount, notebookMarkup } from '../docs/art.js';
@@ -103,24 +105,40 @@ test('the first card shown by the inspect action uses the saved scene rather tha
   const start = source.indexOf("if(action==='inspect'){"), end = source.indexOf("\n  if(action==='debrief')", start);
   assert.ok(start >= 0 && end > start);
   const locations = { corner: ['dress', 'badge', 'teeth'], pump: ['ledger', 'sample', 'glove'], drain: ['roots', 'water', 'map'] };
-  for (const [siteId, discoveries] of Object.entries(locations)) for (const [shift, id] of discoveries.entries()) for (const variant of [1, 2]) {
+  for (const [siteId, discoveries] of Object.entries(locations)) for (const [shift, id] of discoveries.entries()) for (const variant of [1, 2]) for (const lantern of [false, true]) {
     const site = FIELD_SITES.find(site => site.id === siteId);
     const game = { ...field(), shift, player: { x: site.x, y: site.y } };
     game.evidenceScenes[id] = variant;
+    if(lantern)game.fieldEvents.flags.push('lantern');
     const scene = evidenceForState(game, id);
     let card;
-    vm.runInNewContext(source.slice(start, end), {
-      action: 'inspect', game, inspect, nearbySite, evidenceAtSite, currentSiteScene, EVIDENCE, evidenceForState, evidenceMount, esc: escape,
+    const context = {
+      action: 'inspect', game, inspect, nearbySite, evidenceAtSite, rogueOptions, drainEntryMarkup, currentSiteScene, EVIDENCE, evidenceForState, evidenceMount, esc: escape,
       paper: (title, body, tag) => ({ title, body, tag }),
       showModal: (kind, content) => { card = { kind, ...content }; }
-    });
+    };
+    vm.runInNewContext(source.slice(start, end), context);
     assert.equal(card.kind, 'evidence');
     assert.equal(card.body.includes('data-action="dungeon-enter"'), siteId === 'drain');
+    if(siteId==='drain') {
+      const entry=drainEntryMarkup(game);
+      assert.equal(/<button[^>]*\bdisabled\b/.test(entry),!lantern,'missing lantern leaves the visible tunnel choice locked');
+      assert.match(entry,/Acquired lantern/);
+      assert.ok(entry.includes(lantern?'requirement-met':'requirement-unmet'));
+      assert.ok(entry.includes(lantern?'✓':'✗'));
+      assert.ok(entry.includes(lantern?'Met:':'Unmet:'));
+      assert.equal(entry.includes('Too dark without a lantern.'),!lantern);
+      assert.doesNotMatch(entry,/unattended|off the path|find and take/i,'the card names the requirement without giving its location away');
+    }
     assert.equal(card.title, escape(scene.title));
     assert.ok(card.body.includes(escape(scene.text)), `${id} must vary on the initial discovery card`);
     assert.ok(card.body.includes(evidenceMount(id, game)), `${id} must use its saved discovery illustration`);
     assert.ok(card.body.includes(escape(EVIDENCE[id].title)), `${id} should still identify the canonical exhibit`);
     assert.deepEqual(game.evidence, [id]);
+    const before=serialize(game);card=null;
+    vm.runInNewContext(source.slice(start,end),context);
+    assert.equal(Boolean(card),siteId==='drain'&&lantern,'only an unlocked tunnel reopens its inspected discovery');
+    assert.equal(serialize(game),before,'reopening the card cannot grant evidence, change RNG, or rewrite the journal');
   }
 });
 

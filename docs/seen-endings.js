@@ -56,6 +56,8 @@ export function possibleChoiceEndings(game, action, value) {
   if (action === 'rogue-choice' && !['intro', 'choice', 'debrief'].includes(game.rogue?.stage)) return null;
   try {
     const next = clone(game);
+    // Entry prerequisites (including the acquired lantern at the drain) belong
+    // to the real transition. A locked entry never produces a collection hint.
     if (!transition(next, value)) return null;
     const pending = [next], visited = new Set(), endings = new Set();
     while (pending.length) {

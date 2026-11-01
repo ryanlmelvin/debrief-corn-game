@@ -118,6 +118,7 @@ test('story starts accumulate independent unlocks before an ending and retain th
   startShift(story);h.run('save()');
   assert.deepEqual([...h.context.history.miniGames],['watch']);
   story.incident=true;assert.equal(enterField(story),true);
+  story.fieldEvents.flags.push('lantern');
   story.player={x:7,y:5};assert.ok(inspect(story));
   assert.equal(startRogue(story,'dungeon'),true);h.run('save()');
   assert.deepEqual([...h.context.history.miniGames],['watch'],'opening the introduction alone grants no practice access');
