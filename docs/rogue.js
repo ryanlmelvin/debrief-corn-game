@@ -22,7 +22,7 @@ export function rogueOptions(s) {
   const atDrain = s.player.x === 7 && s.player.y === 5 && s.inspected.includes('drain');
   const atPump = s.player.x === 3 && s.player.y === 3 && s.inspected.includes('pump');
   return [
-    { id: 'corn', label: 'Stop resisting the field.', detail: s.exposure >= 70 ? '100 exposure. No way back.' : 'The roots are waiting. Requires 70 exposure.', disabled: !idle || s.exposure < 70 },
+    { id: 'corn', label: 'Stop resisting the field.', detail: s.exposure >= 70 ? '100 exposure.' : 'The roots are waiting. Requires 70 exposure.', disabled: !idle || s.exposure < 70 },
     { id: 'broadcast', label: 'Transmit on every frequency.', detail: 'Something beneath the static knows your voice.', disabled: !idle },
     { id: 'flood', label: 'Reverse the treatment pumps.', detail: atPump ? 'The pipes run both ways.' : 'Return to the pump house after inspecting it.', disabled: !idle || !atPump },
     { id: 'dungeon', label: 'Climb into the drainage channel.', detail: atDrain ? 'Dungeon Crawler Corn. Something has built stairs beneath the field.' : 'Return to the drainage channel after inspecting it.', disabled: !idle || !atDrain }
@@ -74,7 +74,7 @@ export function getRogueScene(s) {
   if (r.stage === 'intro') {
     if (r.route === 'corn') return {
       title: 'How long were you out?',
-      text: 'You wake between the rows, not knowing how long you were out. Your fingers have split into leaves. You feel an overwhelming urge to escape.',
+      text: 'Your exposure reached 100. You wake between the rows, not knowing how long you were out. Your fingers have split into leaves. You feel an overwhelming urge to escape.',
       options: [{ id: 'begin', label: 'Run for the road.' }, { id: 'root', label: 'Stay. Put down roots.', detail: 'End this assignment here.' }]
     };
     if (r.route === 'broadcast') return {

@@ -74,15 +74,12 @@ export class FieldMap {
     if(key===this.lastKey)return;this.lastKey=key;
     const q=id=>this.root.querySelector(`#${id}`), complete=investigationComplete(s),site=FIELD_SITES.find(p=>p.id===this.selected),quiet=this.route(s,'quiet'),direct=this.route(s,'direct'),here=nearbySite(s)?.id===site.id;
     const route=this.travel?{steps:this.travel.steps,exposure:this.travel.steps.reduce((total,p)=>total+fieldStepCost(s,p.x,p.y),0)}:this.route(s);
-    const returning=planFieldRoute({...s,player:site},FIELD_SITES.find(p=>p.id==='tower'));
-    const fatal=s.exposure+route.exposure>=100,unsafeReturn=s.exposure+route.exposure+returning.exposure>=100;
     this.root.querySelector('.field-protocol').disabled=paused;
     q('field-night').textContent=`NIGHT 0${s.shift+1}`;
     q('field-watch-record').hidden=!s.watch?.shots;
     if(s.watch?.shots){const record=watchSummary(s);q('field-watch-record').textContent=`Watch · ${record.score} pts ↗`;q('field-watch-record').setAttribute('aria-label',`Watch record. Grade ${record.grade}, ${record.score} points.`);q('field-watch-record').disabled=paused;}
     q('field-exposure-value').textContent=`${Math.floor(s.exposure)} / 100`;
     q('field-exposure-fill').style.width=`${s.exposure}%`;
-    this.root.classList.toggle('field-danger',s.exposure>=70);
     this.root.classList.toggle('is-walking',!!this.travel);
     for(const p of FIELD_SITES) {
       const done=s.inspected.includes(p.id),button=this.root.querySelector(`[data-value="${p.id}"]`);
@@ -109,9 +106,8 @@ export class FieldMap {
     q('field-direct-cost').textContent=`+${cost(direct.exposure)} exposure`;
     this.root.querySelectorAll('[data-action="field-style"]').forEach(b=>{b.setAttribute('aria-pressed',String(b.dataset.value===this.style));b.disabled=paused||!!this.travel;});
     this.root.querySelector('.field-route-options').hidden=here;
-    q('field-risk').textContent=fatal?'Exposure will reach 100. The field will change you.':unsafeReturn?'Too much exposure to make it back.':site.id==='tower'&&!complete?'Search all three sites before debrief.':'';
+    q('field-risk').textContent=site.id==='tower'&&!complete?'Search all three sites before debrief.':'';
     q('field-risk').hidden=!q('field-risk').textContent;
-    q('field-risk').classList.toggle('risky',fatal||unsafeReturn);
     const go=this.root.querySelector('.field-go');go.hidden=!!this.travel;
     go.textContent=here?(site.id==='tower'?(complete?'Debrief ↗':'Choose a landmark'):scene?scene.label:s.inspected.includes(site.id)?'Location searched':'Inspect'):(site.id==='tower'?'Return ↑':'Walk →');
     go.disabled=paused||(here&&(site.id==='tower'?!complete:s.inspected.includes(site.id)&&!scene));

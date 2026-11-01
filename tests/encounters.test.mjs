@@ -52,7 +52,7 @@ test('early recordings, twine, and compass unlock useful choices on later nights
 });
 
 test('a costly choice can transform the investigator cleanly; calming choices never produce negative exposure',()=>{
-  const s=field();s.exposure=98;trigger(s,'first-call');assert.match(encounterMarkup(s),/reaches 100/);
+  const s=field();s.exposure=98;trigger(s,'first-call');assert.doesNotMatch(encounterMarkup(s),/reaches 100|encounter-cost/);
   assert.equal(chooseFieldEncounter(s,'record'),true);assert.equal(s.phase,'rogue');assert.equal(s.rogue.route,'corn');assert.equal(s.fieldEvents.pending,null);assert.ok(restore(serialize(s)));
   const calm=field();trigger(calm,'extra-step');calm.exposure=1;chooseFieldEncounter(calm,'listen');assert.equal(calm.exposure,0);assert.equal(calm.fieldEvents.journal[0].delta,-1);
 });

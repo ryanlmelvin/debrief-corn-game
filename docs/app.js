@@ -279,7 +279,7 @@ function updateUI(force=false) {
   $('shift-number').textContent=`0${game.shift+1} / 03`;
   $('objective').textContent=field?(site?.label||'Find your way through.'):'Watch the corn.';
   $('objective-detail').textContent=field?(investigationComplete(game)?'Return to the watchtower.':'Follow the unread markers.'):'Shoot any that try to escape.';
-  $('stats').innerHTML=field?stat('EXPOSURE',Math.floor(game.exposure),' / 100',game.exposure,game.exposure>=70)+stat('SEARCHED',['corner','pump','drain'].filter(id=>game.inspected.includes(id)).length,'/ 3'):stat('RELIEF IN',Math.max(0,Math.ceil(SHIFT_LENGTH-game.time)),'sec',(SHIFT_LENGTH-game.time)/SHIFT_LENGTH*100)+stat('BREACHES',game.breaches,'/ 6',game.breaches/6*100,game.breaches>=3);
+  $('stats').innerHTML=field?stat('EXPOSURE',Math.floor(game.exposure),' / 100',game.exposure)+stat('SEARCHED',['corner','pump','drain'].filter(id=>game.inspected.includes(id)).length,'/ 3'):stat('RELIEF IN',Math.max(0,Math.ceil(SHIFT_LENGTH-game.time)),'sec',(SHIFT_LENGTH-game.time)/SHIFT_LENGTH*100)+stat('BREACHES',game.breaches,'/ 6',game.breaches/6*100,game.breaches>=3);
   const pressure=investigationPressure(game), pressureLayer=$('investigation-pressure');
   pressureLayer.hidden=!pressure||paused||!!game.practice;
   pressureLayer.classList.toggle('pressure-held',dialog.open||menuOpen());
@@ -446,7 +446,7 @@ function act(action,value) {
     if(action==='encounter-map')fieldMap.stop(game);
     if(action==='encounter-continue'&&journey&&!fieldMap.travel) {
       fieldMap.choose(game,journey.destination);fieldMap.style=journey.style;
-      if(!fieldMap.start(game))toast('The walk is no longer safe. Choose a lower-exposure route.');
+      if(!fieldMap.start(game))toast('The walk is unavailable right now.');
     }
     lastModalKey='';save();updateUI(true);return;
   }

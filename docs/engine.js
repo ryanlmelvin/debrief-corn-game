@@ -283,7 +283,6 @@ export function move(s, dx, dy) {
   const key = `${x},${y}`; if (!s.visited.includes(key)) s.visited.push(key);
   s.exposure = Math.min(100, s.exposure + fieldStepCost(s,x,y));
   if (s.fieldSteps === 5) addLog(s, 'The rows close behind you. Nothing here smells like rain.', 'story');
-  if (s.exposure >= 70 && !s.inspected.includes('warning')) { s.inspected.push('warning'); addLog(s, 'Your hands are cold. At 100 exposure, the field will change you.', 'alert'); }
   if (s.exposure >= 100) startRogue(s, 'corn');
   else if(!nearbySite(s))encounterAfterStep(s);
   return true;
