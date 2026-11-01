@@ -1,6 +1,6 @@
 import test, { after } from 'node:test';
 import assert from 'node:assert/strict';
-import { createGame, answer, advance, ENDINGS, FIELD_SITES, inspect, chooseFieldEncounter, continueFieldEncounter, eatCrop, endingId } from '../docs/engine.js';
+import { createGame, answer, advance, ENDINGS, FIELD_SITES, inspect, move, chooseFieldEncounter, continueFieldEncounter, eatCrop, endingId } from '../docs/engine.js';
 import { ENCOUNTERS, freshFieldEvents, encounterAfterStep, currentEncounter } from '../docs/encounters.js';
 import { startResolution, chooseResolution, getResolution } from '../docs/alternate-endings.js';
 import { guideTravel, guideRouteStatus, inspectGuide, focusGuide, fireGuide, spareGuide, guideDebrief, answerGuideDebrief } from '../docs/guide.js';
@@ -916,6 +916,171 @@ test('rogue entry and reversible introductions retain every unknown field outcom
       assert.equal(possibleChoiceEndings(game, 'rogue-choice', 'back'), null);
       assertTerminalHint(game, 'rogue-choice', 'root', 'assimilation');
     }
+  }
+});
+
+function contextualEncounter(id, exposure = 0, seed = 202) {
+  const game = createGame('story', seed), encounter = ENCOUNTERS.find(event => event.id === id);
+  Object.assign(game, { phase: 'field', entered: true, departure: 'chosen', shift: encounter.night,
+    exposure, player: { x: 4, y: 4 }, fieldSteps: encounter.step, fieldEvents: freshFieldEvents() });
+  // Earlier encounters are past. The target card is opened by the actual
+  // scheduler, then every tested route and outcome uses public game actions.
+  game.fieldEvents.seen = ENCOUNTERS.filter(event => event.night < encounter.night ||
+    event.night === encounter.night && event.step < encounter.step).map(event => event.id);
+  assert.equal(encounterAfterStep(game), true);
+  assert.equal(currentEncounter(game).id, id);
+  return game;
+}
+
+function assertOpenEntryHint(game, action, value) {
+  const all = Object.keys(ENDINGS), before = structuredClone(game);
+  assert.deepEqual(possibleChoiceEndings(game, action, value), sorted(all));
+  for (const ending of all) assert.equal(hasSeenChoiceEndings(game, action, value, historyExcept(ending)), false);
+  assert.equal(hasSeenChoiceEndings(game, action, value, all), true);
+  assert.deepEqual(game, before, 'contextual entry previews cannot change the live card, journal or testimony');
+}
+
+function finishBroadcast(game, ending) {
+  assert.equal(chooseRogue(game, 'begin'), true);
+  for (let lock = 0; lock < 3; lock++) {
+    let frames = 0;
+    do {
+      advance(game, .01);
+      assert.ok(frames++ < 1000);
+    } while (game.rogue.time < game.rogue.lockReadyAt || (ending === 'assimilation'
+      ? broadcastCursor(game) >= broadcastWindow(game).min - .01 && broadcastCursor(game) <= broadcastWindow(game).max + .01
+      : broadcastCursor(game) < broadcastWindow(game).min + .01 || broadcastCursor(game) > broadcastWindow(game).max - .01));
+    assert.equal(chooseRogue(game, 'lock'), true);
+  }
+  if (ending !== 'assimilation') assert.equal(chooseRogue(game, ending === 'radio_ghost' ? 'warn' : 'command'), true);
+  assert.equal(endingId(game), ending);
+}
+
+test('radio encounter choices retain real signal failures, both messages and withdrawal outcomes', () => {
+  for (const id of ['first-call', 'second-call', 'future-call']) {
+    const entry = contextualEncounter(id);
+    assert.ok(currentEncounter(entry).choices.some(choice => choice.id === 'broadcast'));
+    assertOpenEntryHint(entry, 'encounter-choice', 'broadcast');
+    for (const ending of ['radio_ghost', 'field_voice', 'assimilation']) {
+      const game = structuredClone(entry);
+      assert.equal(chooseFieldEncounter(game, 'broadcast'), true);
+      assert.equal(game.rogue.route, 'broadcast');
+      assertOpenEntryHint(game, 'rogue-choice', 'begin');
+      finishBroadcast(game, ending);
+      assert.equal(hasSeenChoiceEndings(entry, 'encounter-choice', 'broadcast', historyExcept(ending)), false);
+    }
+    const withdrew = structuredClone(entry);
+    assert.equal(chooseFieldEncounter(withdrew, 'broadcast'), true);
+    assertOpenEntryHint(withdrew, 'rogue-choice', 'back');
+    assert.equal(chooseRogue(withdrew, 'back'), true);
+    assert.equal(withdrew.phase, 'field');
+    assert.equal(withdrew.fieldEvents.journal.at(-1).choice, 'broadcast');
+    assert.equal(possibleChoiceEndings(withdrew, 'encounter-choice', 'broadcast'), null);
+    if (id === 'first-call') {
+      assert.equal(move(withdrew, 0, -1), true);
+      assert.equal(move(withdrew, -1, 0), true);
+      assert.ok(inspect(withdrew));
+      assert.equal(eatCrop(withdrew), true);
+      assert.equal(endingId(withdrew), 'consumption', 'release of the radio really returns to open field outcomes');
+      assert.equal(hasSeenChoiceEndings(entry, 'encounter-choice', 'broadcast', historyExcept('consumption')), false);
+    }
+  }
+});
+
+test('high-exposure encounter surrender retains all five Corn outcomes reached by actual inputs', () => {
+  for (const id of ['lamp-keeper', 'root-knot', 'your-outline']) {
+    const entry = contextualEncounter(id, 70);
+    assertOpenEntryHint(entry, 'encounter-choice', 'surrender');
+    const entered = structuredClone(entry);
+    assert.equal(chooseFieldEncounter(entered, 'surrender'), true);
+    assert.equal(entered.exposure, 100);
+    assert.equal(entered.rogue.route, 'corn');
+    assert.equal(possibleChoiceEndings(entered, 'rogue-choice', 'back'), null);
+    assertTerminalHint(entered, 'rogue-choice', 'root', 'assimilation');
+    for (const ending of transmissionExposureEndings) {
+      const game = structuredClone(entered);
+      finishExposedCorn(game, ending);
+      assert.equal(endingId(game), ending);
+      assert.equal(hasSeenChoiceEndings(entry, 'encounter-choice', 'surrender', historyExcept(ending)), false);
+    }
+  }
+});
+
+test('unavailable contextual encounter choices fail closed without changing saves or collection history', () => {
+  const locked = [
+    [contextualEncounter('lamp-keeper', 69.99), 'surrender'],
+    [contextualEncounter('root-knot', 69.99), 'surrender'],
+    [contextualEncounter('your-outline', 69.99), 'surrender'],
+    [contextualEncounter('paired-tracks', 90), 'surrender'],
+    [contextualEncounter('root-knot', 90), 'broadcast'],
+    [contextualEncounter('first-call'), 'unknown']
+  ];
+  const detour = contextualEncounter('second-call');
+  detour.fieldEvents.director = 1;
+  detour.fieldEvents.plan = freshFieldEvents(202).plan;
+  detour.fieldEvents.plan.find(event => event.id === 'second-call').detour = 1;
+  locked.push([detour, 'broadcast']);
+  for (const [game, value] of locked) {
+    const before = structuredClone(game);
+    assert.equal(possibleChoiceEndings(game, 'encounter-choice', value), null);
+    assert.equal(hasSeenChoiceEndings(game, 'encounter-choice', value, Object.keys(ENDINGS)), false);
+    assert.equal(chooseFieldEncounter(game, value), false);
+    assert.deepEqual(game, before);
+  }
+  const history = { collected: Object.keys(ENDINGS), runs: [{ reports: [{ answer: 'Earlier statement.' }] }] };
+  const priorHistory = structuredClone(history), random = Math.random;
+  let randomCalls = 0;
+  try {
+    Math.random = () => { randomCalls++; return .5; };
+    for (const [game, value] of [[contextualEncounter('first-call'), 'broadcast'], [contextualEncounter('root-knot', 70), 'surrender']]) {
+      const saved = JSON.stringify(game);
+      for (let preview = 0; preview < 3; preview++) {
+        assert.equal(hasSeenChoiceEndings(game, 'encounter-choice', value, history.collected), true);
+        assert.equal(JSON.stringify(game), saved);
+        assert.deepEqual(history, priorHistory);
+      }
+    }
+  } finally {
+    Math.random = random;
+  }
+  assert.equal(randomCalls, 0);
+});
+
+test('pump card entry retains real release failures, successful flooding and withdrawal to the location', () => {
+  const entry = createGame('story', 202);
+  Object.assign(entry, { phase: 'field', entered: true, departure: 'chosen', player: { x: 3, y: 3 } });
+  assert.ok(inspect(entry));
+  assertOpenEntryHint(entry, 'rogue-start', 'flood');
+  for (const ending of ['flood', 'breach', 'consumption']) {
+    const game = structuredClone(entry);
+    assert.equal(startRogue(game, 'flood'), true);
+    assertOpenEntryHint(game, 'rogue-choice', 'back');
+    if (ending === 'consumption') {
+      assert.equal(chooseRogue(game, 'back'), true);
+      assert.equal(eatCrop(game), true);
+    } else {
+      assert.equal(chooseRogue(game, 'begin'), true);
+      if (ending === 'flood') {
+        for (const [index, rotation] of [[3, 3], [0, 1], [1, 1], [2, 2], [5, 0]]) {
+          while (game.rogue.tiles[index] !== rotation) assert.equal(chooseRogue(game, `tile-${index}`), true);
+        }
+      }
+      assert.equal(floodConnections(game).connected, ending === 'flood');
+      for (let release = 0; release < (ending === 'flood' ? 1 : 3); release++) {
+        assert.equal(possibleChoiceEndings(game, 'rogue-choice', 'release'), null, 'a live puzzle control remains unmarked');
+        assert.equal(chooseRogue(game, 'release'), true);
+      }
+    }
+    assert.equal(endingId(game), ending);
+    assert.equal(hasSeenChoiceEndings(entry, 'rogue-start', 'flood', historyExcept(ending)), false);
+  }
+  for (const change of [game => game.player.x++, game => { game.inspected = []; }, game => { game.fieldEvents.pending = { id: 'first-call' }; }]) {
+    const game = structuredClone(entry);
+    change(game);
+    const before = structuredClone(game);
+    assert.equal(possibleChoiceEndings(game, 'rogue-start', 'flood'), null);
+    assert.equal(startRogue(game, 'flood'), false);
+    assert.deepEqual(game, before);
   }
 });
 

@@ -22,7 +22,7 @@ import { resolutionGameActive, resolutionGameAction, releaseResolutionGame } fro
 import { ResolutionGamesUI } from './resolution-games-ui.js';
 import { markSeenEndingChoices } from './seen-endings.js';
 import { startRogue, chooseRogue, moveRogue, getRogueScene, rogueOptions } from './rogue.js';
-import { RogueUI, rogueMenuMarkup } from './rogue-ui.js';
+import { RogueUI } from './rogue-ui.js';
 import { MINI_GAMES, createMiniGame, miniGameComplete, miniGameResult, getMiniGameUnlocks, normalizeMiniGameUnlocks } from './mini-games.js';
 import { InstallHandoff, recoverInstallHandoff, progressSnapshot, encodeProgress, decodeProgress, storeProgress, MAX_PROGRESS_BYTES } from './progress.js';
 
@@ -221,7 +221,7 @@ function returnToStory() {
     $('welcome').hidden=false;$('sidebar').hidden=true;$('pause').hidden=true;$('pause-layer').hidden=true;
     $('stats').hidden=true;$('tower-hud').hidden=true;$('watch-scoreboard').hidden=true;$('watch-radio').hidden=true;$('investigation-pressure').hidden=true;
     $('mini-game-return').hidden=true;$('dungeon-restart').hidden=true;
-    for(const id of ['notebook','menu-radio','assignment','protocol-menu','watch-record'])$(id).hidden=true;
+    for(const id of ['notebook','menu-radio','assignment','watch-record'])$(id).hidden=true;
     fieldMap.reset();$('field-exploration').hidden=true;rogueUI.render(null);resolutionUI.render(null);canvas.hidden=false;canvas.tabIndex=0;canvas.setAttribute('aria-hidden','false');
     saved=readSave();$('resume').hidden=!saved;$('save-status').textContent='STORY PROGRESS PRESERVED';syncAudio();$('new-game').focus({preventScroll:true});
   }
@@ -305,7 +305,6 @@ function updateUI(force=false) {
   $('stats').hidden=aftermath||game.phase==='resolution'||game.phase==='rogue';
   $('pause').hidden=game.phase==='ending';
   const phase=game.phase,field=phase==='field',site=nearbySite(game),active=phase==='tower';
-  $('protocol-menu').hidden=!field||!!game.practice;
   $('mini-game-return').hidden=!game.practice;
   $('dungeon-restart').hidden=!(dungeonPreview&&game.practice==='dungeon');
   $('date-label').textContent=`${DATES[game.shift]}, ████`;
@@ -441,13 +440,8 @@ function act(action,value) {
     fieldMap.stop(game);lastModalKey='';save();updateUI(true);
     $('rogue-play').focus({preventScroll:true});return;
   }
-  if(action==='rogue-menu'){
-    if(!game||game.phase!=='field'||paused||dialog.open||game.fieldEvents.pending)return;
-    fieldMap.stop(game);
-    showModal('rogue-menu',rogueMenuMarkup(game));save();return;
-  }
   if(action==='rogue-start'){
-    if(!game||game.phase!=='field'||paused||modalKind!=='rogue-menu')return;
+    if(value!=='flood'||!game||game.phase!=='field'||paused||menuOpen()||(dialog.open&&!['evidence','site-encounter','corn'].includes(modalKind)))return;
     if(!startRogue(game,value))return;
     fieldMap.stop(game);closeModal();lastModalKey='';save();updateUI(true);
     $('rogue-play').focus({preventScroll:true});return;
@@ -561,12 +555,12 @@ function act(action,value) {
   if(action==='move'){fieldMap.stop(game);const [dx,dy]=value.split(',').map(Number);move(game,dx,dy);}
   if(action==='site-scene') {
     const scene=currentSiteScene(game);
-    if(scene)showModal(scene.id==='cooking'?'corn':'site-encounter',paper(esc(scene.title),`<p>${esc(scene.text)}</p>${scene.note?`<p>${esc(scene.note)}</p>`:''}<div class="paper-actions">${scene.action?`<button class="primary" data-action="${esc(scene.action)}">${esc(scene.actionLabel)}</button>`:''}<button class="secondary" data-action="close">${esc(scene.closeLabel)}</button></div>`,nearbySite(game).label.toUpperCase()),scene.art);
+    if(scene)showModal(scene.id==='cooking'?'corn':'site-encounter',paper(esc(scene.title),`<p>${esc(scene.text)}</p>${scene.note?`<p>${esc(scene.note)}</p>`:''}<div class="paper-actions">${!rogueOptions(game).find(option=>option.id==='flood').disabled?'<button class="choice" data-action="rogue-start" data-value="flood"><span>Reverse the treatment pumps.</span></button>':''}${scene.action?`<button class="primary" data-action="${esc(scene.action)}">${esc(scene.actionLabel)}</button>`:''}<button class="secondary" data-action="close">${esc(scene.closeLabel)}</button></div>`,nearbySite(game).label.toUpperCase()),scene.art);
   }
   if(action==='eat-crop' && eatCrop(game))closeModal();
   if(action==='inspect'){
     const id=inspect(game)||(!rogueOptions(game).find(option=>option.id==='dungeon').disabled?evidenceAtSite('drain',game.shift):null);
-    if(id){const e=evidenceForState(game,id),scene=currentSiteScene(game);showModal('evidence',paper(esc(e.title),`<p class="eyebrow">${esc(e.code)}${e.variant?` · ${esc(e.canonicalTitle)}`:''} / ${esc(e.where.toUpperCase())}</p>${evidenceMount(id,game)}<p>${esc(e.text)}</p>${scene?`<p>${esc(scene.cue)}</p><button class="primary" data-action="site-scene">${esc(scene.label)}</button>`:''}${drainEntryMarkup(game)}<button class="primary" data-action="close">Close notebook ↗</button>`,'PRIVATE OBSERVATION'));}
+    if(id){const e=evidenceForState(game,id),scene=currentSiteScene(game);showModal('evidence',paper(esc(e.title),`<p class="eyebrow">${esc(e.code)}${e.variant?` · ${esc(e.canonicalTitle)}`:''} / ${esc(e.where.toUpperCase())}</p>${evidenceMount(id,game)}<p>${esc(e.text)}</p>${scene?`<p>${esc(scene.cue)}</p><button class="primary" data-action="site-scene">${esc(scene.label)}</button>`:''}${!rogueOptions(game).find(option=>option.id==='flood').disabled?'<p>The treatment pipes converge beneath the pump house. A valve can reverse their flow.</p><button class="choice" data-action="rogue-start" data-value="flood"><span>Reverse the treatment pumps.</span></button>':''}${drainEntryMarkup(game)}<button class="primary" data-action="close">Close notebook ↗</button>`,'PRIVATE OBSERVATION'));}
   }
   if(action==='debrief')beginDebrief(game);
   if(action==='restart'){if(game?.practice){launchMiniGame(game.practice,!!previewGame);return;}closeModal();begin(game.mode);return;}

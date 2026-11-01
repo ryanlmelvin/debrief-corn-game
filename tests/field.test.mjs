@@ -16,7 +16,7 @@ const site=id=>FIELD_SITES.find(p=>p.id===id);
 function walk(s,route) { for(const p of route.steps){assert.equal(move(s,p.x-s.player.x,p.y-s.player.y),true);settle(s);} }
 function controller(selected='corner',style='quiet') { return Object.assign(Object.create(FieldMap.prototype),{selected,style,travel:null,lastKey:''}); }
 
-test('an open discovery keeps its actual location selected until the card closes',()=>{
+test('the pump discovery keeps its location choice available after the card closes',()=>{
   const s=field(),c=controller('drain');
   Object.assign(s,{shift:1,player:{x:3,y:3},inspected:['corner']});
   c.lastInspected='corner';
@@ -27,20 +27,20 @@ test('an open discovery keeps its actual location selected until the card closes
     assert.equal(c.lastInspected,'corner','hold the recommendation change while either discovery or its follow-up is open');
   }
   c.updateSelection(s,false);
-  assert.equal(c.selected,'drain');
+  assert.equal(c.selected,'pump');
   assert.equal(c.lastInspected,'corner,pump');
   c.updateSelection(s,false);
-  assert.equal(c.selected,'drain');
+  assert.equal(c.selected,'pump');
 });
 
-test('closing the last discovery recommends the tower and preserves the player position',()=>{
+test('closing the drainage discovery keeps its local choice and preserves the player position',()=>{
   const s=field(),c=controller('drain');
   Object.assign(s,{player:{x:7,y:5},inspected:['corner','pump']});
   c.lastInspected='corner,pump';
   inspect(s);c.updateSelection(s,true);
   assert.equal(c.selected,'drain');
   c.updateSelection(s,false);
-  assert.equal(c.selected,'tower');
+  assert.equal(c.selected,'drain');
   assert.deepEqual(s.player,{x:7,y:5});
 });
 
@@ -144,6 +144,7 @@ test('the map shows the tunnel at an inspected drain and locks it without the la
     game.player={x:point.x,y:point.y};if(inspected)inspect(game);
     if(lantern)game.fieldEvents.flags.push('lantern');
     const map=new FieldMap(root);map.selected=location;map.render(game);
+    assert.equal(root.querySelector('#field-pumps').hidden,!(inspected&&location==='pump'));
     const button=root.querySelector('#field-dungeon');
     assert.equal(button.hidden,!(inspected&&location==='drain'));
     if(inspected&&location==='drain') {
@@ -154,5 +155,8 @@ test('the map shows the tunnel at an inspected drain and locks it without the la
       assert.equal(button.innerHTML.includes('Too dark without a lantern.'),!lantern);
       assert.doesNotMatch(button.innerHTML,/unattended|off the path|find and take/i);
     }
+    map.choose(game,'corner');
+    assert.equal(root.querySelector('#field-dungeon').hidden,true,'the tunnel cannot appear on another location card');
+    assert.equal(root.querySelector('#field-pumps').hidden,true,'the pumps cannot appear on another location card');
   }
 });

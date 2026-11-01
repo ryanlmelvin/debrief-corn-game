@@ -29,15 +29,16 @@ test('a real walk stops for an encounter, blocks movement, and resumes at the sa
 test('all twelve encounters have distinct beats, safe choices, and deterministic outcomes',()=>{
   assert.equal(new Set(ENCOUNTERS.map(e=>e.id)).size,12);
   for(const event of ENCOUNTERS)for(const option of event.choices){
-    const s=field();s.exposure=20;
+    const s=field();s.exposure=Math.max(20,option.minExposure||0);
     if(option.requires)s.fieldEvents.flags.push(option.requires);
     trigger(s,event.id);const before=s.exposure;
     assert.ok(currentEncounter(s).choices.some(c=>c.id===option.id));
-    assert.equal(chooseFieldEncounter(s,option.id),true);assert.equal(s.exposure,before+option.delta);
+    assert.equal(chooseFieldEncounter(s,option.id),true);assert.equal(s.exposure,option.route==='corn'?100:before+option.delta);
     assert.equal(s.fieldEvents.journal[0].choice,option.id);assert.ok(restore(serialize(s)));
     if(option.flag)assert.ok(s.fieldEvents.flags.includes(option.flag));
     const spent=s.exposure;assert.equal(chooseFieldEncounter(s,option.id),false);assert.equal(s.exposure,spent);
-    assert.equal(continueFieldEncounter(s),true);assert.equal(encounterAfterStep(s),false);
+    assert.equal(continueFieldEncounter(s),!option.route);assert.equal(encounterAfterStep(s),false);
+    if(option.route){assert.equal(s.phase,'rogue');assert.equal(s.rogue.route,option.route);}
   }
   for(const e of ENCOUNTERS){assert.equal(e.choices[0].delta,0);assert.equal(e.choices[0].requires,null);}
 });

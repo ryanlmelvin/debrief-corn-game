@@ -4,6 +4,8 @@ import { ENCOUNTER_DETOURS } from './encounter-detours.js';
 import { neededEncounterIds } from './ending-paths.js';
 // Original field encounters for the game adaptation. No source manuscript text.
 const choice=(id,label,delta,result,flag=null,requires=null)=>({id,label,delta,result,flag,requires});
+const broadcastChoice=()=>({...choice('broadcast','Transmit on every frequency.',0,'You hold the transmit switch. Every channel answers with your breathing.'),route:'broadcast'});
+const surrenderChoice=()=>({...choice('surrender','Stop resisting the field.',0,'You stop pulling away. The roots close around your boots.'),route:'corn',minExposure:70});
 const has=(s,flag)=>s.fieldEvents.flags.includes(flag);
 export const ENCOUNTERS=[
   {id:'first-call',night:0,step:3,art:'radio',title:'Your voice. From the soil.',
@@ -11,7 +13,8 @@ export const ENCOUNTERS=[
     report:'A radio in the soil spoke in my voice while my own set was silent.',choices:[
       choice('leave','Leave the set in the mud.',0,'You step past the half-buried radio. Your voice from its speaker keeps describing a place you have not reached yet.'),
       choice('answer','Ask it where you are.',3,'The voice from the half-buried radio gives your exact position, then whispers, “Do not turn around.” Leaves scrape together behind you. You do not look.','answered-radio'),
-      choice('record','Record the radio onto a tape.',5,'You press RECORD and capture a few seconds of your voice from the half-buried radio on your recorder. On playback, the voice stops speaking. The tape keeps running, recording your breathing. You stop it, rewind, and keep the tape in your recorder.','recording')
+      choice('record','Record the radio onto a tape.',5,'You press RECORD and capture a few seconds of your voice from the half-buried radio on your recorder. On playback, the voice stops speaking. The tape keeps running, recording your breathing. You stop it, rewind, and keep the tape in your recorder.','recording'),
+      broadcastChoice()
     ]},
   {id:'paired-tracks',night:0,step:9,art:'tracks',title:'Someone is keeping pace.',
     text:'You find a second trail of boot prints beside your own. Each print has the same split at the heel as your boots. You take one step. A shallow print fills with water a little farther ahead.',
@@ -40,7 +43,8 @@ export const ENCOUNTERS=[
     report:'The field radio played sounds from my previous investigation.',choices:[
       choice('disconnect','Disconnect the loose microphone.',0,'You unplug the microphone from the half-buried radio. The sound of footsteps continues through the empty connector.'),
       choice('mislead','Give it a false direction.',3,'You tell the half-buried radio you are heading west. A whole row bends westward. You go the other way.','false-direction'),
-      choice('compare','Play last night’s radio tape beside it.',-3,'You rewind the tape you made here last night and play it beside the half-buried radio. The recorded voice and the radio voice cancel into a thin whistle. For a few seconds the field sounds like an ordinary field. You use the silence to get your bearings.','verified-voice','recording')
+      choice('compare','Play last night’s radio tape beside it.',-3,'You rewind the tape you made here last night and play it beside the half-buried radio. The recorded voice and the radio voice cancel into a thin whistle. For a few seconds the field sounds like an ordinary field. You use the silence to get your bearings.','verified-voice','recording'),
+      broadcastChoice()
     ]},
   {id:'moved-crossing',night:1,step:9,art:'moved-crossing',title:'The crossing has moved.',
     text:s=>has(s,'twine')?'You reach a crossing between the corn rows. The survey twine you tied last night hangs from a stalk. But this crossing should be two rows farther west. The cut end of the twine is growing pale roots.':'You reach two crossings between the corn rows, although your map shows only one. Your boot prints lead into both crossings. No prints come out.',
@@ -54,7 +58,8 @@ export const ENCOUNTERS=[
     report:'A figure beside a lantern said it was my relief. The voice came from a corn stalk.',choices:[
       choice('back','Back away with the light held steady.',0,'The figure beside the lantern does not follow. Its shadow reaches the crossing before you do.'),
       choice('ask','Ask who sent the relief.',4,'The figure beside the lantern gives your name. Then the name of the person who trained you. You have never spoken that name here.','named'),
-      choice('hand','Offer a hand to pull it free.',7,'The figure beside the lantern closes a cold hand around your fingers. Its boots stay in the soil. When you let go, your palm smells of wet grain.','touched')
+      choice('hand','Offer a hand to pull it free.',7,'The figure beside the lantern closes a cold hand around your fingers. Its boots stay in the soil. When you let go, your palm smells of wet grain.','touched'),
+      surrenderChoice()
     ]},
   {id:'two-towers',night:1,step:23,art:'two-towers',title:'Two lights above the rows.',
     text:'You see two tower lights through the crop, although there should only be one watchtower. From one comes the radio call you expected. From the other comes the sound of someone climbing your ladder.',
@@ -68,21 +73,24 @@ export const ENCOUNTERS=[
     report:'Before the investigation was finished, the radio played a debrief about this same night.',choices:[
       choice('stop','Break off the transmission.',0,'The recorded interview from the half-buried radio stops. For a moment, you can still hear the supervisor breathing.'),
       choice('record','Record the interview that has not happened.',4,'You record the interview playing from the half-buried radio. On playback, the voice that sounds like yours asks why the interview-room door is locked.','future-recording'),
-      choice('compare','Compare it with the first night’s tape.',-3,'Under the first night’s recording and the recorded interview is the same small click. The sound of your thumb releasing the switch, a second before you release it. You keep your hand away from the radio.','verified-future','recording')
+      choice('compare','Compare it with the first night’s tape.',-3,'Under the first night’s recording and the recorded interview is the same small click. The sound of your thumb releasing the switch, a second before you release it. You keep your hand away from the radio.','verified-future','recording'),
+      broadcastChoice()
     ]},
   {id:'root-knot',night:2,step:9,art:'root-knot',title:'The path has a pulse.',
     text:'You find a knot of pale roots across the furrow where the second trail of boot prints used to be. The smallest threads tighten, then loosen. They have wound themselves around the shape of an empty shoe.',
     report:'Roots across the path tightened around the shape of an empty shoe.',choices:[
       choice('around','Step around without touching the roots.',0,'The pale roots loosen as your shadow passes over the knot. You keep walking.'),
       choice('lift','Lift the knot with a fallen stalk.',5,'You lift the knot of roots with the fallen stalk. The roots hold the shape of an empty shoe. Beneath the roots is a print from the sole of your own boot.','lifted-roots'),
-      choice('twine','Lay your survey twine across the knot.',-3,'The root tips follow your survey twine away from your boots. You leave it stretched across the furrow and take the clear ground.','led-roots','twine')
+      choice('twine','Lay your survey twine across the knot.',-3,'The root tips follow your survey twine away from your boots. You leave it stretched across the furrow and take the clear ground.','led-roots','twine'),
+      surrenderChoice()
     ]},
   {id:'your-outline',night:2,step:16,art:'your-outline',title:'Your coat. Your height.',
     text:s=>has(s,'touched')?'You see the figure you tried to pull free of the soil last night. It stands behind the lantern and holds up a hand. Your palm aches where the figure gripped it. The figure is wearing a coat identical to yours.':'You see a figure with your height and build standing beyond the lantern, facing away. The figure wears a coat identical to yours, down to the pale repair on the sleeve. Its shoulders rise when you breathe.',
     report:'A figure in the field wore a coat with the same repair as mine and moved with my breathing.',choices:[
       choice('ground','Keep the beam on the ground and pass.',0,'You watch your boots until the lantern is behind you. There are only two feet in the light.'),
       choice('name','Call your own name.',4,'The figure in the matching coat turns its head a little too far. From behind you, your voice says, “Here.”','called-name'),
-      choice('stand','Stand beside the outline.',7,'You stand beside the figure in the matching coat. For one breath, you cannot tell which shadow is yours. You step away. One of the shadows stays.','stood-beside')
+      choice('stand','Stand beside the outline.',7,'You stand beside the figure in the matching coat. For one breath, you cannot tell which shadow is yours. You step away. One of the shadows stays.','stood-beside'),
+      surrenderChoice()
     ]},
   {id:'last-follower',night:2,step:23,art:'last-follower',title:'Something wants to come back.',
     text:s=>has(s,'looked-back')?'As you approach the watchtower, you see a corn stalk bend behind you, like the stalk you caught straightening when you turned your light on the first night. Your radio says, very quietly, “Hold the door.”':'As you approach the watchtower, the radio on your belt speaks without static. “Hold the door.” Behind you, the dry leaves start moving against the wind.',
@@ -118,7 +126,7 @@ export function encounterForState(s,id) {
   const presentation=flavor?{
     ...event,title:flavor.title,text:flavor.text,report:flavor.report,shortReport:flavor.shortReport,art:flavor.art,
     // Only presentation fields may be overridden. Mechanics stay canonical.
-    choices:event.choices.map(c=>({...c,label:flavor.choices[c.id].label,result:flavor.choices[c.id].result,shortLabel:flavor.choices[c.id].shortLabel}))
+    choices:event.choices.map(c=>({...c,...(flavor.choices[c.id]?{label:flavor.choices[c.id].label,result:flavor.choices[c.id].result,shortLabel:flavor.choices[c.id].shortLabel}:{})}))
   }:event;
   let text=typeof presentation.text==='function'?presentation.text(s):presentation.text;
   if(id==='second-call'&&has(s,'recording'))text+=' Your recorder still holds the tape you made of this radio last night. You could play it back beside the speaker.';
@@ -140,7 +148,7 @@ export function encounterAfterStep(s) {
 export function currentEncounter(s) {
   const pending=s.fieldEvents?.pending,event=pending&&encounterForState(s,pending.id);
   if(!event)return null;
-  return {...event,choices:event.choices.filter(c=>!c.requires||has(s,c.requires))};
+  return {...event,choices:event.choices.filter(c=>(!c.requires||has(s,c.requires))&&(c.minExposure===undefined||s.exposure>=c.minExposure))};
 }
 export function encounterAudioCue(s) {
   const pending=s?.phase==='field'?s.fieldEvents?.pending:null;

@@ -12,7 +12,7 @@ const cost=n=>(Math.ceil(n*10)/10).toFixed(1);
 export class FieldMap {
   constructor(root) {
     this.root=root;this.selected=null;this.style='quiet';this.travel=null;this.lastKey='';
-    root.innerHTML=`<header class="field-heading"><button class="field-protocol" data-action="rogue-menu">Break protocol ↗</button><p class="eyebrow" id="field-night"></p><button id="field-watch-record" class="watch-record-link" data-action="watch-record" hidden></button><div class="field-exposure"><span>EXPOSURE <b id="field-exposure-value"></b></span><div class="field-meter"><i id="field-exposure-fill"></i></div></div></header>
+    root.innerHTML=`<header class="field-heading"><p class="eyebrow" id="field-night"></p><button id="field-watch-record" class="watch-record-link" data-action="watch-record" hidden></button><div class="field-exposure"><span>EXPOSURE <b id="field-exposure-value"></b></span><div class="field-meter"><i id="field-exposure-fill"></i></div></div></header>
       <div class="field-board"><span class="field-north" aria-label="North">N<svg viewBox="0 0 24 32" aria-hidden="true"><path d="M12 1L21 29L12 23L3 29Z" fill="#e8e3c9" stroke="currentColor" stroke-width="1.5"/><path d="M12 1V23L3 29Z" fill="currentColor"/></svg></span><div class="field-map-surface">
         <svg viewBox="-.5 -.5 11 9" preserveAspectRatio="none" aria-hidden="true"><defs><pattern id="corn-rows" width="1" height="1" patternUnits="userSpaceOnUse"><path d="M.2 .15L.15 .8M.55 .15L.5 .8M.85 .15L.8 .8" stroke="#768352" stroke-opacity=".18" stroke-width=".025"/></pattern></defs><rect x="-.5" y="-.5" width="11" height="9" fill="url(#corn-rows)"/>
         ${FIELD_PATHS.map(points=>`<polyline points="${points.map(p=>p.join(',')).join(' ')}" class="field-path"/>`).join('')}<g id="field-footprints"></g><polyline id="field-route" class="field-route"/><g id="field-traces"></g></svg>
@@ -23,6 +23,7 @@ export class FieldMap {
         <div class="field-route-options" role="group" aria-label="Choose your route"><button data-action="field-style" data-value="quiet"><b>Follow paths</b><span id="field-quiet-cost"></span></button><button data-action="field-style" data-value="direct"><b>Cut through rows</b><span id="field-direct-cost"></span></button></div>
         <p id="field-risk" role="status"></p><button class="field-go" data-action="field-go"></button><button class="field-stop" data-action="field-stop" hidden>Stop</button>
         <button id="field-dungeon" class="secondary" data-action="dungeon-enter" hidden>Follow the drain below ground ↘</button>
+        <button id="field-pumps" class="secondary" data-action="rogue-start" data-value="flood" hidden>Reverse the treatment pumps.</button>
       </section>`;
   }
   reset() { this.selected=null;this.travel=null;this.lastKey=''; }
@@ -65,7 +66,8 @@ export class FieldMap {
       return;
     }
     if(!this.selected&&s.fieldEvents.journey){this.selected=s.fieldEvents.journey.destination;this.style=s.fieldEvents.journey.style;}
-    if(!this.selected||(s.inspected.includes(this.selected)&&!this.travel&&this.lastInspected!==s.inspected.join(',')))this.selected=this.recommend(s);
+    const locationChoice=this.selected===nearbySite(s)?.id&&s.inspected.includes(this.selected)&&['pump','drain'].includes(this.selected);
+    if(!this.selected||(s.inspected.includes(this.selected)&&!this.travel&&this.lastInspected!==s.inspected.join(',')&&!locationChoice))this.selected=this.recommend(s);
     this.lastInspected=s.inspected.join(',');
   }
   render(s,paused=false,holdDiscovery=false) {
@@ -76,7 +78,6 @@ export class FieldMap {
     if(key===this.lastKey)return;this.lastKey=key;
     const q=id=>this.root.querySelector(`#${id}`), complete=investigationComplete(s),site=FIELD_SITES.find(p=>p.id===this.selected),quiet=this.route(s,'quiet'),direct=this.route(s,'direct'),here=nearbySite(s)?.id===site.id;
     const route=this.travel?{steps:this.travel.steps,exposure:this.travel.steps.reduce((total,p)=>total+fieldStepCost(s,p.x,p.y),0)}:this.route(s);
-    this.root.querySelector('.field-protocol').disabled=paused;
     q('field-night').textContent=`NIGHT 0${s.shift+1}`;
     q('field-watch-record').hidden=!s.watch?.shots;
     if(s.watch?.shots){const record=watchSummary(s);q('field-watch-record').textContent=`Watch · ${record.score} pts ↗`;q('field-watch-record').setAttribute('aria-label',`Watch record. Grade ${record.grade}, ${record.score} points.`);q('field-watch-record').disabled=paused;}
@@ -114,11 +115,13 @@ export class FieldMap {
     go.textContent=here?(site.id==='tower'?(complete?'Debrief ↗':'Choose a landmark'):scene?scene.label:s.inspected.includes(site.id)?'Location searched':'Inspect'):(site.id==='tower'?'Return ↑':'Walk →');
     go.disabled=paused||(here&&(site.id==='tower'?!complete:s.inspected.includes(site.id)&&!scene));
     const stop=this.root.querySelector('.field-stop');stop.hidden=!this.travel;stop.disabled=paused;
-    // The next suggested landmark can change as soon as the drain is inspected.
-    // Keep its new passage available at the player's actual location.
+    // Each location action stays on its own card, even after inspection.
     const dungeon=q('field-dungeon');
-    dungeon.hidden=nearbySite(s)?.id!=='drain'||!s.inspected.includes('drain')||!!this.travel;
+    dungeon.hidden=!here||site.id!=='drain'||!s.inspected.includes('drain')||!!this.travel;
     dungeon.innerHTML=drainEntryContent(s);
     dungeon.disabled=paused||rogueOptions(s).find(option=>option.id==='dungeon').disabled;
+    const pumps=q('field-pumps');
+    pumps.hidden=!here||site.id!=='pump'||rogueOptions(s).find(option=>option.id==='flood').disabled||!!this.travel;
+    pumps.disabled=paused||!!s.fieldEvents.pending||!!s.expedition?.active;
   }
 }

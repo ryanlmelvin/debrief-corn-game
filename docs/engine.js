@@ -9,7 +9,7 @@ import { witnessRequirements, canTakeEvidenceOutside, retirePreparations } from 
 import { fieldStepCost } from './field.js';
 import { EVIDENCE, evidenceForState, evidenceAtSite, freshEvidenceScenes, migrateEvidenceScenes, validEvidenceScenes } from './evidence-scenes.js';
 import { freshSiteStories, siteScene, migrateSiteStories, validSiteStories } from './site-encounters.js';
-import { freshFieldEvents, encounterAfterStep, resolveEncounter, dismissEncounter, migrateFieldEvents, validFieldEvents, encounterById, encounterForState } from './encounters.js';
+import { freshFieldEvents, encounterAfterStep, currentEncounter, resolveEncounter, dismissEncounter, migrateFieldEvents, validFieldEvents, encounterById, encounterForState } from './encounters.js';
 import { RELOAD_DURATION, RELOAD_WINDOW_MIN, RELOAD_WINDOW_MAX, FLARE_DURATION, FLARE_SLOWDOWN, RUSH_DURATION, RUSH_BONUS, CROP_VARIANTS, freshWatch, watchFeedback, watchWave, bellStatus, migrateWatch, validWatch } from './watch-play.js';
 export { bellStatus } from './watch-play.js';
 // All simulation and story state lives here. Rendering and storage are separate.
@@ -290,9 +290,12 @@ export function move(s, dx, dy) {
   return true;
 }
 export function chooseFieldEncounter(s,id) {
+  const route=currentEncounter(s)?.choices.find(option=>option.id===id)?.route;
+  if(route&&(s.rogue!==undefined||s.expedition?.active))return false;
   if(!resolveEncounter(s,id))return false;
   addLog(s,'An encounter between the rows is retained in your private notebook.','story');
   if(s.exposure>=100)startRogue(s,'corn');
+  else if(route){dismissEncounter(s);startRogue(s,route);}
   return true;
 }
 export function continueFieldEncounter(s) { return dismissEncounter(s); }

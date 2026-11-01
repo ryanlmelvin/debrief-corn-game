@@ -1,4 +1,4 @@
-import { rogueOptions, getRogueScene, cornHazards, broadcastCursor, broadcastWindow, floodConnections } from './rogue.js';
+import { getRogueScene, cornHazards, broadcastCursor, broadcastWindow, floodConnections } from './rogue.js';
 import { pressureWordMarkup } from './pressure-word.js';
 import { dungeonMarkup, renderDungeon } from './dungeon-ui.js';
 
@@ -10,10 +10,6 @@ const CORN = `<svg class="rogue-corn-body" x="-.52" y="-1.58" width="1.14" heigh
 const trafficCrossing = r => r.patternVersion === 2 && r.crossing === 2;
 const escapeWordMarkup = () => `<span class="rogue-escape-word"><span class="sr-only">escape</span>${pressureWordMarkup('escape')}</span>`;
 
-
-export function rogueMenuMarkup(game) {
-  return `<article class="paper rogue-menu-sheet"><button id="dialog-update" class="secondary" data-update hidden>Update ready. Download?</button><div class="paper-top"><span>STATION 04</span><span>BREAK PROTOCOL</span></div><h2 id="dialog-title" tabindex="-1">There are other ways out.</h2><p class="rogue-menu-note">The orders did not account for this.</p><section class="choices" aria-label="Ways to break protocol">${rogueOptions(game).map(option => `<button class="choice" data-action="rogue-start" data-value="${escape(option.id)}" ${option.disabled ? 'disabled' : ''}><span>${escape(option.label)}</span><small>${escape(option.detail || '')}</small></button>`).join('')}</section><button class="secondary" data-action="close">Stay on assignment</button></article>`;
-}
 
 function sceneMarkup(game) {
   const r = game.rogue, scene = getRogueScene(game);

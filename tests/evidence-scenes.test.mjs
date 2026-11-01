@@ -119,6 +119,7 @@ test('the first card shown by the inspect action uses the saved scene rather tha
     };
     vm.runInNewContext(source.slice(start, end), context);
     assert.equal(card.kind, 'evidence');
+    assert.equal(card.body.includes('data-action="rogue-start" data-value="flood"'), siteId === 'pump');
     assert.equal(card.body.includes('data-action="dungeon-enter"'), siteId === 'drain');
     if(siteId==='drain') {
       const entry=drainEntryMarkup(game);

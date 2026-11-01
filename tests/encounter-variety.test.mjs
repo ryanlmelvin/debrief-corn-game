@@ -28,7 +28,7 @@ const field = (seed = 42) => {
   delete game.fieldEvents.director;
   return game;
 };
-const mechanics = event => ({ id: event.id, night: event.night, choices: event.choices.map(({ id, delta, flag, requires }) => ({ id, delta, flag, requires })) });
+const mechanics = event => ({ id: event.id, night: event.night, choices: event.choices.map(({ id, delta, flag, requires, route, minExposure }) => ({ id, delta, flag, requires, route, minExposure })) });
 
 function resume(game) {
   const restored = restore(serialize(game));
@@ -88,7 +88,7 @@ test('every presentation keeps all canonical choices, costs, prerequisites and e
       titles.add(presentation.title); illustrations.add(presentation.art);
       for (const option of event.choices) {
         const copy = structuredClone(game);
-        copy.exposure = 20;
+        copy.exposure = Math.max(20, option.minExposure || 0);
         trigger(copy, event.id);
         if (option.requires) {
           assert.equal(currentEncounter(copy).choices.some(choice => choice.id === option.id), false);
@@ -97,7 +97,7 @@ test('every presentation keeps all canonical choices, costs, prerequisites and e
         }
         assert.ok(currentEncounter(copy).choices.some(choice => choice.id === option.id));
         assert.equal(chooseFieldEncounter(copy, option.id), true);
-        assert.equal(copy.exposure, 20 + option.delta);
+        assert.equal(copy.exposure, option.route === 'corn' ? 100 : Math.max(20, option.minExposure || 0) + option.delta);
         assert.deepEqual(copy.fieldEvents.journal.map(entry => [entry.id, entry.choice]), [[event.id, option.id]]);
         if (option.flag) assert.ok(copy.fieldEvents.flags.includes(option.flag));
         resume(copy);

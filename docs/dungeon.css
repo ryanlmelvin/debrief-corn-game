@@ -1,5 +1,5 @@
 /* Keep the crawl on screen; explanations live behind the help button. */
-#field-dungeon{width:100%;margin-top:8px;min-height:44px}
+#field-dungeon,#field-pumps{width:100%;margin-top:8px;min-height:44px}
 #rogue-play[data-route="dungeon"][data-stage="play"]{padding:60px max(14px,env(safe-area-inset-right)) max(10px,env(safe-area-inset-bottom)) max(14px,env(safe-area-inset-left));overflow:auto}
 .dungeon-playing .masthead .wordmark{font-size:12px;letter-spacing:2px;opacity:.6}
 .dungeon-playing .masthead .wordmark svg{height:20px;width:15px}
