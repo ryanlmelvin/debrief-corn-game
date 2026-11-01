@@ -17,7 +17,7 @@ function harness(storage=new Map(), unlocked=MINI_GAMES.map(entry=>entry.id)) {
     return elements.get(id);
   };
   const history=JSON.parse(storage.get('history')||JSON.stringify({collected:[],runs:[],miniGames:unlocked}));
-  const context=vm.createContext({storage,updates,restore,serialize,createMiniGame,MINI_GAMES,miniGameComplete,getMiniGameUnlocks,normalizeMiniGameUnlocks,game:null,saved:null,paused:false,dungeonPreview:false,previewGame:null,miniGameUnlocksDirty:false,
+  const context=vm.createContext({storage,updates,restore,serialize,createMiniGame,MINI_GAMES,miniGameComplete,getMiniGameUnlocks,normalizeMiniGameUnlocks,game:null,saved:null,paused:false,dungeonPreview:false,previewGame:null,playtest:false,miniGameUnlocksDirty:false,
     storyBeforePractice:null,practiceReturnToGame:false,practiceReturnPaused:false,SAVE_KEY:'story',MINI_GAME_KEY:'practice',HISTORY_KEY:'history',
     lastModalKey:'',lastControlsKey:'',storageWarned:false,$:element,canvas:element('canvas'),
     localStorage:{getItem:key=>storage.get(key)??null,setItem:(key,value)=>storage.set(key,value),removeItem:key=>storage.delete(key)},
@@ -247,4 +247,58 @@ test('practice dungeon interview saves and resumes separately from the suspended
   reloaded.run('returnToStory()');
   assert.equal(serialize(reloaded.context.game),original);
   assert.equal(reloaded.storage.has('practice'),false);
+});
+
+test('browser playtest enables every catalog game and resume without earning story unlocks',()=>{
+  const h=harness(new Map(),[]);h.context.playtest=true;
+  h.run('showMiniGames()');
+  assert.match(h.context.modal.html,/Mini games · Playtest/);
+  assert.match(h.context.modal.html,/Test progress is separate/);
+  assert.doesNotMatch(h.context.modal.html,/ disabled>/);
+  for(const entry of MINI_GAMES){
+    h.context.requested=entry.id;h.run('launchMiniGame(requested);save()');
+    assert.equal(h.context.game.practice,entry.id);
+    const reloaded=harness(h.storage,[]);reloaded.context.playtest=true;
+    assert.equal(reloaded.run('readMiniGame().game.practice'),entry.id);
+    assert.equal(harness(h.storage,[]).run('readMiniGame()'),null,'normal mode still requires earned access');
+  }
+  assert.deepEqual(h.context.history,{collected:[],runs:[],miniGames:[]});
+  assert.equal(h.storage.has('history'),false);
+  assert.equal(h.storage.has('story'),false);
+});
+
+const playtestCode=source.slice(source.indexOf('function browserPlaytestEnabled()'),source.indexOf('const isInstalled ='));
+function playtestSettings(url,storage=new Map(),blocked=false){
+  const location=new URL(url);
+  const context=vm.createContext({location,URL,URLSearchParams,$:()=>({}),document:{},localStorage:{
+    getItem(key){if(blocked)throw Error('Storage unavailable');return storage.get(key)??null;},
+    setItem(key,value){if(blocked)throw Error('Storage unavailable');storage.set(key,value);},
+    removeItem(key){if(blocked)throw Error('Storage unavailable');storage.delete(key);}
+  }});
+  vm.runInContext(playtestCode,context);
+  return JSON.parse(vm.runInContext('JSON.stringify({playtest,previewGame,HISTORY_KEY,SAVE_KEY,MINI_GAME_KEY,progressPath})',context));
+}
+
+test('playtest opt-in persists for this site and isolates saves, history, practice and handoff',()=>{
+  const url='https://example.test/debrief/', storage=new Map();
+  const normal=playtestSettings(url,storage), enabled=playtestSettings(`${url}?playtest=1`,storage);
+  assert.equal(normal.playtest,false);assert.equal(enabled.playtest,true);
+  for(const key of ['HISTORY_KEY','SAVE_KEY','MINI_GAME_KEY','progressPath'])assert.notEqual(enabled[key],normal[key],key);
+  assert.deepEqual(playtestSettings(url,storage),enabled,'the tab keeps all games available after reload or visiting home');
+  assert.equal(playtestSettings('https://example.test/another-game/',storage).playtest,false);
+  assert.deepEqual(playtestSettings(`${url}?playtest=0`,storage),normal,'exiting restores the original save namespace');
+  assert.deepEqual(playtestSettings(url,storage),normal,'the exit persists');
+});
+
+test('playtest tolerates unavailable storage and preserves existing localhost preview namespaces',()=>{
+  const url='https://example.test/debrief/';
+  assert.equal(playtestSettings(`${url}?playtest=1`,new Map(),true).playtest,true);
+  assert.equal(playtestSettings(url,new Map(),true).playtest,false);
+  for(const id of ['dungeon','rescue','transmission']){
+    const local=playtestSettings(`http://localhost:4317/?preview=${id}`);
+    assert.equal(local.previewGame,id);assert.equal(local.playtest,false);
+    assert.equal(local.SAVE_KEY,`debrief-save-v1:/:${id}-preview`);
+    assert.equal(local.progressPath,`/${id}-preview/`);
+    assert.equal(playtestSettings(`${url}?preview=${id}`).previewGame,null,'published preview links keep their existing restriction');
+  }
 });

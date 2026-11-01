@@ -36,17 +36,31 @@ const menu=$('game-menu');
 const menuOpen=()=>menu.matches(':popover-open');
 menu.addEventListener('toggle',()=>{if(menuOpen()){releaseResolutionGame(game);save();}syncAudio();});
 menu.addEventListener('click',event=>{if(event.target.closest('button')&&!event.target.closest('[popovertarget]'))menu.hidePopover();});
+function browserPlaytestEnabled() {
+  const requested=new URLSearchParams(location.search).get('playtest');
+  const key=`debrief-playtest-v1:${new URL('.',location.href).pathname}`;
+  try{
+    if(requested==='1')localStorage.setItem(key,'1');
+    else if(requested==='0')localStorage.removeItem(key);
+    return requested==='1'||(requested!=='0'&&localStorage.getItem(key)==='1');
+  }catch{return requested==='1';}
+}
+const playtest=browserPlaytestEnabled();
 const previewRequested=new URLSearchParams(location.search).get('preview');
 const previewGame=['localhost','127.0.0.1','[::1]'].includes(location.hostname)&&['dungeon','rescue','transmission'].includes(previewRequested)?previewRequested:null;
 const dungeonPreview=previewGame==='dungeon';
-const previewSuffix=previewGame?`:${previewGame}-preview`:'';
+const previewSuffix=previewGame?`:${previewGame}-preview`:playtest?':playtest':'';
 $('dungeon-restart').hidden=!dungeonPreview;
 const HISTORY_KEY=`debrief-history-v1:${new URL('.',location.href).pathname}${previewSuffix}`;
 const SAVE_KEY=`debrief-save-v1:${new URL('.',location.href).pathname}${previewSuffix}`;
 const MINI_GAME_KEY=`debrief-mini-game-v1:${new URL('.',location.href).pathname}${previewSuffix}`;
 let storyBeforePractice=null, practiceReturnToGame=false, practiceReturnPaused=false;
 const progressKeys={save:SAVE_KEY,history:HISTORY_KEY};
-const progressPath=new URL('.',location.href).pathname + (previewGame ? `${previewGame}-preview/` : '');
+const progressPath=new URL('.',location.href).pathname + (previewGame ? `${previewGame}-preview/` : playtest?'playtest/':'');
+if(playtest){
+  document.title='DEBRIEF — Playtest';
+  $('mini-games').textContent='Mini games · All unlocked';
+}
 const isInstalled = () => window.matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
 const installHandoff=new InstallHandoff(document,progressPath,isInstalled);
 let game=null, paused=false, modalKind='', lastModalKey='', lastControlsKey='', lastLog='', lastFrame=0, lastSave=0, lastUI=0, toastTimer, installPrompt=null;
@@ -165,7 +179,7 @@ function readMiniGame() {
   try{
     const session=JSON.parse(localStorage.getItem(MINI_GAME_KEY));
     const restored=restore(session?.game);
-    if(!restored?.practice||(!history.miniGames.includes(restored.practice)&&!(previewGame&&restored.practice===previewGame)))return null;
+    if(!restored?.practice||(!playtest&&!history.miniGames.includes(restored.practice)&&!(previewGame&&restored.practice===previewGame)))return null;
     return {game:restored,returnToGame:session.returnToGame===true,returnPaused:session.returnPaused===true};
   }catch{return null;}
 }
@@ -176,14 +190,14 @@ function showMiniGames() {
   save();
   const art={watch:'watch-corn',corn:'field-corner',broadcast:'encounter-radio',flood:'field-pump',dungeon:'field-drain',rescue:'ending-rescue',transmission:'ending-transmission'};
   const cards=MINI_GAMES.map(entry=>{
-    const unlocked=history.miniGames.includes(entry.id);
+    const unlocked=playtest||history.miniGames.includes(entry.id);
     const status=unlocked?'<span class="mini-game-status" aria-hidden="true">↗</span>':'<span class="mini-game-status"><svg viewBox="0 0 20 24" aria-hidden="true"><path d="M5 10V6a5 5 0 0 1 10 0v4M2 10h16v12H2z"/><path d="M10 14v4"/></svg><span>Locked</span></span>';
     return `<button class="mini-game-card${unlocked?'':' is-locked'}" data-action="mini-game-start" data-value="${entry.id}"${unlocked?'':' disabled'}><span class="mini-game-thumb" style="background-image:url('./assets/${art[entry.id]}.webp')" aria-hidden="true"></span><span><b>${esc(entry.title)}</b><small>${unlocked?esc(entry.description):'Reach it in the story to unlock.'}</small></span>${status}</button>`;
   }).join('');
-  showModal('mini-games',miniGamePaper('Mini games',`<p class="small">Reach games in the story to unlock practice. Practice doesn’t award endings.</p><div class="mini-game-list">${cards}</div><div class="paper-actions">${game?.practice?'<button class="secondary" data-action="mini-game-return">Return to story</button>':''}<button class="secondary" data-action="close">${game?.practice&&!miniGameComplete(game)?'Back to practice':'Close'}</button></div>`));
+  showModal('mini-games',miniGamePaper(playtest?'Mini games · Playtest':'Mini games',`<p class="small">${playtest?'All mini games are unlocked for testing. Test progress is separate from your normal story progress.':'Reach games in the story to unlock practice.'} Practice doesn’t award endings.</p><div class="mini-game-list">${cards}</div><div class="paper-actions">${game?.practice?'<button class="secondary" data-action="mini-game-return">Return to story</button>':''}${playtest?'<button class="secondary" data-action="playtest-exit">Return to normal game</button>':''}<button class="secondary" data-action="close">${game?.practice&&!miniGameComplete(game)?'Back to practice':'Close'}</button></div>`));
 }
 function launchMiniGame(id,preview=false) {
-  if(!history.miniGames.includes(id)&&!(preview&&previewGame===id))return;
+  if(!playtest&&!history.miniGames.includes(id)&&!(preview&&previewGame===id))return;
   const next=createMiniGame(id,game?.mode||$('difficulty').value);
   if(!next)return;
   if(!game?.practice){
@@ -405,6 +419,9 @@ function updateGuideUI() {
   if(progress)progress.style.width=`${route.progress*100}%`;
 }
 function act(action,value) {
+  if(action==='playtest-exit'&&playtest){
+    save();const url=new URL(location.href);url.searchParams.set('playtest','0');url.searchParams.delete('preview');location.assign(url.href);return;
+  }
   if(action==='mini-games'){showMiniGames();return;}
   if(action==='mini-game-start'){launchMiniGame(value);return;}
   if(action==='mini-game-retry'){if(game?.practice)launchMiniGame(game.practice,!!previewGame);return;}
@@ -785,7 +802,7 @@ if(resumedMiniGame){
   if(legacyPreview?.rogue?.route==='dungeon'){
     legacyPreview.practice='dungeon';begin(legacyPreview.mode,false,legacyPreview);
   }else launchMiniGame('dungeon',true);
-}
+}else if(playtest)showMiniGames();
 
 function refreshInstallGuide() {
   if(modalKind !== 'install' || !dialog.open)return;
