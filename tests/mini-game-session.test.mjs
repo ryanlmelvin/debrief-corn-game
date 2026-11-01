@@ -4,7 +4,7 @@ import vm from 'node:vm';
 import { readFileSync } from 'node:fs';
 import { createGame, restore, serialize, startShift, enterField, inspect } from '../docs/engine.js';
 import { MINI_GAMES, createMiniGame, miniGameComplete, getMiniGameUnlocks, normalizeMiniGameUnlocks } from '../docs/mini-games.js';
-import { startRogue, chooseRogue } from '../docs/rogue.js';
+import { startRogue, chooseRogue, moveRogue, getRogueScene } from '../docs/rogue.js';
 
 const source=readFileSync(new URL('../docs/app.js',import.meta.url),'utf8');
 const saveCode=source.slice(source.indexOf('function save()'),source.indexOf('function toast('));
@@ -207,4 +207,44 @@ test('a transient history write failure retries an earned unlock on the next sto
   assert.deepEqual(JSON.parse(h.storage.get('history')).miniGames,['watch']);
   assert.equal(h.context.miniGameUnlocksDirty,false);
   assert.equal(h.storage.get('story'),serialize(story));
+});
+
+test('practice dungeon interview saves and resumes separately from the suspended story',()=>{
+  const h=harness(), story=createGame('story',743);startShift(story);
+  story.time=9;story.rounds=3;story.reserve=15;
+  h.context.game=story;h.run('launchMiniGame("dungeon")');
+  const original=h.storage.get('story'), handoffs=h.updates.length;
+  const directions={R:[1,0],L:[-1,0],U:[0,-1],D:[0,1]};
+  for(const action of 'RRRFRDDRRUURRFRRDDDDDDDDRRFRRDDRRDDFFRRRRDDLLRRDDRRRFADDRRFUURRRRRDDDDDDDD') {
+    assert.equal(action==='F'?chooseRogue(h.context.game,'fire'):action==='A'?chooseRogue(h.context.game,'reload'):moveRogue(h.context.game,...directions[action]),true);
+  }
+  assert.equal(h.context.game.rogue.stage,'debrief');
+  assert.equal(miniGameComplete(h.context.game),false);
+  h.run('save()');
+  const first=getRogueScene(h.context.game);
+  assert.equal(chooseRogue(h.context.game,first.options[0].id),true);
+  h.run('save()');
+  assert.equal(h.storage.get('story'),original);
+  assert.equal(h.updates.length,handoffs);
+  assert.deepEqual(h.context.history.collected,[]);
+
+  const reloaded=harness(h.storage), resumed=reloaded.run('readMiniGame()');
+  assert.equal(resumed.game.rogue.stage,'debrief');
+  assert.equal(resumed.game.practice,'dungeon');
+  assert.deepEqual(getRogueScene(resumed.game),getRogueScene(h.context.game));
+  reloaded.context.game=resumed.game;reloaded.context.practiceReturnToGame=resumed.returnToGame;
+  reloaded.context.practiceReturnPaused=resumed.returnPaused;
+  for(let answer=0;answer<2;answer++){
+    const scene=getRogueScene(reloaded.context.game);
+    assert.equal(chooseRogue(reloaded.context.game,scene.options[0].id),true);
+    reloaded.run('save()');
+  }
+  assert.equal(miniGameComplete(reloaded.context.game),true);
+  assert.equal(reloaded.context.game.practice,'dungeon');
+  assert.deepEqual(reloaded.context.history.collected,[]);
+  assert.equal(reloaded.storage.get('story'),original);
+  assert.equal(reloaded.updates.length,0);
+  reloaded.run('returnToStory()');
+  assert.equal(serialize(reloaded.context.game),original);
+  assert.equal(reloaded.storage.has('practice'),false);
 });

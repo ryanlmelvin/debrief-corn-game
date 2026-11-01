@@ -55,11 +55,20 @@ for (const mode of ['story','hard']) test(`all three dungeon floors can be escap
     floors.add(s.rogue.dungeon.floor);
   }
   assert.deepEqual([...floors],[0,1,2]);
-  assert.equal(s.ending,'dungeon_escape');
+  assert.equal(s.phase,'rogue');assert.equal(s.rogue.stage,'debrief');
+  assert.equal(s.ending,null);assert.equal(getEnding(s),undefined);
   assert.equal(s.rogue.dungeon.hp,6);
   assert.equal(s.rounds,5);assert.equal(s.reserve,18);assert.equal(s.shots,7);
-  assert.equal(s.reports.length,2);
+  for (const [index,id] of ['tunnels-count','keys-found','exit-road'].entries()) {
+    const scene=getRogueScene(s);
+    assert.equal(scene.index,index);assert.equal(scene.total,3);
+    assert.equal(scene.options.length,2);assert.ok(scene.prompt);
+    assert.equal(chooseRogue(s,id),true);s=roundTrip(s);
+    if(index<2)assert.equal(s.ending,null);
+  }
+  assert.equal(s.ending,'dungeon_escape');assert.equal(s.reports.length,5);
   assert.equal(getEnding(s).title,ENDINGS.dungeon_escape.title);
+  assert.notEqual(getEnding(s).text,ENDINGS.dungeon_escape.text,'new survivors complete an interview before the ending');
   const snapshot = serialize(s);
   stepAfterEnding(s);
   assert.equal(serialize(s),snapshot);
@@ -233,4 +242,112 @@ test('local version-one saves keep the crawl and actual rifle ammunition during 
   }
   const invalid=begin();invalid.rogue.dungeon.version=1;invalid.rogue.dungeon.salt=4;
   assert.equal(restore(serialize(invalid)),null,'invalid legacy resources do not bypass validation');
+});
+
+
+const DEBRIEF_CHOICES = [['tunnels-count','tunnels-roots'],['keys-found','keys-placed'],['exit-road','exit-map']];
+
+test('all eight debrief accounts preserve their answers and reach the existing escape ending', () => {
+  const escaped=replay(begin(),WIN), endings=new Set();
+  for(const tunnels of DEBRIEF_CHOICES[0])for(const keys of DEBRIEF_CHOICES[1])for(const exit of DEBRIEF_CHOICES[2]) {
+    let s=structuredClone(escaped);
+    const prior=structuredClone(s.reports), ammunition=[s.rounds,s.reserve], crawl=structuredClone(s.rogue.dungeon), rng=s.rng;
+    for(const [index,id] of [tunnels,keys,exit].entries()) {
+      const scene=getRogueScene(s), option=scene.options.find(choice=>choice.id===id);
+      const snapshot=serialize(s);
+      assert.equal(moveRogue(s,0,-1),false);
+      for(const action of ['begin','back','fire','reload','wait','surface'])assert.equal(chooseRogue(s,action),false);
+      advance(s,10);
+      assert.equal(serialize(s),snapshot,'gameplay and time cannot change an interview');
+      assert.equal(chooseRogue(s,id),true);s=roundTrip(s);
+      const report=s.reports[index+1];
+      assert.equal(report.question,scene.prompt);assert.equal(report.answer,option.label);
+      assert.equal(report.supervisorReply,option.reply);assert.equal(report.replySpeaker,'SUPERVISOR');
+      if(index<2)assert.ok(getRogueScene(s).text.includes(option.reply),'the next question acknowledges the actual answer');
+    }
+    assert.deepEqual(s.reports.slice(0,prior.length),prior,'prior testimony is unchanged');
+    assert.deepEqual([s.rounds,s.reserve],ammunition);assert.equal(s.rng,rng);assert.deepEqual(s.rogue.dungeon,crawl);
+    assert.equal(s.ending,'dungeon_escape');assert.equal(getEnding(s).code,'23');
+    endings.add(getEnding(s).text);
+    assert.equal(chooseRogue(s,exit),false,'a recorded final answer cannot be submitted twice');
+  }
+  assert.equal(endings.size,8,'each account affects the final prose without adding ending IDs');
+});
+
+test('debrief answers transfer intact and resume at the next unanswered question', async () => {
+  const s=replay(begin(),WIN);chooseRogue(s,'tunnels-roots');chooseRogue(s,'keys-placed');
+  const snapshot=progressSnapshot(s,{collected:[],runs:[]});
+  const transferred=(await decodeProgress(await encodeProgress(snapshot))).save;
+  assert.deepEqual(transferred,s);assert.equal(getRogueScene(transferred).index,2);
+  assert.equal(chooseRogue(transferred,'exit-map'),true);
+  assert.match(getEnding(transferred).text,/folds the map/);
+  roundTrip(transferred);
+});
+
+test('restore rejects premature, skipped, reordered, or detached dungeon debrief testimony', () => {
+  const playing=begin();playing.rogue.stage='debrief';
+  assert.equal(restore(serialize(playing)),null,'the guard must physically reach the final exit');
+  const escaped=replay(begin(),WIN);
+  for(const mutate of [
+    s=>s.rogue.debrief.answers.push('exit-map'),
+    s=>s.rogue.debrief.answers.push('unknown'),
+    s=>s.rogue.debrief.version=2,
+    s=>s.rogue.debrief.extra=true,
+    s=>delete s.rogue.debrief,
+    s=>s.rogue.route='broadcast',
+    s=>{s.phase='ending';s.ending='dungeon_escape';s.rogue.stage='done';s.rogue.outcome='dungeon_escape';},
+    s=>{s.rogue.debrief.answers=['tunnels-count','keys-found','exit-road'];},
+    s=>{s.rogue.stage='play';}
+  ]) { const copy=structuredClone(escaped);mutate(copy);assert.equal(restore(serialize(copy)),null); }
+  const answered=structuredClone(escaped);chooseRogue(answered,'tunnels-count');chooseRogue(answered,'keys-found');
+  for(const mutate of [
+    s=>s.rogue.debrief.answers.reverse(),
+    s=>s.reports.splice(1,1),
+    s=>s.reports[1].dungeonDebriefIndex=2,
+    s=>s.reports[1].choice='tunnels-roots',
+    s=>s.reports[1].answer='',
+    s=>s.reports[1].supervisorReply=' ',
+    s=>s.reports.unshift({...s.reports[1]}),
+    s=>delete s.rogue.debrief
+  ]) {const copy=structuredClone(answered);mutate(copy);assert.equal(restore(serialize(copy)),null);}
+  const complete=structuredClone(answered);chooseRogue(complete,'exit-road');
+  complete.rogue.debrief.answers.pop();
+  assert.equal(restore(serialize(complete)),null,'the ending requires all three recorded answers');
+});
+
+test('published completed dungeon saves retain their ending, while older live crawls gain the interview', () => {
+  const legacy=replay(begin(),WIN);
+  delete legacy.rogue.debrief;
+  legacy.phase='ending';legacy.ending='dungeon_escape';legacy.rogue.stage='done';legacy.rogue.outcome='dungeon_escape';
+  legacy.reports.push({kind:'rogue',shift:legacy.shift,rogueRoute:'dungeon',choice:'surface',question:'What happened after you broke protocol?',answer:'I found the three keys and climbed out beneath a different sky.'});
+  const resumed=restore(serialize(legacy));
+  assert.deepEqual(resumed,legacy);assert.deepEqual(getEnding(resumed),ENDINGS.dungeon_escape);
+  assert.equal(getRogueScene(resumed),null);
+  const live=begin();delete live.rogue.debrief;
+  const migrated=restore(serialize(live));
+  assert.ok(migrated);assert.deepEqual(migrated.rogue.debrief,{version:1,answers:[]});
+  replay(migrated,WIN);
+  assert.equal(migrated.rogue.stage,'debrief');assert.equal(migrated.ending,null);
+  roundTrip(migrated);
+});
+
+
+test('debrief saves preserve earlier wording while rejecting malformed or oversized transcript fields', () => {
+  const s=replay(begin(),WIN);chooseRogue(s,'tunnels-roots');
+  s.reports[1].question='An earlier wording of the tunnel question.';
+  s.reports[1].answer='An earlier account of the moving roots.';
+  s.reports[1].supervisorReply='“We have inspected those walls before,” he says.';
+  const resumed=roundTrip(s);
+  assert.ok(getRogueScene(resumed).text.includes(s.reports[1].supervisorReply),'the next scene uses the reply actually saved');
+  for(const field of ['question','answer','supervisorReply'])for(const invalid of ['', '  ', null, 12, 'x'.repeat(1001)]) {
+    const copy=structuredClone(s);copy.reports[1][field]=invalid;
+    assert.equal(restore(serialize(copy)),null,`${field} must be bounded saved text`);
+  }
+  chooseRogue(resumed,'keys-placed');chooseRogue(resumed,'exit-map');
+  const finalReply=resumed.reports.at(-2).supervisorReply;
+  assert.ok(getEnding(resumed).text.startsWith(finalReply+'\n\n'),'the last spoken reply appears before the ending account');
+  resumed.reports.at(-2).supervisorReply='“This was the wording you heard on your original visit.”';
+  const finished=roundTrip(resumed);
+  assert.ok(getEnding(finished).text.startsWith(resumed.reports.at(-2).supervisorReply));
+  assert.deepEqual(finished.reports,resumed.reports,'a release does not rewrite prior testimony');
 });

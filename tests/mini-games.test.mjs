@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createGame, startShift, advance, shoot, reload, serialize, restore, SHIFT_LENGTH, enterField, inspect } from '../docs/engine.js';
-import { chooseRogue, moveRogue, broadcastCursor, broadcastWindow, startRogue } from '../docs/rogue.js';
+import { chooseRogue, moveRogue, getRogueScene, broadcastCursor, broadcastWindow, startRogue } from '../docs/rogue.js';
 import { MINI_GAMES, createMiniGame, miniGameComplete, miniGameResult, getMiniGameUnlocks, normalizeMiniGameUnlocks } from '../docs/mini-games.js';
 
 function roundTrip(s) {
@@ -98,12 +98,39 @@ test('practice dungeon defeat and escape remain practice at both terminal outcom
   const lost=createMiniGame('dungeon','story',42);
   for(let turn=0;turn<14;turn++)assert.equal(chooseRogue(lost,'wait'),true);
   assert.equal(lost.ending,'dungeon_lost');result(lost,false);
-  const escaped=createMiniGame('dungeon','story',42);
+  let escaped=createMiniGame('dungeon','story',42);
   const directions={R:[1,0],L:[-1,0],U:[0,-1],D:[0,1]};
   for(const action of 'RRRFRDDRRUURRFRRDDDDDDDDRRFRRDDRRDDFFRRRRDDLLRRDDRRRFADDRRFUURRRRRDDDDDDDD') {
     assert.equal(action==='F'?chooseRogue(escaped,'fire'):action==='A'?chooseRogue(escaped,'reload'):moveRogue(escaped,...directions[action]),true);
   }
+  assert.equal(escaped.phase,'rogue');assert.equal(escaped.rogue.stage,'debrief');
+  assert.equal(escaped.ending,null);
+  assert.equal(miniGameComplete(escaped),false,'reaching the surface starts the interview before practice results');
+  assert.equal(miniGameResult(escaped),null);
+  // Historical terminal saves predate the interview and contain just the begin
+  // receipt followed by the surface receipt. They must remain completed.
+  const legacy=structuredClone(escaped);
+  delete legacy.rogue.debrief;
+  legacy.phase='ending';legacy.ending='dungeon_escape';
+  legacy.rogue.stage='done';legacy.rogue.outcome='dungeon_escape';
+  legacy.reports=legacy.reports.filter(report=>report.kind!=='rogue'||report.choice==='begin');
+  legacy.reports.push({kind:'rogue',shift:legacy.shift,rogueRoute:'dungeon',choice:'surface',question:'What happened after you broke protocol?',answer:'I found the three keys and climbed out beneath a different sky.'});
+  const oldCompleted=roundTrip(legacy);
+  assert.equal(oldCompleted.rogue.debrief,undefined);
+  result(oldCompleted,true);
+  for(let question=0;question<3;question++) {
+    escaped=roundTrip(escaped);
+    const scene=getRogueScene(escaped);
+    assert.ok(scene?.options?.length,'the next interview question survives reload');
+    assert.equal(chooseRogue(escaped,scene.options[0].id),true);
+    assert.equal(escaped.practice,'dungeon');
+    if(question<2){
+      assert.equal(escaped.rogue.stage,'debrief');assert.equal(escaped.ending,null);
+      assert.equal(miniGameComplete(escaped),false);assert.equal(miniGameResult(escaped),null);
+    }
+  }
   assert.equal(escaped.ending,'dungeon_escape');result(escaped,true);
+  assert.equal(miniGameResult(escaped).reply,escaped.reports.at(-2).supervisorReply);
 });
 
 test('practice watch completes a full real shift and stops at the field boundary', () => {

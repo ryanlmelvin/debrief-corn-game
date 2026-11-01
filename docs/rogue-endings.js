@@ -1,3 +1,5 @@
+import { dungeonDebriefEnding } from './dungeon-debrief.js';
+
 // Original outcomes for the optional breaks in protocol. Share captions live
 // separately so the public cards never contain these ending transcripts.
 export const ROGUE_ENDINGS = {
@@ -53,6 +55,7 @@ export const ROGUE_ENDINGS = {
 export function rogueEnding(s) {
   const r = s.rogue;
   if (s.phase !== 'ending' || r?.stage !== 'done' || r.outcome !== s.ending) return null;
+  if (r.route === 'dungeon' && s.ending === 'dungeon_escape') return dungeonDebriefEnding(s);
   if (r.route === 'corn' && r.patternVersion === 2 && s.ending === 'corn_escape') return {
     text: 'Headlights pass over the ditch and keep going. Behind the road, the guard reloads. You remember that sound from the other side of the rifle. At dawn, a truck slows beside you. The driver mistakes your raised leaves for a wave. You climb into the bed among sacks of seed. The county line passes without a checkpoint.'
   };

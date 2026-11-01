@@ -234,8 +234,10 @@ export function validDungeon(d, stage, outcome, legacy = false) {
     return JSON.stringify(d) === JSON.stringify(expected);
   }
   if (stage === 'play') return d.status === 'active' && d.hp > 0 && !(d.key && d.x === data.stairs.x && d.y === data.stairs.y);
+  const escaped = d.status === 'escaped' && d.hp > 0 && d.floor === 2 && d.key && d.x === data.stairs.x && d.y === data.stairs.y;
+  if (stage === 'debrief') return escaped && outcome === null;
   if (stage !== 'done') return false;
-  if (outcome === 'dungeon_escape') return d.status === 'escaped' && d.hp > 0 && d.floor === 2 && d.key && d.x === data.stairs.x && d.y === data.stairs.y;
+  if (outcome === 'dungeon_escape') return escaped;
   return outcome === 'dungeon_lost' && d.status === 'lost' && d.hp === 0;
 }
 

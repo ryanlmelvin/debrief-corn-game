@@ -1,4 +1,5 @@
 import { createDungeon, moveDungeon, chooseDungeon, validDungeon, migrateDungeon } from './dungeon.js';
+import { getDungeonDebriefScene, validDungeonDebrief } from './dungeon-debrief.js';
 
 // Deliberately broken protocol: self-contained simulations, safe to save mid-step.
 const ROUTES = ['corn', 'broadcast', 'flood', 'dungeon'];
@@ -36,13 +37,15 @@ function clearField(s) {
   s.fieldEvents.journey = null;
 }
 
-function record(s, choice, question, answer) {
+function record(s, choice, question, answer, details = {}) {
   // Repeatedly opening and backing out of the menu never adds testimony.
   if (s.reports.length >= 200) {
-    const prior = s.reports.findIndex(r => r.kind === 'rogue');
+    const protectedReceipt = report => s.rogue.route === 'dungeon' && report.rogueRoute === 'dungeon' && (report.choice === 'begin' || report.dungeonDebriefIndex !== undefined);
+    let prior = s.reports.findIndex(report => report.kind === 'rogue' && !protectedReceipt(report));
+    if (prior < 0) prior = s.reports.findIndex(report => !protectedReceipt(report));
     s.reports.splice(prior < 0 ? 0 : prior, 1);
   }
-  s.reports.push({ kind: 'rogue', shift: s.shift, rogueRoute: s.rogue.route, choice, question, answer });
+  s.reports.push({ kind: 'rogue', shift: s.shift, rogueRoute: s.rogue.route, choice, question, answer, ...details });
 }
 
 export function startRogue(s, route) {
@@ -59,6 +62,7 @@ export function startRogue(s, route) {
     Object.assign(s.rogue, { locks: 0, lockReadyAt: 0 });
   } else if (route === 'dungeon') {
     s.rogue.dungeon = createDungeon();
+    s.rogue.debrief = { version: 1, answers: [] };
   } else {
     let seed = (s.rng ^ 0x51a1ce) >>> 0;
     const tiles = PIPE_KINDS.map(() => { seed = (Math.imul(1664525, seed) + 1013904223) >>> 0; return seed >>> 30; });
@@ -71,6 +75,7 @@ export function startRogue(s, route) {
 export function getRogueScene(s) {
   const r = s.rogue;
   if (s.phase !== 'rogue' || !r) return null;
+  if (r.stage === 'debrief' && r.route === 'dungeon') return getDungeonDebriefScene(s);
   if (r.stage === 'intro') {
     if (r.route === 'corn') return {
       title: 'How long were you out?',
@@ -127,6 +132,15 @@ export function chooseRogue(s, id) {
     r.stage = 'play';
     if (r.route === 'dungeon') s.reload = 0;
     r.message = r.route === 'corn' ? (r.patternVersion === 2 ? "The guard has your rifle and switched it to full auto. Bet you didn't know you could do that, huh?" : 'The guard has your rifle.') : r.route === 'broadcast' ? 'Your breathing answers from every receiver.' : r.route === 'dungeon' ? 'Find the brass key, then the stairs. Red squares show where roots will strike next turn.' : 'The pipes are warm beneath your hands.';
+    return true;
+  }
+  if (r.stage === 'debrief' && r.route === 'dungeon') {
+    const scene = getDungeonDebriefScene(s), option = scene?.options.find(option => option.id === id);
+    if (!option) return false;
+    record(s, id, scene.prompt, option.label, { dungeonDebriefIndex: scene.index, supervisorReply: option.reply, replySpeaker: 'SUPERVISOR' });
+    r.debrief.answers.push(id);
+    r.message = option.reply;
+    if (r.debrief.answers.length === scene.total) end(s, 'dungeon_escape', 'surface', option.label);
     return true;
   }
   if (r.stage === 'choice') {
@@ -251,7 +265,11 @@ function checkCorn(s) {
 
 function finishDungeon(s) {
   const status = s.rogue.dungeon.status;
-  if (status === 'escaped') end(s, 'dungeon_escape', 'surface', 'I found the three keys and climbed out beneath a different sky.');
+  if (status === 'escaped') {
+    s.rogue.stage = 'debrief';
+    s.rogue.debrief ??= { version: 1, answers: [] };
+    s.rogue.message = 'You reach the surface. The supervisor is waiting for your report.';
+  }
   else if (status === 'lost') end(s, 'dungeon_lost', 'lost', 'The roots dragged me under the drainage channel before I could reach the surface.');
 }
 
@@ -330,7 +348,7 @@ export function advanceRogue(s, dt) {
 export function validRogue(s) {
   const r = s.rogue;
   if (r === undefined) return s.phase !== 'rogue' && !NEW_ENDINGS.includes(s.ending);
-  if (!r || typeof r !== 'object' || Array.isArray(r) || !ROUTES.includes(r.route) || !['intro', 'play', 'choice', 'done'].includes(r.stage)) return false;
+  if (!r || typeof r !== 'object' || Array.isArray(r) || !ROUTES.includes(r.route) || !['intro', 'play', 'choice', 'debrief', 'done'].includes(r.stage)) return false;
   // Early preview saves had one crossing. Preserve an already-earned finale.
   if (r.route === 'corn' && r.crossing === undefined) r.crossing = r.stage === 'choice' || ['corn_escape', 'corn_uprising'].includes(r.outcome) ? 2 : 0;
   // Do not replace live published volleys with a new pattern during an update.
@@ -338,7 +356,7 @@ export function validRogue(s) {
     r.patternVersion = 1;
     if (r.lastHit === undefined) r.lastHit = r.hits > 0 ? 'bullet' : null;
   }
-  const keys = ['route', 'stage', 'time', 'hits', 'message', 'outcome', ...(r.route === 'corn' ? ['x', 'y', 'crossing', 'patternVersion', 'lastHit', 'refuge', 'moveReadyAt', 'immuneUntil'] : r.route === 'broadcast' ? ['locks', 'lockReadyAt'] : r.route === 'dungeon' ? ['dungeon'] : ['tiles', 'turns'])];
+  const keys = ['route', 'stage', 'time', 'hits', 'message', 'outcome', ...(r.route === 'corn' ? ['x', 'y', 'crossing', 'patternVersion', 'lastHit', 'refuge', 'moveReadyAt', 'immuneUntil'] : r.route === 'broadcast' ? ['locks', 'lockReadyAt'] : r.route === 'dungeon' ? ['dungeon', 'debrief'] : ['tiles', 'turns'])];
   if (Object.keys(r).some(key => !keys.includes(key)) || !finite(r.time, 0, MAX_TIME) || !integer(r.hits, 0, 3) || typeof r.message !== 'string' || r.message.length > 300) return false;
   if (s.targets.length || s.fieldEvents.pending || s.fieldEvents.journey || s.compulsionNotice) return false;
   if (r.stage === 'done') {
@@ -346,7 +364,9 @@ export function validRogue(s) {
   } else if (s.phase !== 'rogue' || r.outcome !== null || s.ending !== null || r.hits === 3) return false;
   if (r.stage === 'intro' && (r.time !== 0 || r.hits !== 0)) return false;
   const matchesReport = (report, choice) => report?.kind === 'rogue' && report.shift === s.shift && report.rogueRoute === r.route && report.choice === choice && typeof report.question === 'string' && typeof report.answer === 'string';
-  if (r.stage !== 'intro') {
+  if (r.stage === 'debrief' && r.route !== 'dungeon') return false;
+  const dungeonInterview = r.route === 'dungeon' && r.debrief !== undefined && (r.stage === 'debrief' || r.stage === 'done' && r.outcome === 'dungeon_escape');
+  if (r.stage !== 'intro' && !dungeonInterview) {
     const rootedWithoutRunning = r.route === 'corn' && r.outcome === 'assimilation' && r.hits === 0;
     if (r.stage === 'done') {
       const choice = rootedWithoutRunning ? 'root' : ({ corn_escape: 'escape', corn_uprising: 'gate', corn_contained: 'rooted', roadkill: 'rooted', radio_ghost: 'warn', field_voice: 'command', flood: 'release', breach: 'rupture', dungeon_escape: 'surface', dungeon_lost: 'lost' }[r.outcome] || (r.route === 'corn' ? 'rooted' : 'signal-lost'));
@@ -370,6 +390,13 @@ export function validRogue(s) {
     if (r.stage === 'play' && r.locks === 3 || r.outcome === 'assimilation' && (r.hits !== 3 || r.locks === 3)) return false;
   } else if (r.route === 'dungeon') {
     if (r.hits !== 0 || r.time !== 0 || !integer(s.rounds, 0, 6) || !integer(s.reserve, 0, Number.MAX_SAFE_INTEGER) || !migrateDungeon(s) || !validDungeon(r.dungeon, r.stage, r.outcome)) return false;
+    if (r.debrief === undefined) {
+      if (r.stage === 'debrief' || s.reports.some(report => report.dungeonDebriefIndex !== undefined)) return false;
+      // Existing completed outcomes remain complete. Every resumed live crawl
+      // receives the new interview when it reaches the surface.
+      if (r.stage !== 'done') r.debrief = { version: 1, answers: [] };
+    }
+    if (r.debrief !== undefined && !validDungeonDebrief(s)) return false;
   } else {
     if (!Array.isArray(r.tiles) || r.tiles.length !== 9 || !r.tiles.every(tile => integer(tile, 0, 3)) || !integer(r.turns, 0, 1000000) || r.time !== 0 || r.stage === 'choice') return false;
     if (r.stage === 'intro' && r.turns !== 0 || r.outcome === 'flood' && (r.hits === 3 || !floodConnections(s).connected) || r.outcome === 'breach' && (r.hits !== 3 || floodConnections(s).connected)) return false;

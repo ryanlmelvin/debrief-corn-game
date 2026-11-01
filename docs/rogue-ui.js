@@ -53,7 +53,7 @@ export class RogueUI {
   constructor(root) { this.root = root; this.key = ''; this.hazardNodes = new Map(); this.lastMessage = ''; }
 
   render(game, paused = false) {
-    const active = game?.phase === 'rogue' && game.rogue;
+    const active = game?.phase === 'rogue' && game.rogue && game.rogue.stage !== 'debrief';
     this.root.hidden = !active;
     if (!active) { this.key = ''; return; }
     const r = game.rogue, key = `${game.runId}:${r.route}:${r.stage}:${r.route === 'corn' ? `${r.patternVersion || 1}:${r.crossing || 0}` : ''}`;

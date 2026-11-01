@@ -41,7 +41,7 @@ function continuations(s) {
   }
   if (s.phase === 'resolution') return { action: 'resolution-answer', options: getResolution(s)?.options };
   if (s.phase === 'guide' && s.guide?.stage === 'debrief') return { action: 'guide-answer', options: guideDebrief(s)?.options };
-  if (s.phase === 'rogue' && ['intro', 'choice'].includes(s.rogue?.stage)) return { action: 'rogue-choice', options: getRogueScene(s)?.options };
+  if (s.phase === 'rogue' && ['intro', 'choice', 'debrief'].includes(s.rogue?.stage)) return { action: 'rogue-choice', options: getRogueScene(s)?.options };
   return null;
 }
 
@@ -52,7 +52,7 @@ export function possibleChoiceEndings(game, action, value) {
   if (!game || game.practice || game.phase === 'ending' || !transition) return null;
   // Minigame inputs include both timed controls and turn-based combat. Do not
   // infer the remaining crawl (or a later timed click) from one rendered input.
-  if (action === 'rogue-choice' && !['intro', 'choice'].includes(game.rogue?.stage)) return null;
+  if (action === 'rogue-choice' && !['intro', 'choice', 'debrief'].includes(game.rogue?.stage)) return null;
   try {
     const next = clone(game);
     if (!transition(next, value)) return null;

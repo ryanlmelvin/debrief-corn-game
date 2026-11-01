@@ -87,5 +87,7 @@ export function miniGameResult(s) {
     title = success ? 'Back above ground.' : 'The roots closed in.';
     message = `Floor ${s.rogue.dungeon.floor + 1} of 3 · ${s.rogue.dungeon.turn} turns · ${s.rogue.dungeon.kills} roots stopped.`;
   }
-  return { id, title, success, message };
+  const reply = id === 'dungeon' && success && s.rogue.debrief?.answers.length === 3
+    ? s.reports.find(report => report.dungeonDebriefIndex === 2)?.supervisorReply : null;
+  return { id, title, success, message, ...(reply ? { reply } : {}) };
 }

@@ -17,7 +17,7 @@ import { decisionQuestion } from './decision-copy.js';
 import { chooseResolution } from './alternate-endings.js';
 import { resolutionMarkup } from './resolution-ui.js';
 import { markSeenEndingChoices } from './seen-endings.js';
-import { startRogue, chooseRogue, moveRogue } from './rogue.js';
+import { startRogue, chooseRogue, moveRogue, getRogueScene } from './rogue.js';
 import { RogueUI, rogueMenuMarkup } from './rogue-ui.js';
 import { MINI_GAMES, createMiniGame, miniGameComplete, miniGameResult, getMiniGameUnlocks, normalizeMiniGameUnlocks } from './mini-games.js';
 import { InstallHandoff, recoverInstallHandoff, progressSnapshot, encodeProgress, decodeProgress, storeProgress, MAX_PROGRESS_BYTES } from './progress.js';
@@ -220,11 +220,21 @@ function begin(mode,fromSave=false,supplied=null) {
 }
 function sceneDialog() {
   if(!game)return;
+  if(game.phase==='rogue'&&game.rogue?.route==='dungeon'&&game.rogue.stage==='debrief'){
+    const scene=getRogueScene(game);
+    const key=`dungeon-debrief:${game.runId}:${scene.index}`;
+    if(key!==lastModalKey){
+      lastModalKey=key;
+      showModal('dungeon-debrief',paper(esc(scene.title),`<span class="question-num" aria-label="Question ${scene.index+1} of ${scene.total}">${scene.index+1} / ${scene.total}</span><p class="note">${esc(scene.text)}</p><div class="interview-question"><span class="speaker-label">SUPERVISOR</span><p>${esc(scene.prompt)}</p></div><div class="choices" role="group" aria-label="Your response"><span class="speaker-label">YOUR RESPONSE</span>${scene.options.map((option,i)=>`<button class="choice" data-action="rogue-choice" data-value="${esc(option.id)}"><span class="response-key" aria-hidden="true">${String.fromCharCode(65+i)}</span><span>${esc(option.label)}</span></button>`).join('')}</div>`, 'DRAINAGE DEBRIEF'));
+      save();
+    }
+    return;
+  }
   if(game.practice){
     const result=miniGameResult(game);
     if(result){
       const key=`practice:${game.runId}:${result.id}:${game.ending}:${game.rogue?.stage}`;
-      if(key!==lastModalKey){lastModalKey=key;showModal('mini-result',miniGamePaper(result.success?'Run complete.':'Try again.',`<p class="eyebrow">${esc(result.title)} · PRACTICE</p><p>${esc(result.message)}</p><p class="small">Endings unlock only through normal story play.</p><div class="paper-actions"><button class="primary" data-action="mini-game-retry">Play again</button><button class="secondary" data-action="mini-games">Mini games</button><button class="secondary" data-action="mini-game-return">Return to story</button></div>`));save();}
+      if(key!==lastModalKey){lastModalKey=key;showModal('mini-result',miniGamePaper(result.success?'Run complete.':'Try again.',`<p class="eyebrow">${esc(result.title)} · PRACTICE</p>${result.reply?`<p>${esc(result.reply)}</p>`:''}<p>${esc(result.message)}</p><p class="small">Endings unlock only through normal story play.</p><div class="paper-actions"><button class="primary" data-action="mini-game-retry">Play again</button><button class="secondary" data-action="mini-games">Mini games</button><button class="secondary" data-action="mini-game-return">Return to story</button></div>`));save();}
     }
     return;
   }
@@ -407,7 +417,8 @@ function act(action,value) {
     $('rogue-play').focus({preventScroll:true});return;
   }
   if(action==='rogue-choice'||action==='rogue-move'){
-    if(!game||game.phase!=='rogue'||paused||dialog.open||menuOpen())return;
+    const debriefAnswer=action==='rogue-choice'&&modalKind==='dungeon-debrief'&&game?.rogue?.route==='dungeon'&&game.rogue.stage==='debrief';
+    if(!game||game.phase!=='rogue'||paused||dialog.open&&!debriefAnswer||menuOpen())return;
     const changed=action==='rogue-choice'?chooseRogue(game,value):moveRogue(game,...String(value).split(',').map(Number));
     if(!changed)return;
     if(game.rogue?.route==='dungeon'&&action==='rogue-choice'&&value==='fire')shotSound('hit');
@@ -488,7 +499,7 @@ function act(action,value) {
     else {game.guide.focused=null;toast(game.guide.fired?'They have reached cover. Someone is calling for help.':'The lights have reached cover. You can let them leave.');}
   }
   if(action==='guide-fire'){const t=game?.guide?.team.find(t=>t.id===game.guide.focused&&t.status==='running');const p=t&&visibleGuideTarget(game.guide,t,renderer.view);if(t&&!p){game.guide.focused=null;toast(game.guide.fired?'They have reached cover. Someone is calling for help.':'The lights have reached cover. You can let them leave.');return;}if(p)renderer.pointer={x:p.x,y:p.y-p.height*.5};fire(renderer.pointer);}
-  if(action==='close'){closeModal();if(game?.practice&&miniGameComplete(game)){lastModalKey='';sceneDialog();return;}if(game&&(['briefing','debrief','resolution','ending'].includes(game.phase)||game.guide?.stage==='debrief')){lastModalKey='';updateUI(true);}return;}
+  if(action==='close'){closeModal();if(game?.practice&&miniGameComplete(game)){lastModalKey='';sceneDialog();return;}if(game&&(['briefing','debrief','resolution','ending'].includes(game.phase)||game.guide?.stage==='debrief'||game.rogue?.stage==='debrief')){lastModalKey='';updateUI(true);}return;}
   if(action==='start'){closeModal();startShift(game);canvas.focus({preventScroll:true});}
   if(action==='answer'){closeModal();answer(game,value);}
   if(action==='reload')reload(game);
@@ -521,7 +532,7 @@ $('new-game').addEventListener('click',()=>{
 $('resume').addEventListener('click',()=>begin(null,true));
 function togglePause(force) {if(!game||game.phase==='ending'||dialog.open)return;paused=typeof force==='boolean'?force:!paused;updateUI();save();syncAudio();}
 $('pause').addEventListener('click',()=>togglePause());$('unpause').addEventListener('click',()=>{togglePause(false);(game?.phase==='rogue'?$('rogue-play'):canvas).focus({preventScroll:true});});
-dialog.addEventListener('cancel',event=>{if(modalKind==='mini-result'){event.preventDefault();showMiniGames();}else if(modalKind==='resolution-menu'){event.preventDefault();act('resolution-answer','back');}else if(['briefing','debrief','guide-debrief','resolution','ending','encounter'].includes(modalKind))event.preventDefault();else{event.preventDefault();act('close');}});
+dialog.addEventListener('cancel',event=>{if(modalKind==='mini-result'){event.preventDefault();showMiniGames();}else if(modalKind==='resolution-menu'){event.preventDefault();act('resolution-answer','back');}else if(['briefing','debrief','guide-debrief','dungeon-debrief','resolution','ending','encounter'].includes(modalKind))event.preventDefault();else{event.preventDefault();act('close');}});
 $('manual').addEventListener('click',()=>showModal('manual',paper('Field manual',`<ol class="orders"><li><span>01</span>Watch the corn. Shoot any that try to escape.</li><li><span>02</span>Remain in the watchtower.</li><li><span>03</span>Do not consume the crop.</li><li><span>04</span>Remember any irregularities for your debrief at the end of the night.</li></ol><p class="watch-tips"><b>Runners</b> move fast. <b>Husks</b> take two hits. Five clean containments earn a replacement flare. Misses and breaches break the chain.</p><p class="small"><b>R / Reload:</b> tap again as the marker reaches gold to finish early. Waiting always completes a normal reload.<br><b>F / Flare:</b> slows all crops for 4.5 seconds. Start with two; earn more through streaks and bell rushes. Carry up to two.<br><b>B / Ring bell:</b> optional risk. Clear three marked crops in ten seconds for +600 points, +6 reserve rounds, and a flare. Any escape or timeout loses the bonus; the crops remain a threat. Two attempts per watch, available until 39 seconds.</p><button class="primary" data-action="close">Close</button>`)));
 
 $('about').addEventListener('click',()=>showModal('about',paper('About Debrief.', '<p>An interactive adaptation of the short story by Ryan L. Melvin.</p><p>Three shifts. About ten minutes. Headphones optional.</p><p>Debrief is open source, licensed under <a href="https://github.com/ryanlmelvin/debrief-corn-game/blob/main/LICENSE" target="_blank" rel="noopener">GPLv3</a>. <a href="https://github.com/ryanlmelvin/debrief-corn-game" target="_blank" rel="noopener">View the source code on GitHub</a>.</p><p class="small">Music: <a href="https://opengameart.org/content/lost-in-a-bad-place-horror-ambience-loop" target="_blank" rel="noopener">Lost in a Bad Place</a> by congusbongus · <a href="https://creativecommons.org/publicdomain/zero/1.0/" target="_blank" rel="noopener">CC0</a>.</p><p class="small">Field sounds (CC0): <a href="https://opengameart.org/content/crickets-ambient-noise-loopable" target="_blank" rel="noopener">crickets by Ted Kerr</a>; <a href="https://opengameart.org/content/random-sounds-samples" target="_blank" rel="noopener">footsteps and leaves by Brandon Morris</a>; <a href="https://opengameart.org/content/static" target="_blank" rel="noopener">radio static by xhunterko</a>.</p><p>The goal is to find your way through every possible ending. New endings added all the time.</p><p class="small">Your saved game, achieved endings, and transcripts stay in this browser or app, on this device. Clearing site data deletes them; installation is not a backup.</p><button class="primary" data-action="close">Back ↗</button>', 'STATION 04')));

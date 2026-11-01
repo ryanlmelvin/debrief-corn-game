@@ -64,7 +64,7 @@ export function dialogArtwork(kind, shift = 0, art = null) {
   if (art) return scenePlate(art);
   if (kind === 'debrief') return `<div class="interview-scene">${scenePlate('debrief')}<span class="recording-label"><i></i> REC / TAPE 0${shift + 1}</span></div>`;
   if (kind === 'guide-intro') return scenePlate('retrieval');
-  if (kind === 'guide-debrief') return scenePlate('debrief');
+  if (['guide-debrief', 'dungeon-debrief'].includes(kind)) return scenePlate('debrief');
   if (['briefing', 'manual'].includes(kind)) return scenePlate('tower');
   if (kind === 'sighting') return scenePlate(shift === 2 ? 'hazmat' : shift === 1 ? 'retrieval' : 'sighting');
   if (['ending', 'records'].includes(kind)) return scenePlate('debrief');
