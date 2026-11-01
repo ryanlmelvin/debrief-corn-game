@@ -8,7 +8,7 @@ import { startRogue, chooseRogue, moveRogue, getRogueScene } from '../docs/rogue
 
 const source=readFileSync(new URL('../docs/app.js',import.meta.url),'utf8');
 const saveCode=source.slice(source.indexOf('function save()'),source.indexOf('function toast('));
-const unlockCode=source.slice(source.indexOf('function recordMiniGameUnlocks('),source.indexOf('\nif(!dungeonPreview)for('));
+const unlockCode=source.slice(source.indexOf('function recordMiniGameUnlocks('),source.indexOf('\nif(!previewGame)for('));
 const sessionCode=source.slice(source.indexOf('function readMiniGame()'),source.indexOf('function begin('));
 function harness(storage=new Map(), unlocked=MINI_GAMES.map(entry=>entry.id)) {
   const elements=new Map(), updates=[];
@@ -17,14 +17,14 @@ function harness(storage=new Map(), unlocked=MINI_GAMES.map(entry=>entry.id)) {
     return elements.get(id);
   };
   const history=JSON.parse(storage.get('history')||JSON.stringify({collected:[],runs:[],miniGames:unlocked}));
-  const context=vm.createContext({storage,updates,restore,serialize,createMiniGame,MINI_GAMES,miniGameComplete,getMiniGameUnlocks,normalizeMiniGameUnlocks,game:null,saved:null,paused:false,dungeonPreview:false,miniGameUnlocksDirty:false,
+  const context=vm.createContext({storage,updates,restore,serialize,createMiniGame,MINI_GAMES,miniGameComplete,getMiniGameUnlocks,normalizeMiniGameUnlocks,game:null,saved:null,paused:false,dungeonPreview:false,previewGame:null,miniGameUnlocksDirty:false,
     storyBeforePractice:null,practiceReturnToGame:false,practiceReturnPaused:false,SAVE_KEY:'story',MINI_GAME_KEY:'practice',HISTORY_KEY:'history',
     lastModalKey:'',lastControlsKey:'',storageWarned:false,$:element,canvas:element('canvas'),
     localStorage:{getItem:key=>storage.get(key)??null,setItem:(key,value)=>storage.set(key,value),removeItem:key=>storage.delete(key)},
     installHandoff:{update:(...args)=>updates.push(args)},history,toast(){},esc:String,paper:(title,body)=>`<article>${title}${body}</article>`,
     showModal(kind,html){context.modal={kind,html};},
     document:{body:{classList:{remove(){}},dataset:{}}},dialog:{open:false},menuOpen:()=>false,
-    fieldMap:{reset(){}},rogueUI:{render(){}},syncAudio(){},updateUI(){},
+    fieldMap:{reset(){}},rogueUI:{render(){}},resolutionUI:{render(){}},syncAudio(){},updateUI(){},
     readSave:()=>restore(storage.get('story')),
     begin(mode,fromSave,supplied){context.game=supplied;context.paused=false;vm.runInContext('save()',context);}
   });
@@ -151,7 +151,7 @@ test('practice and the localhost preview never grant story unlocks',()=>{
   h.run('returnToStory()');
   h.run('launchMiniGame("dungeon",true)');
   assert.equal(h.context.game,null,'the preview argument cannot bypass locks outside the localhost preview');
-  h.context.dungeonPreview=true;
+  h.context.dungeonPreview=true;h.context.previewGame='dungeon';
   h.run('launchMiniGame("dungeon",true)');
   assert.equal(h.context.game.practice,'dungeon');
   h.run('save()');
@@ -172,7 +172,7 @@ test('locked cards stay visible and only reached games offer enabled launch cont
     assert.match(card,/ disabled>/);
     assert.ok(h.context.modal.html.includes(entry.title));
   }
-  assert.equal((h.context.modal.html.match(/Reach it in the story to unlock\./g)||[]).length,5);
+  assert.equal((h.context.modal.html.match(/Reach it in the story to unlock\./g)||[]).length,MINI_GAMES.length);
   h.context.history.miniGames=['watch','dungeon'];h.run('showMiniGames()');
   for(const entry of MINI_GAMES){
     const card=cards().find(markup=>markup.includes(`data-value="${entry.id}"`));
@@ -184,11 +184,11 @@ test('resuming an old practice slot cannot bypass story locks except the explici
   const h=harness(new Map(),[]);
   h.storage.set('practice',JSON.stringify({game:serialize(createMiniGame('dungeon','story',740)),returnToGame:false}));
   assert.equal(h.run('readMiniGame()'),null);
-  h.context.dungeonPreview=true;
+  h.context.dungeonPreview=true;h.context.previewGame='dungeon';
   assert.equal(h.run('readMiniGame().game.practice'),'dungeon');
   h.storage.set('practice',JSON.stringify({game:serialize(createMiniGame('flood','story',741)),returnToGame:false}));
   assert.equal(h.run('readMiniGame()'),null,'the preview exception applies only to the dungeon');
-  h.context.dungeonPreview=false;h.context.history.miniGames=['flood'];
+  h.context.dungeonPreview=false;h.context.previewGame=null;h.context.history.miniGames=['flood'];
   assert.equal(h.run('readMiniGame().game.practice'),'flood');
 });
 

@@ -1,4 +1,5 @@
 import test from 'node:test';
+import { solveResolutionGame } from './helpers/resolution-play.mjs';
 import assert from 'node:assert/strict';
 import {
   createGame, startShift, advance, shoot, reload, move, inspect, FIELD_SITES,
@@ -105,6 +106,7 @@ for (const mode of ['story', 'hard']) for (const [id, route] of Object.entries(r
     game = await transfer(roundTrip(game));
     assert.equal(chooseResolution(game, id), true);
     for (const action of route.actions) {
+      solveResolutionGame(game);
       game = await transfer(roundTrip(game));
       assert.equal(game.phase, 'resolution');
       assert.ok(getResolution(game).options.some(option => option.id === action));
@@ -175,7 +177,7 @@ test('the rescue gives up recordings only at commitment, while preserving the pr
   assert.equal(canTakeEvidenceOutside(game), true);
   assert.equal(answer(game, 'follow-lead'), true);
   assert.equal(chooseResolution(game, 'rescue'), true);
-  for (const action of routes.rescue.actions) assert.equal(chooseResolution(game, action), true);
+  for (const action of routes.rescue.actions) { solveResolutionGame(game); assert.equal(chooseResolution(game, action), true); }
   assert.equal(game.ending, 'rescue');
   assert.equal(canTakeEvidenceOutside(game), false);
   assert.equal(availableResolutions(game).find(option => option.id === 'witness_present').disabled, true);

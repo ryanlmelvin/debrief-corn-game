@@ -5,6 +5,7 @@ import { readFileSync } from 'node:fs';
 import { createGame, move, inspect, FIELD_SITES, beginDebrief, answer, startShift, restore, serialize, chooseFieldEncounter, continueFieldEncounter } from '../docs/engine.js';
 import { fieldStepCost, planFieldRoute } from '../docs/field.js';
 import { FieldMap } from '../docs/field-ui.js';
+import { resolutionGameActive } from '../docs/resolution-games.js';
 
 import { currentEncounter } from '../docs/encounters.js';
 function settle(s){if(s.fieldEvents.pending){chooseFieldEncounter(s,currentEncounter(s).choices[0].id);continueFieldEncounter(s);}}
@@ -93,7 +94,7 @@ test('automatic travel halts behind pause, menu, dialogs, and a background tab',
   const source=readFileSync(new URL('../docs/app.js',import.meta.url),'utf8');
   const frame=source.slice(source.indexOf('function frame(now)'));
   for(const gate of ['paused','dialog','menu','hidden']) {
-    let ticks=0;const context={game:field(),paused:gate==='paused',dialog:{open:gate==='dialog'},menuOpen:()=>gate==='menu',document:{hidden:gate==='hidden'},lastFrame:0,lastUI:0,lastSave:0,advance(){},fieldMap:{tick(){ticks++;}},updateUI(){},save(){},renderer:{draw(){}},requestAnimationFrame(){}};
+    let ticks=0;const context={game:field(),paused:gate==='paused',dialog:{open:gate==='dialog'},menuOpen:()=>gate==='menu',document:{hidden:gate==='hidden'},lastFrame:0,lastUI:0,lastSave:0,advance(){},fieldMap:{tick(){ticks++;}},updateUI(){},save(){},renderer:{draw(){}},requestAnimationFrame(){},resolutionGameActive};
     vm.createContext(context);vm.runInContext(frame,context);vm.runInContext('frame(1000)',context);assert.equal(ticks,0,gate);
     context.paused=false;context.dialog.open=false;context.document.hidden=false;context.menuOpen=()=>false;
     vm.runInContext('frame(1100)',context);assert.equal(ticks,1);

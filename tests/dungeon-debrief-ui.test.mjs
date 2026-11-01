@@ -5,6 +5,7 @@ import { readFileSync } from 'node:fs';
 import { createGame, startShift, enterField, inspect, serialize, restore, getEnding, ENDINGS } from '../docs/engine.js';
 import { startRogue, chooseRogue, moveRogue, getRogueScene } from '../docs/rogue.js';
 import { createMiniGame, miniGameComplete, miniGameResult } from '../docs/mini-games.js';
+import { resolutionGameActive } from '../docs/resolution-games.js';
 
 const source=readFileSync(new URL('../docs/app.js',import.meta.url),'utf8');
 const sceneCode=source.slice(source.indexOf('function sceneDialog()'),source.indexOf('function stat('));
@@ -25,7 +26,7 @@ function escaped(practice) {
 function ui(game) {
   const modals=[],saves=[];
   const context=vm.createContext({game,paused:false,modalKind:'',lastModalKey:'',dialog:{open:false},menuOpen:()=>false,
-    getRogueScene,chooseRogue,moveRogue,miniGameComplete,miniGameResult,getEnding,ENDINGS,
+    getRogueScene,chooseRogue,moveRogue,miniGameComplete,miniGameResult,getEnding,ENDINGS,resolutionGameActive,
     esc:String,paper:(title,body)=>`${title}${body}`,miniGamePaper:(title,body)=>`${title}${body}`,
     sightingPromptReady:()=>false,isGuideAftermath:()=>false,archives:0,
     archiveRun(){context.archives++;},

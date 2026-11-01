@@ -1,0 +1,10 @@
+.resolution-play{position:absolute;inset:0;z-index:1;display:flex;flex-direction:column;gap:8px;padding:calc(60px + env(safe-area-inset-top)) max(20px,env(safe-area-inset-right)) max(14px,env(safe-area-inset-bottom)) max(20px,env(safe-area-inset-left));background:#111710;overflow:auto}
+.resolution-play[hidden]{display:none}
+.resolution-game-board{flex:1;min-height:0}
+.resolution-game-exit{flex:0 0 auto;text-align:center}
+.resolution-game-exit button{font-size:11px;min-height:36px;padding:6px 12px}
+body.resolution-playing #sidebar{display:none}
+body.resolution-playing .workspace{width:100%}
+body.resolution-playing #control-hint{display:none}
+@media(max-width:600px){.resolution-play{padding:calc(56px + env(safe-area-inset-top)) max(10px,env(safe-area-inset-right)) max(10px,env(safe-area-inset-bottom)) max(10px,env(safe-area-inset-left));gap:6px}.resolution-game-exit button{min-height:40px}}
+@media(max-height:500px) and (orientation:landscape){.resolution-play{padding:calc(48px + env(safe-area-inset-top)) max(10px,env(safe-area-inset-right)) max(6px,env(safe-area-inset-bottom)) max(10px,env(safe-area-inset-left));gap:3px}.resolution-game-exit button{min-height:28px;padding:3px 12px;font-size:10px}}

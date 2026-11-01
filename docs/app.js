@@ -16,6 +16,8 @@ import { endingShareData, shareEnding } from './sharing.js';
 import { decisionQuestion } from './decision-copy.js';
 import { chooseResolution } from './alternate-endings.js';
 import { resolutionMarkup } from './resolution-ui.js';
+import { resolutionGameActive, resolutionGameAction, releaseResolutionGame } from './resolution-games.js';
+import { ResolutionGamesUI } from './resolution-games-ui.js';
 import { markSeenEndingChoices } from './seen-endings.js';
 import { startRogue, chooseRogue, moveRogue, getRogueScene } from './rogue.js';
 import { RogueUI, rogueMenuMarkup } from './rogue-ui.js';
@@ -28,20 +30,23 @@ const pager=new DialogPager(dialog);
 let modalReturnFocus=null;
 const fieldMap=new FieldMap($('field-exploration'));
 const rogueUI=new RogueUI($('rogue-play'));
+const resolutionUI=new ResolutionGamesUI($('resolution-play'));
 $('investigate-urge').innerHTML=pressureWordMarkup();
 const menu=$('game-menu');
 const menuOpen=()=>menu.matches(':popover-open');
-menu.addEventListener('toggle',()=>{syncAudio();if(menuOpen())save();});
+menu.addEventListener('toggle',()=>{if(menuOpen()){releaseResolutionGame(game);save();}syncAudio();});
 menu.addEventListener('click',event=>{if(event.target.closest('button')&&!event.target.closest('[popovertarget]'))menu.hidePopover();});
-const dungeonPreview = ['localhost','127.0.0.1','[::1]'].includes(location.hostname) && new URLSearchParams(location.search).get('preview') === 'dungeon';
-const previewSuffix = dungeonPreview ? ':dungeon-preview' : '';
+const previewRequested=new URLSearchParams(location.search).get('preview');
+const previewGame=['localhost','127.0.0.1','[::1]'].includes(location.hostname)&&['dungeon','rescue'].includes(previewRequested)?previewRequested:null;
+const dungeonPreview=previewGame==='dungeon';
+const previewSuffix=previewGame?`:${previewGame}-preview`:'';
 $('dungeon-restart').hidden=!dungeonPreview;
 const HISTORY_KEY=`debrief-history-v1:${new URL('.',location.href).pathname}${previewSuffix}`;
 const SAVE_KEY=`debrief-save-v1:${new URL('.',location.href).pathname}${previewSuffix}`;
 const MINI_GAME_KEY=`debrief-mini-game-v1:${new URL('.',location.href).pathname}${previewSuffix}`;
 let storyBeforePractice=null, practiceReturnToGame=false, practiceReturnPaused=false;
 const progressKeys={save:SAVE_KEY,history:HISTORY_KEY};
-const progressPath=new URL('.',location.href).pathname + (dungeonPreview ? 'dungeon-preview/' : '');
+const progressPath=new URL('.',location.href).pathname + (previewGame ? `${previewGame}-preview/` : '');
 const isInstalled = () => window.matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
 const installHandoff=new InstallHandoff(document,progressPath,isInstalled);
 let game=null, paused=false, modalKind='', lastModalKey='', lastControlsKey='', lastLog='', lastFrame=0, lastSave=0, lastUI=0, toastTimer, installPrompt=null;
@@ -70,7 +75,7 @@ function recordMiniGameUnlocks(state) {
   miniGameUnlocksDirty=true;
   return true;
 }
-if(!dungeonPreview)for(const state of [...history.runs,readSave()])recordMiniGameUnlocks(state);
+if(!previewGame)for(const state of [...history.runs,readSave()])recordMiniGameUnlocks(state);
 if(miniGameUnlocksDirty)try{localStorage.setItem(HISTORY_KEY,JSON.stringify(history));miniGameUnlocksDirty=false;}catch{}
 function updateHistoryCount(){ $('records').textContent=`Endings · ${history.collected.length}/${Object.keys(ENDINGS).length}`; }
 updateHistoryCount();
@@ -139,6 +144,7 @@ function paper(title,body,tag='') {
   return `<article class="paper"><button id="dialog-update" class="secondary" data-update hidden>Update ready. Download?</button>${tag?`<div class="paper-top"><span>STATION 04</span><span>${tag}</span></div>`:''}<h2 id="dialog-title" tabindex="-1">${title}</h2>${body}</article>`;
 }
 function showModal(kind,html,art=null) {
+  releaseResolutionGame(game);
   modalReturnFocus=menuOpen()?$('game-menu-toggle'):null;
   if(menuOpen())menu.hidePopover();
   modalKind=kind;$('dialog-content').innerHTML=html;
@@ -154,12 +160,12 @@ function showModal(kind,html,art=null) {
   $('dialog-title')?.focus({preventScroll:true});
   syncAudio();
 }
-function closeModal() {dialog.close();modalKind='';if(game?.phase==='field')fieldMap.render(game,paused);syncAudio();const target=modalReturnFocus||(game?.phase==='rogue'?$('rogue-play'):game?.phase==='field'?$('field-exploration').querySelector('button.field-go:not([hidden]),button.field-stop:not([hidden])'):canvas);target?.focus({preventScroll:true});modalReturnFocus=null;}
+function closeModal() {dialog.close();modalKind='';if(game?.phase==='field')fieldMap.render(game,paused);syncAudio();const target=modalReturnFocus||(resolutionGameActive(game)?$('resolution-play'):game?.phase==='rogue'?$('rogue-play'):game?.phase==='field'?$('field-exploration').querySelector('button.field-go:not([hidden]),button.field-stop:not([hidden])'):canvas);target?.focus({preventScroll:true});modalReturnFocus=null;}
 function readMiniGame() {
   try{
     const session=JSON.parse(localStorage.getItem(MINI_GAME_KEY));
     const restored=restore(session?.game);
-    if(!restored?.practice||(!history.miniGames.includes(restored.practice)&&!(dungeonPreview&&restored.practice==='dungeon')))return null;
+    if(!restored?.practice||(!history.miniGames.includes(restored.practice)&&!(previewGame&&restored.practice===previewGame)))return null;
     return {game:restored,returnToGame:session.returnToGame===true,returnPaused:session.returnPaused===true};
   }catch{return null;}
 }
@@ -168,7 +174,7 @@ function miniGamePaper(title,body) {
 }
 function showMiniGames() {
   save();
-  const art={watch:'watch-corn',corn:'field-corner',broadcast:'encounter-radio',flood:'field-pump',dungeon:'field-drain'};
+  const art={watch:'watch-corn',corn:'field-corner',broadcast:'encounter-radio',flood:'field-pump',dungeon:'field-drain',rescue:'ending-rescue'};
   const cards=MINI_GAMES.map(entry=>{
     const unlocked=history.miniGames.includes(entry.id);
     const status=unlocked?'<span class="mini-game-status" aria-hidden="true">↗</span>':'<span class="mini-game-status"><svg viewBox="0 0 20 24" aria-hidden="true"><path d="M5 10V6a5 5 0 0 1 10 0v4M2 10h16v12H2z"/><path d="M10 14v4"/></svg><span>Locked</span></span>';
@@ -177,7 +183,7 @@ function showMiniGames() {
   showModal('mini-games',miniGamePaper('Mini games',`<p class="small">Reach games in the story to unlock practice. Practice doesn’t award endings.</p><div class="mini-game-list">${cards}</div><div class="paper-actions">${game?.practice?'<button class="secondary" data-action="mini-game-return">Return to story</button>':''}<button class="secondary" data-action="close">${game?.practice&&!miniGameComplete(game)?'Back to practice':'Close'}</button></div>`));
 }
 function launchMiniGame(id,preview=false) {
-  if(!history.miniGames.includes(id)&&!(preview&&dungeonPreview&&id==='dungeon'))return;
+  if(!history.miniGames.includes(id)&&!(preview&&previewGame===id))return;
   const next=createMiniGame(id,game?.mode||$('difficulty').value);
   if(!next)return;
   if(!game?.practice){
@@ -195,12 +201,12 @@ function returnToStory() {
   if(next){begin(next.mode,false,next);if(wasPaused){paused=true;updateUI(true);}}
   else{
     game=null;paused=false;lastModalKey='';lastControlsKey='';
-    document.body.classList.remove('playing','dungeon-playing');delete document.body.dataset.phase;
+    document.body.classList.remove('playing','dungeon-playing','resolution-playing');delete document.body.dataset.phase;
     $('welcome').hidden=false;$('sidebar').hidden=true;$('pause').hidden=true;$('pause-layer').hidden=true;
     $('stats').hidden=true;$('tower-hud').hidden=true;$('watch-scoreboard').hidden=true;$('watch-radio').hidden=true;$('investigation-pressure').hidden=true;
     $('mini-game-return').hidden=true;$('dungeon-restart').hidden=true;
     for(const id of ['notebook','menu-radio','assignment','protocol-menu','watch-record'])$(id).hidden=true;
-    fieldMap.reset();$('field-exploration').hidden=true;rogueUI.render(null);canvas.hidden=false;canvas.tabIndex=0;canvas.setAttribute('aria-hidden','false');
+    fieldMap.reset();$('field-exploration').hidden=true;rogueUI.render(null);resolutionUI.render(null);canvas.hidden=false;canvas.tabIndex=0;canvas.setAttribute('aria-hidden','false');
     saved=readSave();$('resume').hidden=!saved;$('save-status').textContent='STORY PROGRESS PRESERVED';syncAudio();$('new-game').focus({preventScroll:true});
   }
 }
@@ -210,16 +216,18 @@ function begin(mode,fromSave=false,supplied=null) {
   if($('guide-aftermath').matches(':popover-open'))$('guide-aftermath').hidePopover();
   game=supplied||(fromSave?readSave():createGame(mode));
   if(!game){toast('The saved game could not be read. You can start a new game.');return;}
+  releaseResolutionGame(game);
   soundEvents.reset(game);
   paused=false;lastModalKey='';lastControlsKey='';lastLog='';
   fieldMap.reset();
   $('notebook').hidden=false;$('menu-radio').hidden=false;$('assignment').hidden=false;
   $('welcome').hidden=true;$('sidebar').hidden=false;$('pause').hidden=false;document.body.classList.add('playing');
   if(dialog.open)closeModal();updateUI(true);save();
-  if(game.phase==='rogue')$('rogue-play').focus({preventScroll:true});
+  if(resolutionGameActive(game))$('resolution-play').focus({preventScroll:true});
+  else if(game.phase==='rogue')$('rogue-play').focus({preventScroll:true});
 }
 function sceneDialog() {
-  if(!game)return;
+  if(!game||resolutionGameActive(game))return;
   if(game.phase==='rogue'&&game.rogue?.route==='dungeon'&&game.rogue.stage==='debrief'){
     const scene=getRogueScene(game);
     const key=`dungeon-debrief:${game.runId}:${scene.index}`;
@@ -239,7 +247,7 @@ function sceneDialog() {
     return;
   }
   const pending=game.fieldEvents.pending;
-  const key=`${game.phase}:${game.shift}:${game.question}:${game.ending}:${game.incident}:${sightingPromptReady(game)}:${pending?.id}:${pending?.choice}:${game.guide?.stage}:${game.guide?.debriefQuestion}:${game.resolution?.route}:${game.resolution?.step}`;
+  const key=`${game.phase}:${game.shift}:${game.question}:${game.ending}:${game.incident}:${sightingPromptReady(game)}:${pending?.id}:${pending?.choice}:${game.guide?.stage}:${game.guide?.debriefQuestion}:${game.resolution?.route}:${game.resolution?.step}:${game.resolution?.activity?.state.stage}`;
   if(key===lastModalKey)return;
   lastModalKey=key;
   if(game.phase==='field'&&pending){showModal('encounter',encounterMarkup(game));save();return;}
@@ -276,6 +284,7 @@ function updateUI(force=false) {
   if(!game)return;
   document.body.dataset.phase=game.phase;
   document.body.classList.toggle('dungeon-playing',game.phase==='rogue'&&game.rogue?.route==='dungeon'&&game.rogue.stage==='play');
+  document.body.classList.toggle('resolution-playing',resolutionGameActive(game));
   const aftermath=isGuideAftermath(game);
   $('stats').hidden=aftermath||game.phase==='resolution'||game.phase==='rogue';
   $('pause').hidden=game.phase==='ending';
@@ -299,7 +308,7 @@ function updateUI(force=false) {
   }
   $('tower-hud').hidden=!active;
   updateWatchUI(game,paused);
-  $('controls').hidden=active||field||phase==='rogue';
+  $('controls').hidden=active||field||phase==='rogue'||phase==='resolution';
   $('evidence-count').textContent=String(game.evidence.length).padStart(2,'0');
   $('control-hint').textContent=field?'ARROWS / WASD TO MOVE · E TO INSPECT':active?'CLICK / TAP FIRE · R RELOAD · F FLARE':'STATION 04';
   if(phase!=='guide'&&!aftermath)canvas.setAttribute('aria-label',field?`Field survey. Your position is column ${game.player.x+1}, row ${game.player.y+1}. ${site?site.label+'. ':''}Gold page markers show tonight’s unread discoveries. Check marks show searched locations. Use arrow keys or WASD to move. E to inspect. Watchtower is column 2 row 8; pump house column 4 row 4; drainage channel column 8 row 6; northeast corner column 10 row 2.`:'Watchtower shooting gallery. Click moving corn to fire. X selects a crop. Space fires. R reloads; press again in gold to reload faster. F fires a flare to slow crops. B rings the bell for an optional timed rush.');
@@ -336,9 +345,15 @@ function updateUI(force=false) {
     $('station-status').textContent=dungeonPreview?'LOCAL PLAYTEST':'SIGNAL LOST';
     if(game.rogue.route==='dungeon')$('control-hint').textContent='ARROWS / WASD · F / SPACE FIRE · R RELOAD · PERIOD WAIT';
   }
+  resolutionUI.render(game,paused||dialog.open||menuOpen());
+  if(resolutionGameActive(game)){
+    $('objective').textContent='Free the person at the lantern.';
+    $('objective-detail').textContent='Match the recorded breath to the radio. Pull only while the roots loosen.';
+    $('station-status').textContent=previewGame?'LOCAL PLAYTEST':'AFTER THE WATCH';
+  }
   canvas.hidden=field;
-  canvas.setAttribute('aria-hidden',String(phase==='rogue'));
-  canvas.tabIndex=phase==='rogue'?-1:0;
+  canvas.setAttribute('aria-hidden',String(phase==='rogue'||resolutionGameActive(game)));
+  canvas.tabIndex=phase==='rogue'||resolutionGameActive(game)?-1:0;
   $('guide-message').hidden=phase!=='guide'||game.guide?.stage==='debrief'||paused;
   if (phase === 'guide') updateGuideUI();
   if(aftermath){
@@ -391,7 +406,7 @@ function updateGuideUI() {
 function act(action,value) {
   if(action==='mini-games'){showMiniGames();return;}
   if(action==='mini-game-start'){launchMiniGame(value);return;}
-  if(action==='mini-game-retry'){if(game?.practice)launchMiniGame(game.practice,dungeonPreview);return;}
+  if(action==='mini-game-retry'){if(game?.practice)launchMiniGame(game.practice,!!previewGame);return;}
   if(action==='mini-game-return'){returnToStory();return;}
   if(game?.practice&&miniGameComplete(game)&&!['close','records','record-run','share-record','select-share-link','restart','export','notebook-page','watch-record'].includes(action))return;
   if(game?.practice&&['confirm-enter','enter','rogue-start','dungeon-enter','answer','debrief','inspect','resolution-answer','guide-answer','guide-travel'].includes(action))return;
@@ -434,8 +449,14 @@ function act(action,value) {
   if(action==='select-share-link'){const input=dialog.querySelector('.share-link');input?.focus();input?.select();return;}
   if(action==='share-ending'){if(game?.phase==='ending'&&!game.practice)shareDisposition(endingId(game),getEnding(game).stamp);return;}
   if(action==='share-record'){const run=history.runs[Number(value)];if(run)shareDisposition(run.ending,run.stamp);return;}
+  if(action==='resolution-game'){
+    if(!game||paused||dialog.open||menuOpen()||!resolutionGameAction(game,value))return;
+    save();updateUI(true);return;
+  }
   if(action==='resolution-answer'){
-    if(!game||game.phase!=='resolution'||!['resolution','resolution-menu'].includes(modalKind))return;
+    if(!game||game.phase!=='resolution'||paused||menuOpen())return;
+    if(!['resolution','resolution-menu'].includes(modalKind)&&!(resolutionGameActive(game)&&!dialog.open&&value==='back'))return;
+    releaseResolutionGame(game);
     if(!chooseResolution(game,value))return;
     closeModal();lastModalKey='';save();updateUI(true);return;
   }
@@ -518,20 +539,23 @@ function act(action,value) {
     if(id){const e=evidenceForState(game,id),scene=currentSiteScene(game);showModal('evidence',paper(esc(e.title),`<p class="eyebrow">${esc(e.code)}${e.variant?` · ${esc(e.canonicalTitle)}`:''} / ${esc(e.where.toUpperCase())}</p>${evidenceMount(id,game)}<p>${esc(e.text)}</p>${scene?`<p>${esc(scene.cue)}</p><button class="primary" data-action="site-scene">${esc(scene.label)}</button>`:''}<button class="primary" data-action="close">Close notebook ↗</button>`,'PRIVATE OBSERVATION'));}
   }
   if(action==='debrief')beginDebrief(game);
-  if(action==='restart'){if(game?.practice){launchMiniGame(game.practice,dungeonPreview);return;}closeModal();begin(game.mode);return;}
+  if(action==='restart'){if(game?.practice){launchMiniGame(game.practice,!!previewGame);return;}closeModal();begin(game.mode);return;}
   if(action==='new-confirm'){closeModal();begin($('difficulty').value);return;}
   if(action==='export'){if(!game?.practice)exportRecord();return;}
   save();updateUI(true);syncAudio();
   if(action==='confirm-enter'&&game?.phase==='field')$('field-exploration').querySelector('.field-go')?.focus({preventScroll:true});
 }
-document.addEventListener('click',event=>{const button=event.target.closest('[data-action]');if(button&&!button.disabled)act(button.dataset.action,button.dataset.value);});
+document.addEventListener('click',event=>{const button=event.target.closest('[data-action]');if(button&&!button.disabled){
+  if(button.dataset.hold){if(event.detail===0)act('resolution-game',game?.resolution?.activity?.state.holding?'release':'pull');return;}
+  act(button.dataset.action,button.dataset.value);
+}});
 $('new-game').addEventListener('click',()=>{
   if(readSave())showModal('confirm',paper('Start a new game?',`<p>This replaces your current saved game. Your achieved endings and transcripts from completed games are kept.</p><div class="paper-actions"><button class="primary" data-action="new-confirm">Start new game</button><button class="secondary" data-action="close">Cancel</button></div>`));
   else begin($('difficulty').value);
 });
 $('resume').addEventListener('click',()=>begin(null,true));
-function togglePause(force) {if(!game||game.phase==='ending'||dialog.open)return;paused=typeof force==='boolean'?force:!paused;updateUI();save();syncAudio();}
-$('pause').addEventListener('click',()=>togglePause());$('unpause').addEventListener('click',()=>{togglePause(false);(game?.phase==='rogue'?$('rogue-play'):canvas).focus({preventScroll:true});});
+function togglePause(force) {if(!game||game.phase==='ending'||dialog.open)return;paused=typeof force==='boolean'?force:!paused;if(paused)releaseResolutionGame(game);updateUI();save();syncAudio();}
+$('pause').addEventListener('click',()=>togglePause());$('unpause').addEventListener('click',()=>{togglePause(false);(resolutionGameActive(game)?$('resolution-play'):game?.phase==='rogue'?$('rogue-play'):canvas).focus({preventScroll:true});});
 dialog.addEventListener('cancel',event=>{if(modalKind==='mini-result'){event.preventDefault();showMiniGames();}else if(modalKind==='resolution-menu'){event.preventDefault();act('resolution-answer','back');}else if(['briefing','debrief','guide-debrief','dungeon-debrief','resolution','ending','encounter'].includes(modalKind))event.preventDefault();else{event.preventDefault();act('close');}});
 $('manual').addEventListener('click',()=>showModal('manual',paper('Field manual',`<ol class="orders"><li><span>01</span>Watch the corn. Shoot any that try to escape.</li><li><span>02</span>Remain in the watchtower.</li><li><span>03</span>Do not consume the crop.</li><li><span>04</span>Remember any irregularities for your debrief at the end of the night.</li></ol><p class="watch-tips"><b>Runners</b> move fast. <b>Husks</b> take two hits. Five clean containments earn a replacement flare. Misses and breaches break the chain.</p><p class="small"><b>R / Reload:</b> tap again as the marker reaches gold to finish early. Waiting always completes a normal reload.<br><b>F / Flare:</b> slows all crops for 4.5 seconds. Start with two; earn more through streaks and bell rushes. Carry up to two.<br><b>B / Ring bell:</b> optional risk. Clear three marked crops in ten seconds for +600 points, +6 reserve rounds, and a flare. Any escape or timeout loses the bonus; the crops remain a threat. Two attempts per watch, available until 39 seconds.</p><button class="primary" data-action="close">Close</button>`)));
 
@@ -560,6 +584,24 @@ canvas.addEventListener('pointerdown',event=>{
   }
 });
 function fire(p,padding=0) {const result=game.phase==='guide'?fireGuide(game,p.x,p.y):shoot(game,p.x,p.y,padding);if(!['blocked','empty'].includes(result))shotSound(result);updateUI();save();}
+let rescuePointer = null;
+$('resolution-play').addEventListener('pointerdown',event=>{
+  const button=event.target.closest('[data-hold="pull"]');
+  if(!button||button.disabled||paused||dialog.open||menuOpen()||rescuePointer!==null)return;
+  event.preventDefault();button.focus({preventScroll:true});
+  rescuePointer=event.pointerId;
+  button.setPointerCapture(event.pointerId);
+  act('resolution-game','pull');
+});
+function releaseRescueInput(event) {
+  if(event?.pointerId!==undefined&&rescuePointer!==event.pointerId)return;
+  rescuePointer=null;
+  releaseResolutionGame(game);
+  if(game&&resolutionGameActive(game)){save();updateUI();}
+}
+for(const type of ['pointerup','pointercancel','lostpointercapture'])$('resolution-play').addEventListener(type,releaseRescueInput);
+document.addEventListener('keyup',event=>{if(event.key===' '&&game?.resolution?.activity?.kind==='rescue')releaseRescueInput();});
+window.addEventListener('blur',()=>{releaseRescueInput();});
 document.addEventListener('keydown',event=>{
   if(!game||dialog.open||menuOpen()||event.ctrlKey||event.metaKey||event.altKey||['INPUT','SELECT','TEXTAREA'].includes(event.target.tagName))return;
   const k=event.key.toLowerCase();
@@ -567,6 +609,13 @@ document.addEventListener('keydown',event=>{
   if(k==='escape'&&$('guide-aftermath').matches(':popover-open')){event.preventDefault();$('guide-aftermath').hidePopover();return;}
   if(k==='p'||k==='escape'){event.preventDefault();togglePause();return;}
   if(paused)return;
+  if(resolutionGameActive(game)){
+    const onButton=['BUTTON','A'].includes(event.target.tagName);
+    const stage=game.resolution.activity.state.stage;
+    const action=stage==='align'?{arrowleft:'earlier',arrowright:'later',...(!onButton?{enter:'align'}:{})}[k]:(k===' '&&(!onButton||event.target.closest('[data-hold]'))?'pull':null);
+    if(action){event.preventDefault();if(!event.repeat)act('resolution-game',action);}
+    return;
+  }
   if(game.phase==='rogue'){
     const directions={arrowup:'0,-1',w:'0,-1',arrowdown:'0,1',s:'0,1',arrowleft:'-1,0',a:'-1,0',arrowright:'1,0',d:'1,0'};
     if(['corn','dungeon'].includes(game.rogue.route)&&game.rogue.stage==='play'&&directions[k]){
@@ -599,7 +648,7 @@ document.addEventListener('keydown',event=>{
     if(k==='e'){event.preventDefault();fieldMap.stop(game);act(nearbySite(game)?.id==='tower'?'debrief':currentSiteScene(game)?'site-scene':'inspect');}
   }
 });
-document.addEventListener('visibilitychange',()=>{if(document.hidden){save();if(game&&!dialog.open)togglePause(true);}syncAudio();});
+document.addEventListener('visibilitychange',()=>{if(document.hidden){releaseResolutionGame(game);save();if(game&&!dialog.open)togglePause(true);}syncAudio();});
 window.addEventListener('pagehide',save);
 let sharingEnding=false;
 async function shareDisposition(ending,stamp) {
@@ -725,6 +774,9 @@ const resumedMiniGame=readMiniGame();
 if(resumedMiniGame){
   practiceReturnToGame=resumedMiniGame.returnToGame;practiceReturnPaused=resumedMiniGame.returnPaused;
   begin(resumedMiniGame.game.mode,false,resumedMiniGame.game);
+}else if(previewGame&&!dungeonPreview){
+  document.title='Roots & Recordings — Local playtest';
+  launchMiniGame(previewGame,true);
 }else if(dungeonPreview){
   document.title='Dungeon Crawler Corn — Local playtest';
   let legacyPreview=null;
@@ -817,6 +869,7 @@ if ('serviceWorker' in navigator && ['https:', 'http:'].includes(location.protoc
   };
   const applyUpdate = () => {
     if (!waitingWorker || applyingUpdate) return;
+    releaseResolutionGame(game);
     save();
     applyingUpdate = true;
     paused = true;
@@ -834,6 +887,7 @@ if ('serviceWorker' in navigator && ['https:', 'http:'].includes(location.protoc
   navigator.serviceWorker.addEventListener('controllerchange', () => {
     if (refreshing) return;
     refreshing = true;
+    releaseResolutionGame(game);
     save();
     location.reload();
   });
@@ -875,10 +929,11 @@ function frame(now) {
       if(aim)renderer.pointer={x:aim.x,y:aim.y-aim.height*.5};
       else game.guide.focused=null;
     }
-    if(now-lastUI>100){updateUI();lastUI=now;}
+    if(now-lastUI>100||(game.practice&&miniGameComplete(game))){updateUI();lastUI=now;}
     if(now-lastSave>1200){save();lastSave=now;}
   }
   if(game?.phase!=='field')renderer.draw(game,now,!game);
+  if(resolutionGameActive(game))resolutionUI.render(game,paused||dialog.open||menuOpen()||document.hidden);
   if(game?.phase==='rogue')rogueUI.render(game,paused||dialog.open||menuOpen()||document.hidden);
   requestAnimationFrame(frame);
 }

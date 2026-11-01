@@ -8,6 +8,9 @@ import { startRogue, chooseRogue, moveRogue, getRogueScene, validRogue, broadcas
 import { createMiniGame } from '../docs/mini-games.js';
 import { possibleChoiceEndings, hasSeenChoiceEndings, markSeenEndingChoices } from '../docs/seen-endings.js';
 import { REVIEWED_ENDING_HINTS } from '../scripts/check-ending-hints.mjs';
+import { resolutionGameAction, resolutionGameActive } from '../docs/resolution-games.js';
+import { rescueStatus } from '../docs/rescue.js';
+import { solveResolutionGame } from './helpers/resolution-play.mjs';
 
 const guideEndings = ['guide', 'guide_arrested', 'guide_interrupted', 'guide_shot'];
 const requirements = {
@@ -85,8 +88,7 @@ function enter(route, game = ready(route)) {
   return game;
 }
 
-function escapeScene() {
-  const game = ready();
+function escapeScene(game = ready()) {
   assert.equal(answer(game, 'guide'), true);
   for (const id of ['boot', 'radio', 'corner']) {
     assert.equal(guideTravel(game), true);
@@ -98,8 +100,8 @@ function escapeScene() {
   return game;
 }
 
-function interview(outcome, empty = false) {
-  const game = escapeScene();
+function interview(outcome, empty = false, from = ready()) {
+  const game = escapeScene(from);
   if (outcome === 'spared') assert.equal(spareGuide(game), true);
   else if (outcome === 'secured') {
     if (empty) for (let i = 0; i < 3; i++) assert.equal(fireGuide(game, 0, 0), 'miss');
@@ -182,6 +184,7 @@ test('each route remains reversible until its final commitment, including the pr
       assert.equal(hasSeenChoiceEndings(game, 'resolution-answer', id, [route]), false);
       assert.equal(chooseResolution(game, id), true);
     }
+    solveResolutionGame(game);
     assertTerminalHint(game, 'resolution-answer', path.at(-1), route);
     assert.equal(hasSeenChoiceEndings(game, 'resolution-answer', 'back', [route]), false);
     if (route === 'vacancy') {
@@ -194,6 +197,172 @@ test('each route remains reversible until its final commitment, including the pr
   chooseResolution(honest, 'relief-approach');
   chooseResolution(honest, 'relief-warning');
   assertTerminalHint(honest, 'resolution-answer', 'relief-handoff-honest', 'relief');
+});
+
+function rescueChoices() {
+  const game = ready('rescue', 'relief', 'witness'), choices = [];
+  const record = (action, value) => choices.push({ game: structuredClone(game), action, value });
+  record('answer', 'follow-lead');
+  assert.equal(answer(game, 'follow-lead'), true);
+  record('resolution-answer', 'rescue');
+  assert.equal(chooseResolution(game, 'rescue'), true);
+  record('resolution-answer', 'rescue-radio');
+  assert.equal(chooseResolution(game, 'rescue-radio'), true);
+  record('resolution-answer', 'rescue-carry');
+  assert.equal(chooseResolution(game, 'rescue-carry'), true);
+  assert.equal(resolutionGameActive(game), true);
+  record('resolution-answer', 'back');
+  solveResolutionGame(game);
+  assert.equal(game.phase, 'resolution', 'freeing the boots leaves the final sacrifice undecided');
+  record('resolution-answer', 'back');
+  return choices;
+}
+
+function alignRescue(game) {
+  for (let steps = 0; !rescueStatus(game.resolution.activity.state).aligned; steps++) {
+    assert.ok(steps < 24, 'the tape alignment must remain reachable');
+    assert.equal(resolutionGameAction(game, 'later'), true);
+  }
+  assert.equal(resolutionGameAction(game, 'align'), true);
+}
+
+function finishAfterRescueWithdrawal(game, ending) {
+  if (game.phase === 'resolution') assert.equal(chooseResolution(game, 'back'), true);
+  assert.equal(game.phase, 'debrief');
+  if (ending === 'dissent' || ending === 'witness') {
+    assert.equal(answer(game, ending === 'witness' ? 'expose' : 'sign'), true);
+  } else if (ending === 'rescue' || ending === 'relief') {
+    enter(ending, game);
+    for (const choice of paths[ending]) {
+      solveResolutionGame(game);
+      assert.equal(chooseResolution(game, choice), true);
+    }
+  } else {
+    const outcome = ending === 'guide_shot' ? 'secured' : ending === 'guide_arrested' ? 'arrested' : 'spared';
+    interview(outcome, ending === 'guide_arrested', game);
+    if (ending === 'guide_interrupted') {
+      assert.equal(answerGuideDebrief(game, guideDebrief(game).options.find(option => option.action === 'rifle').id), true);
+    } else {
+      while (game.phase === 'guide') assert.equal(answerGuideDebrief(game, guideDebrief(game).options[0].id), true);
+    }
+  }
+  assert.equal(game.phase, 'ending');
+  assert.equal(endingId(game), ending);
+}
+
+test('rescue entry and withdrawals retain every ending demonstrated by real continuation paths', () => {
+  const all = Object.keys(ENDINGS);
+  const reachable = ['rescue', 'relief', 'witness', 'dissent', ...guideEndings];
+  for (const { game, action, value } of rescueChoices()) {
+    const before = structuredClone(game);
+    // A live rescue is intentionally an open bound, including future registry
+    // additions. Proven paths below do not justify pruning that conservative set.
+    assert.deepEqual(possibleChoiceEndings(game, action, value), sorted(all));
+    for (const ending of reachable) {
+      const actual = structuredClone(game);
+      assert.equal(action === 'answer' ? answer(actual, value) : chooseResolution(actual, value), true);
+      finishAfterRescueWithdrawal(actual, ending);
+      assert.equal(hasSeenChoiceEndings(game, action, value, historyExcept(ending)), false,
+        `${action}/${value} must retain its real ${ending} continuation`);
+    }
+    for (const ending of all) assert.equal(hasSeenChoiceEndings(game, action, value, historyExcept(ending)), false);
+    assert.equal(hasSeenChoiceEndings(game, action, value, all), true);
+    assert.deepEqual(game, before);
+  }
+});
+
+test('rescue timing controls stay unmarked and the final sacrifice unlocks only after real play', () => {
+  const game = enter('rescue');
+  chooseResolution(game, 'rescue-radio');
+  chooseResolution(game, 'rescue-carry');
+  const all = Object.keys(ENDINGS);
+  for (let frame = 0; frame < 3; frame++) {
+    const before = structuredClone(game);
+    assert.equal(getResolution(game).options.find(option => option.id === 'rescue-leave').disabled, true);
+    assert.equal(chooseResolution(game, 'rescue-leave'), false);
+    assert.equal(possibleChoiceEndings(game, 'resolution-answer', 'rescue-leave'), null);
+    for (const value of ['earlier', 'later', 'align', 'pull', 'release', 'complete', 'unknown']) {
+      assert.equal(possibleChoiceEndings(game, 'resolution-game', value), null);
+      assert.equal(hasSeenChoiceEndings(game, 'resolution-game', value, all), false);
+    }
+    assert.equal(resolutionGameAction(game, 'complete'), false, 'a forged shortcut is not a player action');
+    assert.deepEqual(game, before);
+    advance(game, .1);
+  }
+  alignRescue(game);
+  let frame = 0;
+  while (!rescueStatus(game.resolution.activity.state).canPull) {
+    advance(game, .05);
+    assert.ok(frame++ < 1000);
+  }
+  assert.equal(resolutionGameAction(game, 'pull'), true);
+  advance(game, .1);
+  const pulling = structuredClone(game);
+  assert.equal(rescueStatus(game.resolution.activity.state).holding, true);
+  assert.equal(hasSeenChoiceEndings(game, 'resolution-game', 'release', all), false);
+  assert.equal(hasSeenChoiceEndings(game, 'resolution-game', 'pull', all), false);
+  assert.deepEqual(game, pulling);
+  assert.equal(resolutionGameAction(game, 'release'), true);
+  while (rescueStatus(game.resolution.activity.state).safe) {
+    advance(game, .05);
+    assert.ok(frame++ < 1000);
+  }
+  assert.equal(hasSeenChoiceEndings(game, 'resolution-game', 'pull', all), false,
+    'the same rendered control remains unmarked when the roots tighten');
+  solveResolutionGame(game);
+  assert.equal(resolutionGameActive(game), false);
+  assertTerminalHint(game, 'resolution-answer', 'rescue-leave', 'rescue');
+  assert.equal(hasSeenChoiceEndings(game, 'resolution-answer', 'back', ['rescue']), false);
+  for (const value of ['earlier', 'later', 'align', 'pull', 'release']) {
+    assert.equal(hasSeenChoiceEndings(game, 'resolution-game', value, all), false);
+    assert.equal(resolutionGameAction(game, value), false);
+  }
+});
+
+test('rescue previews preserve saves, transcripts, history and random state across timing snapshots', () => {
+  const game = enter('rescue');
+  chooseResolution(game, 'rescue-radio');
+  chooseResolution(game, 'rescue-carry');
+  alignRescue(game);
+  const history = { collected: Object.keys(ENDINGS), runs: [{ id: 'previous', reports: [] }] };
+  const priorHistory = JSON.stringify(history), random = Math.random;
+  let randomCalls = 0;
+  try {
+    Math.random = () => { randomCalls++; return .5; };
+    for (let frame = 0; frame < 5; frame++) {
+      advance(game, .37);
+      const save = JSON.stringify(game);
+      for (const [action, value] of [['resolution-answer', 'back'], ['resolution-answer', 'rescue-leave'], ['resolution-game', 'pull'], ['resolution-game', 'align']]) {
+        possibleChoiceEndings(game, action, value);
+        hasSeenChoiceEndings(game, action, value, history.collected);
+        assert.equal(JSON.stringify(game), save);
+        assert.equal(JSON.stringify(history), priorHistory);
+      }
+    }
+  } finally {
+    Math.random = random;
+  }
+  assert.equal(randomCalls, 0);
+});
+
+test('locked rescue leads and practice rescue controls cannot receive collection hints', () => {
+  const locked = ready(), all = Object.keys(ENDINGS);
+  assert.equal(startResolution(locked), true);
+  const before = structuredClone(locked);
+  assert.equal(getResolution(locked).options.find(option => option.id === 'rescue').disabled, true);
+  assert.equal(possibleChoiceEndings(locked, 'resolution-answer', 'rescue'), null);
+  assert.equal(hasSeenChoiceEndings(locked, 'resolution-answer', 'rescue', all), false);
+  assert.equal(resolutionGameAction(locked, 'pull'), false);
+  assert.deepEqual(locked, before);
+  const practice = createMiniGame('rescue', 'story', 42);
+  assert.ok(practice);
+  assert.equal(resolutionGameActive(practice), true);
+  for (const [action, value] of [['resolution-answer', 'back'], ['resolution-answer', 'rescue-leave'], ['resolution-game', 'pull']]) {
+    assert.equal(possibleChoiceEndings(practice, action, value), null);
+    assert.equal(hasSeenChoiceEndings(practice, action, value, all), false);
+  }
+  solveResolutionGame(practice);
+  assert.equal(hasSeenChoiceEndings(practice, 'resolution-answer', 'rescue-leave', all), false);
 });
 
 test('committing to the recovery team includes all four separately collected outcomes', () => {

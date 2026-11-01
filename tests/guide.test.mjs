@@ -5,6 +5,7 @@ import { sightingPromptReady } from '../docs/watch-story.js';
 import { readFileSync } from 'node:fs';
 import { createGame, answer, advance, restore, serialize, getEnding, BRIEFINGS, ENDINGS, enterField, inspect } from '../docs/engine.js';
 import { guideTravel, guideRouteStatus, inspectGuide, focusGuide, fireGuide, spareGuide, guideWall, projectGuide, isGuideAftermath, guideDebrief, answerGuideDebrief } from '../docs/guide.js';
+import { resolutionGameActive } from '../docs/resolution-games.js';
 function begin(){const s=createGame('story',123);Object.assign(s,{phase:'debrief',shift:2,question:2});answer(s,'guide');return s;}
 function walkToClue(s){
   assert.equal(guideTravel(s),true);
@@ -298,7 +299,7 @@ test('every guide result opens both debrief questions before it can be archived'
   for(const outcome of ['spared','secured','arrested']){
     const game=explore();if(outcome==='spared')spareGuide(game);else if(outcome==='secured')for(let i=0;i<3;i++)hitNext(game);else for(let i=0;i<6;i++)fireGuide(game,0,0);
     let archived=0;const dialogs=[];
-    const context=vm.createContext({game,lastModalKey:'',sightingPromptReady,guideDebrief,isGuideAftermath,getEnding,ENDINGS,
+    const context=vm.createContext({game,lastModalKey:'',sightingPromptReady,guideDebrief,isGuideAftermath,getEnding,ENDINGS,resolutionGameActive,
       paper:(title,body,tag)=>({title,body,tag}),esc:String,
       archiveRun(){archived++;},showModal(kind,paper){dialogs.push({kind,...paper});}});
     vm.runInContext(scene+';sceneDialog();sceneDialog();',context);
@@ -364,7 +365,7 @@ test('guide keyboard shortcuts follow the current action and respect focused but
   const source=readFileSync(new URL('../docs/app.js',import.meta.url),'utf8');
   const keyboard=source.slice(source.indexOf("document.addEventListener('keydown'"),source.indexOf("document.addEventListener('visibilitychange'"));
   const calls=[],game=begin();let keydown;
-  const context=vm.createContext({game,paused:false,dialog:{open:false},menuOpen:()=>false,
+  const context=vm.createContext({game,paused:false,dialog:{open:false},menuOpen:()=>false,resolutionGameActive,
     document:{addEventListener(type,handler){if(type==='keydown')keydown=handler;}},
     compulsionNotice:{matches:()=>false},$:()=>({matches:()=>false}),nearbyGuideSite:s=>guideRouteStatus(s).ready,
     act(...args){calls.push(args);},togglePause(){}});

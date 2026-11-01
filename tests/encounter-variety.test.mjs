@@ -16,6 +16,7 @@ import { canTakeEvidenceOutside } from '../docs/ending-requirements.js';
 import { encounterMarkup, notebookMarkup } from '../docs/art.js';
 import { decisionQuestion } from '../docs/decision-copy.js';
 import { encodeProgress, decodeProgress, progressSnapshot } from '../docs/progress.js';
+import { solveResolutionGame } from './helpers/resolution-play.mjs';
 
 const seeds = [1, 42, 847, 12345];
 const timings = [[2, 4], [8, 10], [15, 17], [22, 24]];
@@ -316,7 +317,10 @@ for (const mode of ['story', 'hard']) for (const [name, route] of Object.entries
         assert.equal(availableResolutions(game).find(option => option.id === name).disabled, false);
         assert.equal(answer(game, 'follow-lead'), true);
         assert.equal(chooseResolution(game, name), true);
-        for (const action of route.actions) assert.equal(chooseResolution(game, action), true);
+        for (const action of route.actions) {
+          solveResolutionGame(game);
+          assert.equal(chooseResolution(game, action), true);
+        }
       }
       assert.equal(game.phase, 'ending');
       assert.equal(game.ending, name);

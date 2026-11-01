@@ -21,7 +21,7 @@ function harness(waiting = true) {
   const reg = { waiting: waiting ? worker : null, update: async () => calls.push('check'), addEventListener: (name, fn) => { workerEvents[name] = fn; } };
   const serviceWorker = { controller: {}, register: async () => reg, addEventListener: (name, fn) => { events[name] = fn; } };
   const document = { hidden: false, addEventListener: (name, fn) => { events[name] = fn; }, querySelectorAll: () => Object.values(buttons).slice(0, 2) };
-  const context = { navigator: { serviceWorker }, document, location: { protocol: 'https:', reload: () => calls.push('reload') }, $: id => buttons[id], save: () => calls.push('save'), syncAudio() {}, toast() {}, paused: false, setInterval() {}, MutationObserver: class { observe() {} } };
+  const context = { game: null, releaseResolutionGame() {}, navigator: { serviceWorker }, document, location: { protocol: 'https:', reload: () => calls.push('reload') }, $: id => buttons[id], save: () => calls.push('save'), syncAudio() {}, toast() {}, paused: false, setInterval() {}, MutationObserver: class { observe() {} } };
   vm.runInNewContext(updateCode, context);
   return { buttons, calls, events, workerEvents, reg, worker };
 }

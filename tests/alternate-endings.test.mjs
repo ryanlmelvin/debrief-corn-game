@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createGame, restore, serialize } from '../docs/engine.js';
+import { solveResolutionGame } from './helpers/resolution-play.mjs';
 import { ENCOUNTERS } from '../docs/encounters.js';
 import { witnessRequirements } from '../docs/ending-requirements.js';
 import { ALTERNATE_ENDINGS, resolutionRequirements, availableResolutions, canResolve, startResolution, getResolution, chooseResolution, validResolution, resolutionEnding } from '../docs/alternate-endings.js';
@@ -39,7 +40,7 @@ function enter(route, s = ready(route)) {
 }
 function finish(route, s = ready(route), path = paths[route]) {
   enter(route, s);
-  for (const id of path) assert.equal(chooseResolution(s, id), true);
+  for (const id of path) { solveResolutionGame(s); assert.equal(chooseResolution(s, id), true); }
   return s;
 }
 
@@ -98,6 +99,7 @@ test('each route requires all three scenes, preserves its exact state on reload,
   for (const [route, path] of Object.entries(paths)) {
     let s = enter(route);
     for (let step = 0; step < path.length; step++) {
+      solveResolutionGame(s);
       const current = getResolution(s), before = JSON.stringify(s);
       assert.equal(current.step, step + 1);
       assert.equal(current.total, 3);

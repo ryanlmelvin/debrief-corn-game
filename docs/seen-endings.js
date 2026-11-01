@@ -2,6 +2,7 @@
 // Preview real transitions on copies; uncertainty must never discourage a choice.
 import { ENDINGS, answer, endingId, getQuestion, eatCrop, chooseFieldEncounter } from './engine.js';
 import { getResolution, chooseResolution } from './alternate-endings.js';
+import { resolutionGameActive } from './resolution-games.js';
 import { guideDebrief, answerGuideDebrief, spareGuide } from './guide.js';
 import { startRogue, chooseRogue, getRogueScene } from './rogue.js';
 
@@ -69,7 +70,8 @@ export function possibleChoiceEndings(game, action, value) {
       // We make no claims about pruning it: every registered ending stays possible.
       if (['briefing', 'tower', 'decision', 'field'].includes(state.phase) ||
           (state.phase === 'debrief' && state.shift < 2) ||
-          (state.phase === 'rogue' && state.rogue?.stage === 'play')) {
+          (state.phase === 'rogue' && state.rogue?.stage === 'play') ||
+          resolutionGameActive(state)) {
         Object.keys(ENDINGS).forEach(id => endings.add(id));
         continue;
       }

@@ -1,6 +1,7 @@
 // Optional final-night resolutions. The encounter journal is the source of truth:
 // a loose encounter flag cannot unlock a route by itself.
 import { endingPathRequirements } from './ending-paths.js';
+import { RESOLUTION_GAMES, createResolutionActivity, validResolutionActivity } from './resolution-games.js';
 export const ALTERNATE_ENDINGS = {
   relief: { code: '11', title: 'I trained my replacement. He’s me.', art: 'ending-relief', stamp: 'RELIEF ACCEPTED', text: 'You give the figure your badge and show it how to check the rifle. It repeats each order without looking at the paper. At the ladder, it asks when its relief will come. You give it the same answer they gave you. By morning, you are on a bus heading out of the county. The department never calls. Two weeks later, your pay arrives, including overtime.', last: 'Your attendance remains perfect.' },
   witness_present: { code: '12', title: 'I brought a plus-one.', art: 'ending-witness', stamp: 'WITNESS PRESENT', text: 'The supervisor looks at the empty chair. You refuse to answer until he speaks to your witness. He asks its name. The chair creaks. The answer begins in the voice that asked you to hold the door. Halfway through, the voice changes. He reaches for the recorder. You move it out of his reach.', last: 'The tape runs out before your witness finishes its name.' },
@@ -35,7 +36,7 @@ export function canResolve(s) { return availableResolutions(s).some(option => !o
 export function startResolution(s) {
   if (s.phase !== 'debrief' || s.shift !== 2 || s.question !== 2 || s.resolution !== undefined) return false;
   s.phase = 'resolution';
-  s.resolution = { route: null, step: 0, answers: [] };
+  s.resolution = { version: 1, route: null, step: 0, answers: [] };
   return true;
 }
 
@@ -79,6 +80,13 @@ function scene(s, route, step) {
     ]
   };
   const entry = scenes[route]?.[step];
+  if (entry && route === 'rescue' && step === 2 && s.resolution?.activity) {
+    const complete = s.resolution.activity.state.stage === 'complete';
+    entry.context = complete
+      ? 'Both boots are free. The radio and recorder keep the roots loose. When you lift the recorder, the path bends again. You set it down. To carry the person out, you need both hands.'
+      : 'The voices must line up before the roots will loosen. Match the recorded breath to the radio, then pull during the quiet stretches.';
+    entry.options[0] = { ...entry.options[0], label: 'Leave the radio and recorder. Carry the person out.', disabled: !complete };
+  }
   return entry ? { ...entry, eyebrow: 'FINAL NIGHT', art: ALTERNATE_ENDINGS[route].art, options: [...entry.options, back()], step: step + 1, total: 3 } : null;
 }
 
@@ -99,7 +107,7 @@ function withdraw(s) {
 }
 
 export function chooseResolution(s, id) {
-  if (!validResolution(s) || s.phase !== 'resolution') return false;
+  if (s.practice || !validResolution(s) || s.phase !== 'resolution') return false;
   const current = getResolution(s), selected = current?.options.find(item => item.id === id && !item.disabled);
   if (!selected) return false;
   const r = s.resolution;
@@ -119,6 +127,11 @@ export function chooseResolution(s, id) {
   r.answers.push({ id });
   if (r.route === null) { r.route = id; return true; }
   r.step++;
+  if (r.step === 2 && RESOLUTION_GAMES.includes(route)) {
+    r.version = 1;
+    r.activity = createResolutionActivity(s, route);
+    s.reports.at(-1).resolutionGame = route;
+  }
   if (r.step < 3) return true;
   if (route === 'rescue') r.recordingsRelinquished = true;
   s.phase = 'ending';
@@ -134,10 +147,15 @@ export function validResolution(s) {
   const r = s.resolution, alternateEnding = s.phase === 'ending' && ROUTES.includes(s.ending);
   if (r === undefined) return s.phase !== 'resolution' && !alternateEnding;
   if (!r || !['resolution', 'ending'].includes(s.phase) || s.shift !== 2 || s.question !== 2 || !Array.isArray(r.answers) || !Number.isInteger(r.step) || r.step < 0 || r.step > 3) return false;
-  if (Object.keys(r).some(key => !['route', 'step', 'answers', 'recordingsRelinquished'].includes(key))) return false;
-  if (r.route === null) return s.phase === 'resolution' && r.step === 0 && r.answers.length === 0 && r.recordingsRelinquished === undefined;
+  if (Object.keys(r).some(key => !['version', 'route', 'step', 'answers', 'recordingsRelinquished', 'activity'].includes(key))) return false;
+  if (r.version !== undefined && r.version !== 1) return false;
+  if (r.route === null) return s.phase === 'resolution' && r.step === 0 && r.answers.length === 0 && r.recordingsRelinquished === undefined && r.activity === undefined;
   if (!ROUTES.includes(r.route) || !resolutionRequirements(s, r.route).every(item => item.met)) return false;
   const completed = r.step === 3;
+  const playable = RESOLUTION_GAMES.includes(r.route) && r.step >= 2;
+  if (r.activity !== undefined && (!playable || !validResolutionActivity(r.activity, r.route))) return false;
+  if (playable && r.version === 1 && !r.activity) return false;
+  if (completed && r.activity && r.activity.state.stage !== 'complete') return false;
   if (completed ? !alternateEnding || s.ending !== r.route : s.phase !== 'resolution') return false;
   if (completed && r.route === 'rescue' ? r.recordingsRelinquished !== true : r.recordingsRelinquished !== undefined) return false;
   if (r.answers.length !== r.step + 1 || !r.answers.every(answer => answer && Object.keys(answer).length === 1 && typeof answer.id === 'string') || r.answers[0].id !== r.route) return false;
@@ -155,6 +173,20 @@ export function validResolution(s) {
     // progress; the stable choice, route, and step bind each saved response.
     return report?.kind === 'resolution' && report.shift === 2 && typeof report.question === 'string' && typeof report.answer === 'string' && report.choice === id && report.resolutionRoute === r.route && report.resolutionStep === i - 1;
   });
+}
+
+// Archived endings keep their original sequence. An older unfinished lead
+// resumes at the new activity without discarding testimony or prerequisites.
+export function migrateResolution(s) {
+  if (!validResolution(s)) return false;
+  const r = s.resolution;
+  if (s.phase !== 'resolution' || !r || r.version !== undefined) return true;
+  r.version = 1;
+  if (RESOLUTION_GAMES.includes(r.route) && r.step === 2) {
+    r.activity = createResolutionActivity(s, r.route);
+    s.reports.at(-1).resolutionGame = r.route;
+  }
+  return validResolution(s);
 }
 
 export function resolutionEnding(s) {

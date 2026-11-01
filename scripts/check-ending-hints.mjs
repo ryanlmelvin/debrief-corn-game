@@ -18,7 +18,7 @@ export const REVIEWED_ENDING_HINTS = Object.freeze({
   guide_shot: reviewed('recovery', 'All three casualties have a distinct identity; remaining ammunition may still permit interruption.'),
   relief: reviewed('direct', 'Only the final handover commits; earlier scenes retain every withdrawal destination.'),
   witness_present: reviewed('direct', 'Only the final recording choice commits; earlier scenes retain every withdrawal destination.'),
-  rescue: reviewed('direct', 'Only leaving the recordings commits; earlier scenes retain every withdrawal destination.'),
+  rescue: reviewed('direct', 'Real tape alignment and timed hold/release inputs free both boots before the stable final sacrifice can commit. Live inputs remain unmarked; entry and withdrawals conservatively retain every ending. Replays verify rescue, alternate leads, outside evidence, signing and all four recovery identities after withdrawal, while previews preserve saves, testimony, history and randomness.'),
   vacancy: reviewed('direct', 'Approval commits; signing the release and refusing approval still allow withdrawal.'),
   transmission: reviewed('direct', 'Only the final broadcast commits; earlier scenes retain every withdrawal destination.'),
   corn_escape: reviewed('direct', 'The stable finale choice is simulated; crossings and entry remain conservatively bounded.'),

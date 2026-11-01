@@ -1,7 +1,8 @@
 import { SIGHTING_TIME, sightingPeople, watchNight, personExitTime, observedSighting } from './watch-story.js';
 import { startGuide, advanceGuide, guideDisposition, restoreGuideRoute } from './guide.js';
 import { ENDING_SHARES } from './sharing.js';
-import { ALTERNATE_ENDINGS, startResolution, validResolution, resolutionEnding } from './alternate-endings.js';
+import { ALTERNATE_ENDINGS, startResolution, validResolution, migrateResolution, resolutionEnding } from './alternate-endings.js';
+import { RESOLUTION_GAMES, advanceResolutionGame } from './resolution-games.js';
 import { ROGUE_ENDINGS, rogueEnding } from './rogue-endings.js';
 import { startRogue, advanceRogue, validRogue } from './rogue.js';
 import { witnessRequirements, canTakeEvidenceOutside, retirePreparations } from './ending-requirements.js';
@@ -112,6 +113,7 @@ export function ringBell(s) {
   return true;
 }
 export function advance(s, dt) {
+  if (s.phase === 'resolution') { advanceResolutionGame(s, dt); return; }
   if (s.phase === 'rogue') { advanceRogue(s, dt); return; }
   if (s.phase === 'guide') { advanceGuide(s, dt); return; }
   if (s.phase !== 'tower' || !Number.isFinite(dt) || dt <= 0) return;
@@ -448,9 +450,11 @@ export function restore(raw) {
     // Keep practice provenance through every save/restore path. A mini game
     // cannot resume as a different route or as a normal story assignment.
     if (s.practice !== undefined) {
-      if (!['watch', 'corn', 'broadcast', 'flood', 'dungeon'].includes(s.practice)) return null;
+      if (!['watch', 'corn', 'broadcast', 'flood', 'dungeon', ...RESOLUTION_GAMES].includes(s.practice)) return null;
       if (s.practice === 'watch') {
         if (s.rogue !== undefined || !['tower', 'field', 'ending'].includes(s.phase) || s.phase === 'ending' && s.ending !== 'breach') return null;
+      } else if (RESOLUTION_GAMES.includes(s.practice)) {
+        if (s.phase !== 'resolution' || s.resolution?.route !== s.practice || s.resolution?.step !== 2 || !s.resolution?.activity || s.ending !== null || s.rogue !== undefined) return null;
       } else if (s.rogue?.route !== s.practice || !['rogue', 'ending'].includes(s.phase)) return null;
     }
     if (!Number.isInteger(s.shift) || s.shift < 0 || s.shift > 2 || !Number.isInteger(s.question) || s.question < 0 || s.question > 3) return null;
@@ -480,7 +484,7 @@ export function restore(raw) {
     }
     if (!s.log.every(l => typeof l.message === 'string') || !s.reports.every(r => typeof r.question === 'string' && typeof r.answer === 'string')) return null;
     if (!retirePreparations(s)) return null;
-    if (!validResolution(s)) return null;
+    if (!migrateResolution(s) || !validResolution(s)) return null;
     if (!validRogue(s)) return null;
     if (s.phase === 'ending' && !Object.hasOwn(ENDINGS,s.ending)) return null;
     if (s.ending === 'guide_interrupted' && (s.phase !== 'ending' || !s.guide)) return null;

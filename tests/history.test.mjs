@@ -9,7 +9,7 @@ const source=readFileSync(new URL('../docs/app.js',import.meta.url),'utf8');
 const block=source.slice(source.indexOf('let history='),source.indexOf('let saved=readSave();'));
 function archive(storage=new Map(),saved=null){
   const elements=new Map();
-  const context=vm.createContext({HISTORY_KEY:'archive',ENDINGS,getEnding,endingId,MINI_GAMES,getMiniGameUnlocks,normalizeMiniGameUnlocks,game:null,dungeonPreview:false,readSave:()=>saved,installHandoff:{update(){}},
+  const context=vm.createContext({HISTORY_KEY:'archive',ENDINGS,getEnding,endingId,MINI_GAMES,getMiniGameUnlocks,normalizeMiniGameUnlocks,game:null,dungeonPreview:false,previewGame:null,readSave:()=>saved,installHandoff:{update(){}},
     localStorage:{getItem:key=>storage.get(key)||null,setItem:(key,value)=>storage.set(key,value)},
     $:id=>{if(!elements.has(id))elements.set(id,{textContent:'',addEventListener(){}});return elements.get(id)},toast(){},esc:String,paper(){},showModal(){}});
   vm.runInContext(block,context);return {context,storage,run:code=>vm.runInContext(code,context)};
