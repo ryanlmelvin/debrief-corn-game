@@ -442,8 +442,9 @@ function act(action,value) {
   if(action==='encounter-continue'||action==='encounter-map') {
     const journey=game.fieldEvents.journey;
     if(!continueFieldEncounter(game))return;
-    closeModal();fieldMap.stop(game);
-    if(action==='encounter-continue'&&journey) {
+    closeModal();
+    if(action==='encounter-map')fieldMap.stop(game);
+    if(action==='encounter-continue'&&journey&&!fieldMap.travel) {
       fieldMap.choose(game,journey.destination);fieldMap.style=journey.style;
       if(!fieldMap.start(game))toast('The walk is no longer safe. Choose a lower-exposure route.');
     }

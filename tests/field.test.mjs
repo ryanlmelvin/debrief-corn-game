@@ -96,3 +96,18 @@ test('automatic travel halts behind pause, menu, dialogs, and a background tab',
     vm.runInContext('frame(1100)',context);assert.equal(ticks,1);
   }
 });
+
+test('encounters pause the chosen walk and continue its remaining steps',()=>{
+  const s=field(),c=controller('corner','direct');
+  assert.equal(c.start(s),true);
+  const travel=c.travel;
+  c.tick(s,1,()=>{s.fieldEvents.pending={};return true;},()=>assert.fail('arrived during encounter'));
+  assert.equal(c.travel,travel);
+  const remaining=travel.steps.length;
+  c.tick(s,1,()=>assert.fail('moved during encounter'),()=>assert.fail('arrived'));
+  assert.equal(travel.steps.length,remaining);
+  s.fieldEvents.pending=null;
+  c.tick(s,1,()=>true,()=>{});
+  assert.equal(travel.steps.length,remaining-1);
+  assert.deepEqual(s.fieldEvents.journey,{destination:'corner',style:'direct'});
+});

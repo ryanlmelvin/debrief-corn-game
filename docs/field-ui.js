@@ -44,13 +44,14 @@ export class FieldMap {
   }
   stop(s) { this.travel=null;this.lastKey='';if(s)s.fieldEvents.journey=null; }
   tick(s,dt,step,arrive) {
-    if(!this.travel)return;
+    if(!this.travel||s.fieldEvents.pending)return;
     this.travel.elapsed+=dt;
     if(this.travel.elapsed<this.travel.interval)return;
     this.travel.elapsed=0;
     const next=this.travel.steps.shift();
     if(next&&!step(next.x-s.player.x,next.y-s.player.y)){this.stop();return;}
-    if(s.phase!=='field'||s.fieldEvents.pending){this.stop();return;}
+    if(s.phase!=='field'){this.stop();return;}
+    if(s.fieldEvents.pending)return;
     if(!this.travel.steps.length){this.stop(s);arrive();}
   }
   updateSelection(s,holdDiscovery=false) {
