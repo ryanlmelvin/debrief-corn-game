@@ -13,13 +13,13 @@ test('a real walk stops for an encounter, blocks movement, and resumes at the sa
   let s=field();const c=Object.assign(Object.create(FieldMap.prototype),{selected:'pump',style:'quiet',travel:null,lastKey:''});
   assert.equal(c.start(s),true);
   for(let i=0;i<3;i++)c.tick(s,.4,(dx,dy)=>move(s,dx,dy),()=>assert.fail('not at landmark yet'));
-  assert.equal(s.fieldSteps,3);assert.equal(s.fieldEvents.pending.id,'first-call');assert.equal(c.travel,null);
+  assert.equal(s.fieldSteps,3);assert.equal(s.fieldEvents.pending.id,'first-call');assert.ok(c.travel);
   const position={...s.player},exposure=s.exposure;
   assert.equal(move(s,0,-1),false);assert.equal(inspect(s),null);assert.equal(beginDebrief(s),false);assert.equal(continueFieldEncounter(s),false);
   s=restore(serialize(s));assert.ok(s);assert.deepEqual(s.player,position);assert.equal(s.fieldEvents.journey.destination,'pump');
   assert.equal(chooseFieldEncounter(s,'record'),true);assert.equal(s.exposure,exposure+5);assert.equal(s.fieldEvents.journal.length,1);
   s=restore(serialize(s));assert.ok(s);assert.equal(chooseFieldEncounter(s,'record'),false);assert.equal(s.exposure,exposure+5);
-  assert.equal(continueFieldEncounter(s),true);assert.equal(c.start(s),true);
+  assert.equal(continueFieldEncounter(s),true);c.stop();assert.equal(c.start(s),true);
   let arrived=0;for(let i=0;i<4;i++)c.tick(s,.4,(dx,dy)=>move(s,dx,dy),()=>{arrived++;inspect(s);});
   assert.equal(arrived,1);assert.ok(s.evidence.includes('ledger'));assert.equal(s.fieldEvents.journal.length,1);assert.equal(s.fieldEvents.journey,null);
 });
