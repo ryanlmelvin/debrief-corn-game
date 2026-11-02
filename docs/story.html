@@ -70,5 +70,10 @@
 <p>[static]</p>
 <p>[static]</p>
 <p>[static]</p></main>
+<script>
+// Safari can restore the pre-update reader from its page history.
+window.addEventListener('pageshow', event => { if (event.persisted) location.reload(); });
+navigator.serviceWorker?.addEventListener('controllerchange', () => location.reload());
+</script>
 </body>
 </html>

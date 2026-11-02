@@ -56,7 +56,7 @@ test('button appears when a new worker finishes installing', async () => {
 test('service worker activates on the explicit update message', async () => {
   const events = {}, calls = [];
   vm.runInNewContext(readFileSync(new URL('../docs/sw.js', import.meta.url), 'utf8'), {
-    URL, self: { location: { hostname: 'example.com', href: 'https://example.com/game/sw.js' }, addEventListener: (name, fn) => { events[name] = fn; }, skipWaiting: async () => calls.push('activate') }
+    URL, self: { location: { hostname: 'example.com', origin: 'https://example.com', href: 'https://example.com/game/sw.js' }, addEventListener: (name, fn) => { events[name] = fn; }, skipWaiting: async () => calls.push('activate') }
   });
   events.message({ data: { type: 'unrelated' } });
   assert.equal(calls.length, 0);
@@ -84,4 +84,22 @@ test('new offline cache downloads release-specific assets without reusing HTTP c
   assert.ok(saved.some(item=>item.url==='https://example.com/game/style.css'));
   assert.ok(saved.some(item=>item.url==='https://example.com/game/'));
   assert.ok(saved.every(item=>!new URL(item.url).search));
+});
+
+test('story reader refreshes online and falls back to the cached document offline', async () => {
+  for (const online of [true, false]) {
+    const events = {}, writes = [];
+    const cached = { source: 'cached' };
+    const fresh = { ok: true, source: 'fresh', clone() { return this; } };
+    vm.runInNewContext(readFileSync(new URL('../docs/sw.js', import.meta.url), 'utf8'), {
+      URL,
+      self: { location: { hostname: 'example.com', origin: 'https://example.com', href: 'https://example.com/game/sw.js' }, addEventListener: (name, fn) => { events[name] = fn; } },
+      caches: { open: async () => ({ match: async () => cached, put: async (...args) => writes.push(args) }) },
+      fetch: async (_request, options) => { assert.equal(options.cache, 'no-store'); if (!online) throw new Error('offline'); return fresh; }
+    });
+    let response;
+    events.fetch({ request: { method: 'GET', url: 'https://example.com/game/story.html?reader=126', mode: 'navigate' }, respondWith: promise => { response = promise; } });
+    assert.equal(await response, online ? fresh : cached);
+    assert.equal(writes.length, online ? 1 : 0);
+  }
 });

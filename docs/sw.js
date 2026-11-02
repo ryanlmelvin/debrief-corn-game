@@ -1,6 +1,6 @@
 // Bump this version whenever a shipped asset changes. An active game keeps its
 // current worker; the new version activates after all old game tabs close.
-const VERSION = 'debrief-v125-single-spaced-datelines';
+const VERSION = 'debrief-v126-refresh-story-reader';
 const DEVELOPMENT = ['localhost', '127.0.0.1', '[::1]'].includes(self.location.hostname);
 const SCOPE = new URL('./', self.location.href).pathname;
 const CACHE_PREFIX = `debrief:${SCOPE}:`;
@@ -34,6 +34,14 @@ self.addEventListener('fetch',event=>{
   event.respondWith((async()=>{
     const cache=await caches.open(CACHE);
     if(DEVELOPMENT){try{const response=await fetch(event.request);if(response.ok)return response;}catch{ /* Use cached assets while offline. */ }}
+    // The standalone reader can outlive a game update in browser history.
+    // Refresh its document online; retain the downloaded copy for offline reading.
+    if(url.pathname===new URL('./story.html',self.location.href).pathname){
+      try{
+        const response=await fetch(event.request,{cache:'no-store'});
+        if(response.ok){await cache.put(new URL('./story.html',self.location.href).href,response.clone());return response;}
+      }catch{ /* Read the saved story offline. */ }
+    }
     const cached=await cache.match(event.request,{ignoreSearch:true});
     if(cached)return cached;
     try{return await fetch(event.request);}
