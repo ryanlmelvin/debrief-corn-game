@@ -33,7 +33,7 @@ const canvas=$('field'), renderer=new Renderer(canvas), dialog=$('paper-dialog')
 const pager=new DialogPager(dialog);
 let modalReturnFocus=null;
 const fieldMap=new FieldMap($('field-exploration'));
-const rogueUI=new RogueUI($('rogue-play'));
+const rogueUI=new RogueUI($('rogue-play'),{onMove:(dx,dy)=>act('rogue-move',`${dx},${dy}`)??false});
 const resolutionUI=new ResolutionGamesUI($('resolution-play'));
 const guide3d=new Guide3D($('guide-exploration'),{
   onInspect:id=>act('guide-inspect',id),
@@ -45,7 +45,7 @@ let guideLoadRequested=false;
 $('investigate-urge').innerHTML=pressureWordMarkup();
 const menu=$('game-menu');
 const menuOpen=()=>menu.matches(':popover-open');
-menu.addEventListener('toggle',()=>{if(menuOpen()){releaseResolutionGame(game);guide3d.release();save();}syncAudio();});
+menu.addEventListener('toggle',()=>{if(menuOpen()){releaseResolutionGame(game);guide3d.release();rogueUI.release();save();}syncAudio();});
 menu.addEventListener('click',event=>{if(event.target.closest('button')&&!event.target.closest('[popovertarget]'))menu.hidePopover();});
 function browserPlaytestEnabled() {
   const requested=new URLSearchParams(location.search).get('playtest');
@@ -176,6 +176,7 @@ function paper(title,body,tag='') {
 function showModal(kind,html,art=null) {
   releaseResolutionGame(game);
   guide3d.release();
+  rogueUI.release();
   modalReturnFocus=menuOpen()?$('game-menu-toggle'):null;
   if(menuOpen())menu.hidePopover();
   modalKind=kind;$('dialog-content').innerHTML=html;
@@ -379,6 +380,7 @@ function updateUI(force=false) {
     $('objective-detail').textContent=game.rogue.message;
     $('phase-label').textContent='BEYOND PROTOCOL';
     $('station-status').textContent=dungeonPreview?'LOCAL PLAYTEST':'SIGNAL LOST';
+    if(game.rogue.route==='corn')$('control-hint').textContent='ARROWS / WASD TO HOP · SWIPE OR USE ARROWS ON PHONE';
     if(game.rogue.route==='dungeon')$('control-hint').textContent='ARROWS / WASD · F / SPACE FIRE · R RELOAD · PERIOD WAIT';
   }
   resolutionUI.render(game,paused||dialog.open||menuOpen());
@@ -484,11 +486,11 @@ function act(action,value) {
   }
   if(action==='rogue-choice'||action==='rogue-move'){
     const debriefAnswer=action==='rogue-choice'&&modalKind==='dungeon-debrief'&&game?.rogue?.route==='dungeon'&&game.rogue.stage==='debrief';
-    if(!game||game.phase!=='rogue'||paused||dialog.open&&!debriefAnswer||menuOpen())return;
+    if(!game||game.phase!=='rogue'||paused||dialog.open&&!debriefAnswer||menuOpen()||action==='rogue-move'&&game.rogue.route==='corn'&&(document.hidden||rogueUI.loading))return false;
     const changed=action==='rogue-choice'?chooseRogue(game,value):moveRogue(game,...String(value).split(',').map(Number));
-    if(!changed)return;
+    if(!changed)return false;
     if(game.rogue?.route==='dungeon'&&action==='rogue-choice'&&value==='fire')shotSound('hit');
-    lastModalKey='';save();updateUI(true);return;
+    lastModalKey='';save();updateUI(true);return true;
   }
   if(action==='watch-record'){
     if(!game?.watch)return;
@@ -632,7 +634,7 @@ $('new-game').addEventListener('click',()=>{
   else begin($('difficulty').value);
 });
 $('resume').addEventListener('click',()=>begin(null,true));
-function togglePause(force) {if(!game||game.phase==='ending'||dialog.open)return;paused=typeof force==='boolean'?force:!paused;if(paused){releaseResolutionGame(game);guide3d.release();}updateUI();save();syncAudio();}
+function togglePause(force) {if(!game||game.phase==='ending'||dialog.open)return;paused=typeof force==='boolean'?force:!paused;if(paused){releaseResolutionGame(game);guide3d.release();rogueUI.release();}updateUI();save();syncAudio();}
 $('pause').addEventListener('click',()=>togglePause());$('unpause').addEventListener('click',()=>{togglePause(false);if(guide3d.active)guide3d.focus();else (resolutionGameActive(game)?$('resolution-play'):game?.phase==='rogue'?$('rogue-play'):canvas).focus({preventScroll:true});});
 dialog.addEventListener('cancel',event=>{if(modalKind==='mini-result'){event.preventDefault();showMiniGames();}else if(modalKind==='resolution-menu'){event.preventDefault();act('resolution-answer','back');}else if(['briefing','debrief','guide-debrief','dungeon-debrief','resolution','ending','encounter'].includes(modalKind))event.preventDefault();else{event.preventDefault();act('close');}});
 $('manual').addEventListener('click',()=>showModal('manual',paper('Field manual',`<ol class="orders"><li><span>01</span>Watch the corn. Shoot any that try to escape.</li><li><span>02</span>Remain in the watchtower.</li><li><span>03</span>Do not consume the crop.</li><li><span>04</span>Remember any irregularities for your debrief at the end of the night.</li></ol><button class="primary" data-action="close">Close</button>`)));
@@ -695,6 +697,7 @@ document.addEventListener('keydown',event=>{
     return;
   }
   if(game.phase==='rogue'){
+    if(game.rogue.route==='corn'&&rogueUI.cornOwnsInput)return;
     const directions={arrowup:'0,-1',w:'0,-1',arrowdown:'0,1',s:'0,1',arrowleft:'-1,0',a:'-1,0',arrowright:'1,0',d:'1,0'};
     if(['corn','dungeon'].includes(game.rogue.route)&&game.rogue.stage==='play'&&directions[k]){
       event.preventDefault();if(game.rogue.route!=='dungeon'||!event.repeat)act('rogue-move',directions[k]);
@@ -1028,7 +1031,8 @@ if ('serviceWorker' in navigator && ['https:', 'http:'].includes(location.protoc
 function frame(now) {
   const dt=lastFrame?Math.min((now-lastFrame)/1000,.1):0;lastFrame=now;
   const guideLoading=game?.phase==='guide'&&!guide3d.ready&&!guide3d.failed;
-  if(game&&!guideLoading&&!paused&&!dialog.open&&!menuOpen()&&!document.hidden&&(!game.practice||!miniGameComplete(game))){
+  const cornLoading=game?.phase==='rogue'&&game.rogue?.route==='corn'&&rogueUI.loading;
+  if(game&&!guideLoading&&!cornLoading&&!paused&&!dialog.open&&!menuOpen()&&!document.hidden&&(!game.practice||!miniGameComplete(game))){
     advance(game,dt);
     if(game.phase==='tower')updateReloadUI(game, false);
     if(game.phase==='field'&&!game.practice)fieldMap.tick(game,dt,(dx,dy)=>move(game,dx,dy),()=>{

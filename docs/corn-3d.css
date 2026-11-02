@@ -1,0 +1,22 @@
+/* The fixed camera leaves the crossing and its controls the available space. */
+#rogue-play[data-route="corn"][data-stage="play"]{padding:68px max(10px,env(safe-area-inset-right)) max(10px,env(safe-area-inset-bottom)) max(10px,env(safe-area-inset-left))}
+.rogue-game.corn-3d-game{max-width:1240px;grid-template-rows:auto minmax(0,1fr) auto;gap:8px}
+.corn-3d-hud{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:0 6px;font:11px/1.4 ui-monospace,monospace;color:#cbd0b1}
+.corn-3d-hud p{margin:0}.corn-3d-hud .rogue-condition{display:flex;gap:8px;align-items:baseline;font-size:11px}.corn-3d-hud .rogue-condition span{font-size:10px;letter-spacing:0}.corn-3d-hud .rogue-condition b{font-size:12px}
+.corn-3d-stage{position:relative;min-height:0;width:100%;height:100%;overflow:hidden;background:#18231d;touch-action:none}
+.corn-3d-stage:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
+.corn-3d-canvas,.corn-3d-fallback{display:block;width:100%;height:100%;touch-action:none}
+.corn-3d-canvas[hidden],.corn-3d-fallback[hidden]{display:none}
+.corn-3d-fallback .rogue-crossing{height:100%;width:100%;max-height:none}
+.corn-3d-stage .rogue-message{position:absolute;left:50%;bottom:10px;transform:translateX(-50%);width:max-content;max-width:calc(100% - 28px);min-height:0;margin:0;padding:8px 12px;background:#142018eb;border:1px solid #8c987177;pointer-events:none;font:13px/1.4 Georgia,serif;text-align:center}
+.corn-3d-stage .rogue-message:empty{display:none}
+.corn-3d-game .corn-3d-controls{grid-column:1;grid-row:3;margin:0;grid-template-columns:repeat(3,52px);grid-template-rows:repeat(2,46px);gap:5px}
+.corn-3d-controls button{touch-action:none!important;user-select:none;-webkit-user-select:none}
+.corn-3d-controls button.held{background:#3b4c30;border-color:#d8bb7b}
+@media(max-width:760px){#rogue-play[data-route="corn"][data-stage="play"]{padding-top:65px}.corn-3d-hud{font-size:10px}.corn-3d-game .corn-3d-controls{grid-template-columns:repeat(3,56px);grid-template-rows:repeat(2,48px)}}
+@media(max-height:520px) and (min-width:600px){
+ #rogue-play[data-route="corn"][data-stage="play"]{padding-top:58px;padding-bottom:6px}
+ .rogue-game.corn-3d-game{grid-template-columns:minmax(0,1fr) 180px;grid-template-rows:auto minmax(0,1fr);gap:5px 12px}
+ .corn-3d-hud{grid-column:1/-1}.corn-3d-stage{grid-column:1;grid-row:2}.corn-3d-game .corn-3d-controls{grid-column:2;grid-row:2;align-self:center}
+ .corn-3d-stage .rogue-message{font-size:12px;padding:5px 8px;bottom:5px}
+}

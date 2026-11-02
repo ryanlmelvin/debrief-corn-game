@@ -1,6 +1,7 @@
 import { getRogueScene, cornHazards, broadcastCursor, broadcastWindow, floodConnections } from './rogue.js';
 import { pressureWordMarkup } from './pressure-word.js';
 import { dungeonMarkup, renderDungeon } from './dungeon-ui.js';
+import { Corn3DUI } from './corn-3d-ui.js';
 
 const escape = value => String(value).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const TITLES = { corn: 'Shoot any that try to escape.', broadcast: 'Everyone is listening.', flood: 'The field drinks first.' };
@@ -25,7 +26,7 @@ function head(route) {
 
 function status() { return '<p id="rogue-message" class="rogue-message" role="status" aria-live="polite" aria-atomic="true"></p>'; }
 
-function cornMarkup(game) {
+function cornBoardMarkup(game) {
   const r = game.rogue, road = trafficCrossing(r);
   const lanes = Array.from({ length: 9 }, (_, y) => {
     const safe = [0, 4, 8].includes(y);
@@ -33,7 +34,11 @@ function cornMarkup(game) {
     const boundary = safe || [3, 7].includes(y);
     return `<g><rect x="-.5" y="${y - .5}" width="11" height="1" fill="${fill}"/>${road ? `<path d="M-.5 ${y + .5}H10.5" stroke="${boundary ? '#c9bc83' : '#b5b89f'}" stroke-opacity="${boundary ? '.8' : '.5'}" stroke-width="${boundary ? '.035' : '.025'}" ${boundary ? '' : 'stroke-dasharray=".5 .6"'}/>` : `<path d="M-.5 ${y + .5}H10.5" stroke="${safe ? '#8f9a68' : '#697255'}" stroke-width=".018" stroke-dasharray="${safe ? '.08 .07' : '.025 .11'}"/>`}</g>`;
   }).join('');
-  return `<div class="rogue-game rogue-corn-game${road ? ' rogue-road-game' : ''}">${head('corn')}<div class="rogue-play-layout"><div class="rogue-crossing-wrap"><svg id="rogue-crossing" class="rogue-crossing" viewBox="-.5 -.5 11 9" role="img" aria-label="${road ? 'Corn crossing six lanes of traffic. The median provides cover.' : 'Corn crossing the firing lanes. The middle ditch provides cover.'}"><defs><clipPath id="rogue-hazard-clip"><rect x="-.5" y=".5" width="11" height="7"/></clipPath></defs>${lanes}${road ? '' : `<g class="rogue-grid" stroke="#a8b58c" stroke-opacity=".08" stroke-width=".015">${Array.from({ length: 10 }, (_, x) => `<path d="M${x + .5}-.5V8.5"/>`).join('')}</g>`}<g id="rogue-bullets" clip-path="url(#rogue-hazard-clip)" aria-hidden="true"></g><g id="rogue-corn" transform="translate(5 8)" aria-hidden="true"><ellipse cy=".08" rx=".37" ry=".15" fill="#08110bee"/>${CORN}<rect class="rogue-hit-marker" x="-.2" y="-.2" width=".4" height=".4" rx=".08"/></g></svg></div><aside class="rogue-control-panel">${status()}<div class="rogue-dpad" role="group" aria-label="Move your corn"><button class="rogue-up" data-action="rogue-move" data-value="0,-1" aria-label="Move ${road ? 'toward the far shoulder' : 'toward the road'}">↑</button><button class="rogue-left" data-action="rogue-move" data-value="-1,0" aria-label="Move left">←</button><button class="rogue-down" data-action="rogue-move" data-value="0,1" aria-label="Move back ${road ? 'toward the near shoulder' : 'toward the rows'}">↓</button><button class="rogue-right" data-action="rogue-move" data-value="1,0" aria-label="Move right">→</button></div></aside></div></div>`;
+  return `<svg id="rogue-crossing" class="rogue-crossing" viewBox="-.5 -.5 11 9" role="img" aria-label="${road ? 'Corn crossing six lanes of traffic. The median provides cover.' : 'Corn crossing the firing lanes. The middle ditch provides cover.'}"><defs><clipPath id="rogue-hazard-clip"><rect x="-.5" y=".5" width="11" height="7"/></clipPath></defs>${lanes}${road ? '' : `<g class="rogue-grid" stroke="#a8b58c" stroke-opacity=".08" stroke-width=".015">${Array.from({ length: 10 }, (_, x) => `<path d="M${x + .5}-.5V8.5"/>`).join('')}</g>`}<g id="rogue-bullets" clip-path="url(#rogue-hazard-clip)" aria-hidden="true"></g><g id="rogue-corn" transform="translate(5 8)" aria-hidden="true"><ellipse cy=".08" rx=".37" ry=".15" fill="#08110bee"/>${CORN}<rect class="rogue-hit-marker" x="-.2" y="-.2" width=".4" height=".4" rx=".08"/></g></svg>`;
+}
+
+function cornMarkup(game) {
+  return `<div class="rogue-game rogue-corn-game corn-3d-game"><header class="corn-3d-hud"><h2 id="rogue-title" class="sr-only" tabindex="-1">Corn Escape</h2><p id="corn-3d-crossing"></p><p class="rogue-condition"><span>HUSK</span><b id="rogue-health"></b></p></header><div class="corn-3d-stage" tabindex="0" role="group" aria-label="Corn Escape. Use WASD or arrow keys to hop. Swipe or use the arrow buttons on touch screens."><canvas id="corn-3d-canvas" class="corn-3d-canvas" hidden aria-hidden="true"></canvas><div class="corn-3d-fallback">${cornBoardMarkup(game)}</div>${status()}</div><div class="corn-3d-controls rogue-dpad" role="group" aria-label="Move your corn"><button type="button" class="rogue-up" data-direction="up" aria-label="Hop forward">↑</button><button type="button" class="rogue-left" data-direction="left" aria-label="Hop left">←</button><button type="button" class="rogue-down" data-direction="down" aria-label="Hop back">↓</button><button type="button" class="rogue-right" data-direction="right" aria-label="Hop right">→</button></div></div>`;
 }
 
 function broadcastMarkup() {
@@ -46,62 +51,96 @@ function floodMarkup() {
 
 /** Keeps live controls mounted so keyboard focus and touch targets never move with the simulation. */
 export class RogueUI {
-  constructor(root) { this.root = root; this.key = ''; this.hazardNodes = new Map(); this.lastMessage = ''; }
+  constructor(root, { onMove = () => false } = {}) {
+    this.root = root; this.onMove = onMove; this.key = ''; this.hazardNodes = new Map(); this.lastMessage = '';
+    this.corn3d = null; this.cornBoard = ''; this.cornNotice = ''; this.cornNoticeUntil = 0;
+  }
+
+  get loading() { return this.corn3d?.loading || false; }
+  get cornOwnsInput() { return !!this.corn3d && !this.corn3d.disposed; }
+  release() { this.corn3d?.release(); }
+  disposeCorn() { this.corn3d?.dispose(); this.corn3d = null; this.cornBoard = ''; this.cornNotice = ''; this.cornNoticeUntil = 0; }
+
 
   render(game, paused = false) {
     const active = game?.phase === 'rogue' && game.rogue && game.rogue.stage !== 'debrief';
     this.root.hidden = !active;
-    if (!active) { this.key = ''; return; }
-    const r = game.rogue, key = `${game.runId}:${r.route}:${r.stage}:${r.route === 'corn' ? `${r.patternVersion || 1}:${r.crossing || 0}` : ''}`;
+    if (!active) { this.disposeCorn(); this.key = ''; return; }
+    const r = game.rogue, key = `${game.runId}:${r.route}:${r.stage}:${r.route === 'corn' ? r.patternVersion || 1 : ''}`;
     if (key !== this.key) {
+      this.disposeCorn();
       const hadFocus = !this.key || this.root.contains(document.activeElement);
       this.key = key; this.hazardNodes = new Map(); this.lastMessage = ''; delete this.root.dataset.dungeonRender;
       this.root.dataset.route = r.route; this.root.dataset.stage = r.stage;
       this.root.innerHTML = r.stage === 'play' ? ({ corn: cornMarkup, broadcast: broadcastMarkup, flood: floodMarkup, dungeon: dungeonMarkup }[r.route])(game) : sceneMarkup(game);
-      if (hadFocus) this.root.querySelector('#rogue-title')?.focus({ preventScroll: true });
+      if (r.route === 'corn' && r.stage === 'play') {
+        this.cornBoard = `${r.patternVersion || 1}:${r.crossing || 0}`;
+        this.corn3d = new Corn3DUI({ root: this.root.querySelector('.corn-3d-game'),
+          canvas: this.root.querySelector('#corn-3d-canvas'), surface: this.root.querySelector('.corn-3d-stage'),
+          buttons: this.root.querySelector('.corn-3d-controls'), fallback: this.root.querySelector('.corn-3d-fallback'),
+          onMove: this.onMove });
+      }
+      if (hadFocus) this.root.querySelector(this.corn3d ? '.corn-3d-stage' : '#rogue-title')?.focus({ preventScroll: true });
     }
     this.root.classList.toggle('rogue-is-paused', paused);
-    this.root.querySelectorAll('button').forEach(button => { button.disabled = paused; });
+    this.root.querySelectorAll('button').forEach(button => { button.disabled = paused || this.loading; });
     if (r.stage !== 'play') return;
     if (r.route === 'dungeon') { renderDungeon(this.root, game, paused); return; }
     const q = selector => this.root.querySelector(selector);
     q('#rogue-health').textContent = r.route === 'corn' ? `${3 - r.hits} / 3` : r.route === 'broadcast' ? `${r.locks} / 3 locked` : `${3 - r.hits} seals left`;
     q('.rogue-condition').classList.toggle('rogue-critical', r.hits >= 2);
-    const message = r.message || (r.route === 'corn' ? 'The guard above has your rifle.' : r.route === 'broadcast' ? 'Listen for the space between voices.' : 'The pumps are still feeding the roots.');
-    if (message !== this.lastMessage) { q('#rogue-message').textContent = message; this.lastMessage = message; }
-    if (r.route === 'corn') this.renderCorn(game, q);
+    const message = r.message || (r.route === 'corn' ? '' : r.route === 'broadcast' ? 'Listen for the space between voices.' : 'The pumps are still feeding the roots.');
+    let visibleMessage = message;
+    if (r.route === 'corn') {
+      const notice = `${r.crossing}:${r.hits}:${message}`;
+      if (notice !== this.cornNotice) { this.cornNotice = notice; this.cornNoticeUntil = r.time + 3.3; }
+      visibleMessage = r.time < this.cornNoticeUntil ? message : '';
+      q('#rogue-message').hidden = !visibleMessage;
+    }
+    if (visibleMessage !== this.lastMessage) { q('#rogue-message').textContent = visibleMessage; this.lastMessage = visibleMessage; }
+    if (r.route === 'corn') { this.renderCorn(game, q); this.corn3d.render(game, paused); }
     if (r.route === 'broadcast') this.renderBroadcast(game, q, paused);
     if (r.route === 'flood') this.renderFlood(game, q);
   }
 
   renderCorn(game, q) {
-    const r = game.rogue, hazards = cornHazards(game), layer = q('#rogue-bullets'), road = trafficCrossing(r);
-    q('.rogue-eyebrow').textContent = `${road ? 'THE ROAD' : 'SPECIMEN 04'} / CROSSING ${(r.crossing || 0) + 1} OF 3`;
-    const visible = new Set();
-    hazards.forEach((hazard, index) => {
-      const id = hazard.id ?? `${hazard.kind}-${index}`;
-      visible.add(id);
-      let node = this.hazardNodes.get(id);
-      if (!node) {
-        node = document.createElementNS('http://www.w3.org/2000/svg', 'g');
-        node.setAttribute('class', `rogue-hazard rogue-${hazard.kind}`);
-        // The viewBox matches the solid body, not the transparent padding or
-        // muzzle trail. Overflow lets the non-colliding trail remain visible.
-        node.innerHTML = hazard.kind === 'car'
-          ? `<svg viewBox="52 99 1678 677" preserveAspectRatio="none" overflow="visible"><image href="./assets/rogue-car.png" width="1774" height="887"/></svg>`
-          : `<svg viewBox="1115 235 995 242" preserveAspectRatio="none" overflow="visible"><image href="./assets/rogue-bullet.png" width="2172" height="724"/></svg>`;
-        layer.append(node); this.hazardNodes.set(id, node);
-      }
-      node.setAttribute('transform', `translate(${hazard.x} ${hazard.y}) scale(${hazard.direction} 1)`);
-      const art = node.querySelector('svg');
-      art.setAttribute('x', -hazard.width / 2); art.setAttribute('y', -hazard.height / 2);
-      art.setAttribute('width', hazard.width); art.setAttribute('height', hazard.height);
-    });
-    for (const [id, node] of this.hazardNodes) if (!visible.has(id)) { node.remove(); this.hazardNodes.delete(id); }
-    q('#rogue-corn').setAttribute('transform', `translate(${r.x} ${r.y})`);
-    q('#rogue-corn').classList.toggle('rogue-immune', r.immuneUntil > r.time);
+    const r = game.rogue, road = trafficCrossing(r), board = `${r.patternVersion || 1}:${r.crossing || 0}`;
+    if (board !== this.cornBoard) {
+      q('.corn-3d-fallback').innerHTML = cornBoardMarkup(game);
+      this.hazardNodes = new Map(); this.cornBoard = board;
+    }
+    q('.corn-3d-game').classList.toggle('rogue-road-game', road);
+    q('#corn-3d-crossing').textContent = road ? 'The road' : `Field ${(r.crossing || 0) + 1} / ${r.patternVersion === 2 ? 2 : 3}`;
+    if (!this.corn3d.world) {
+      const hazards = cornHazards(game), layer = q('#rogue-bullets');
+      const visible = new Set();
+      hazards.forEach((hazard, index) => {
+        const id = hazard.id ?? `${hazard.kind}-${index}`;
+        visible.add(id);
+        let node = this.hazardNodes.get(id);
+        if (!node) {
+          node = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+          node.setAttribute('class', `rogue-hazard rogue-${hazard.kind}`);
+          // The viewBox matches the solid body, not the transparent padding or
+          // muzzle trail. Overflow lets the non-colliding trail remain visible.
+          node.innerHTML = hazard.kind === 'car'
+            ? `<svg viewBox="52 99 1678 677" preserveAspectRatio="none" overflow="visible"><image href="./assets/rogue-car.png" width="1774" height="887"/></svg>`
+            : `<svg viewBox="1115 235 995 242" preserveAspectRatio="none" overflow="visible"><image href="./assets/rogue-bullet.png" width="2172" height="724"/></svg>`;
+          layer.append(node); this.hazardNodes.set(id, node);
+        }
+        node.setAttribute('transform', `translate(${hazard.x} ${hazard.y}) scale(${hazard.direction} 1)`);
+        const art = node.querySelector('svg');
+        art.setAttribute('x', -hazard.width / 2); art.setAttribute('y', -hazard.height / 2);
+        art.setAttribute('width', hazard.width); art.setAttribute('height', hazard.height);
+      });
+      for (const [id, node] of this.hazardNodes) if (!visible.has(id)) { node.remove(); this.hazardNodes.delete(id); }
+      q('#rogue-corn').setAttribute('transform', `translate(${r.x} ${r.y})`);
+      q('#rogue-corn').classList.toggle('rogue-immune', r.immuneUntil > r.time);
+    }
     const description = `You are corn. Crossing ${(r.crossing || 0) + 1} of 3. Column ${r.x + 1} of 11, ${r.y === 0 ? road ? 'at the far shoulder' : 'at the crossing' : r.y === 4 ? road ? 'in the safe median' : 'in the safe ditch' : r.y === 8 ? road ? 'on the near shoulder' : 'in the safe starting rows' : `${road ? 'traffic' : 'firing'} lane ${r.y}`}. ${3 - r.hits} husk layers left.`;
     if (q('#rogue-crossing').getAttribute('aria-label') !== description) q('#rogue-crossing').setAttribute('aria-label', description);
+    const surfaceDescription = `${description} WASD or arrow keys to hop. Swipe or use the arrow buttons on touch screens.`;
+    if (q('.corn-3d-stage').getAttribute('aria-label') !== surfaceDescription) q('.corn-3d-stage').setAttribute('aria-label', surfaceDescription);
   }
 
   renderBroadcast(game, q, paused) {
