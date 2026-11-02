@@ -1,4 +1,4 @@
-// The recovery team follows one readable route, stopping at each discovery.
+// The recovery search supports free exploration and the original guided route.
 export const GUIDE_SIZE = 13;
 export const GUIDE_SITES = [
   { id: 'boot', x: 1.5, y: 9.5, label: 'A boot print', text: 'A boot print full of water. Beside it, a second print faces the other way.' },
@@ -39,14 +39,99 @@ export function startGuide(s) {
   s.guide = { ...routePose(0), routeVersion: 1, routeProgress: 0, walking: false, encounterVersion: 2, outcome: null, debriefQuestion: 0, steps: 0, time: 0, clues: [], stage: 'search', team: [], fired: 0, focused: null,
     message: 'Three people follow your light. Lead them to the first crossing.' };
 }
+function guidePositionOpen(x,y) {
+  if (!Number.isFinite(x)||!Number.isFinite(y)) return false;
+  return [-.14,.14].every(dx=>[-.14,.14].every(dy=>!guideWall(x+dx,y+dy)));
+}
+function clearGuideTravel(g) {
+  g.walking=false;
+  delete g.explorationPath;delete g.explorationGoal;delete g.explorationLength;
+}
+export function enableGuideExploration(s) {
+  if (s?.phase!=='guide'||s.guide?.stage!=='search') return false;
+  const g=s.guide;
+  if (g.explorationVersion===1) return true;
+  if (g.explorationVersion!==undefined||!guidePositionOpen(g.x,g.y)) return false;
+  g.explorationVersion=1;g.pitch=-.12;
+  clearGuideTravel(g);
+  return true;
+}
+export function availableGuideSites(s) {
+  if (s?.phase!=='guide'||s.guide?.stage!=='search') return [];
+  const g=s.guide;
+  if (g.explorationVersion!==1) return GUIDE_SITES[g.clues.length]?[GUIDE_SITES[g.clues.length]]:[];
+  // Older free-walk saves may have examined the clearing before the other clues.
+  // Keep it available so those players can gather the team without backtracking.
+  return GUIDE_SITES.filter(site=>site.id==='corner'||!g.clues.includes(site.id));
+}
+export function guideClueInReach(s,site) {
+  if (s?.phase!=='guide'||s.guide?.stage!=='search'||!site) return false;
+  const g=s.guide,dx=site.x-g.x,dy=site.y-g.y;
+  if (!Number.isFinite(g.x)||!Number.isFinite(g.y)||!Number.isFinite(dx)||!Number.isFinite(dy)||Math.hypot(dx,dy)>1.35) return false;
+  for(let i=0;i<=20;i++)if(guideWall(g.x+dx*i/20,g.y+dy*i/20))return false;
+  return true;
+}
+export function moveGuide(s,input,dt) {
+  if (s?.phase!=='guide'||s.guide?.stage!=='search'||s.guide.explorationVersion!==1||!Number.isFinite(dt)||dt<=0) return false;
+  const g=s.guide,axis=value=>Number.isFinite(value)?Math.max(-1,Math.min(1,value)):0;
+  const forward=axis(input?.forward),strafe=axis(input?.strafe),turn=axis(input?.turn),look=axis(input?.look);
+  if (!(forward||strafe||turn||look)) return false;
+  clearGuideTravel(g);dt=Math.min(dt,.1);
+  g.angle-=turn*dt*1.65;g.pitch=Math.max(-1.1,Math.min(.65,g.pitch+look*dt));
+  const distance=.95*dt/Math.max(1,Math.hypot(forward,strafe));
+  const dx=(Math.cos(g.angle)*forward-Math.sin(g.angle)*strafe)*distance;
+  const dy=(Math.sin(g.angle)*forward+Math.cos(g.angle)*strafe)*distance;
+  const beforeX=g.x,beforeY=g.y;
+  if(guidePositionOpen(g.x+dx,g.y))g.x+=dx;
+  if(guidePositionOpen(g.x,g.y+dy))g.y+=dy;
+  const moved=Math.hypot(g.x-beforeX,g.y-beforeY);g.steps+=moved;
+  return moved>.0001;
+}
+// The fallback follows real open cells from the saved position. Its remaining
+// path is saved, so returning to a moving walk never jumps to an earlier stop.
+function guidePath(g,site) {
+  const start=[Math.floor(g.x),Math.floor(g.y)],end=[Math.floor(site.x),Math.floor(site.y)];
+  const key=point=>point.join(','),queue=[start],previous=new Map([[key(start),null]]);
+  for(let i=0;i<queue.length&&!previous.has(key(end));i++) {
+    const [x,y]=queue[i];
+    for(const [dx,dy] of [[0,-1],[1,0],[0,1],[-1,0]]) {
+      const point=[x+dx,y+dy],id=key(point);
+      if(guideWall(point[0]+.5,point[1]+.5)||previous.has(id))continue;
+      previous.set(id,queue[i]);queue.push(point);
+    }
+  }
+  if(!previous.has(key(end)))return null;
+  const path=[];
+  for(let point=end;point;point=previous.get(key(point)))path.unshift({x:point[0]+.5,y:point[1]+.5});
+  if(Math.hypot(path[0].x-g.x,path[0].y-g.y)<.000001)path.shift();
+  return path;
+}
+function pathLength(g,path) {
+  let length=0,previous=g;
+  for(const point of path){length+=Math.hypot(point.x-previous.x,point.y-previous.y);previous=point;}
+  return length;
+}
 export function guideRouteStatus(s) {
   const g = s.guide, leg = g.clues.length, start = leg ? STOPS[leg - 1] : 0, end = STOPS[leg] ?? 20;
+  if(g.explorationVersion===1) {
+    const nearby=nearbyGuideSite(s),site=nearby||availableGuideSites(s)[0]||null;
+    const remaining=site?pathLength(g,g.explorationPath||guidePath(g,site)||[]):0;
+    return {walking:g.walking,ready:!!nearby,site,leg,progress:nearby?1:g.walking&&g.explorationLength?Math.max(0,1-remaining/g.explorationLength):0,remaining:nearby?0:remaining};
+  }
   return { walking: g.walking, ready: g.stage === 'search' && g.routeProgress === end, site: GUIDE_SITES[leg] || null,
     leg, progress: end > start ? (g.routeProgress - start) / (end - start) : 1, remaining: Math.max(0, end - g.routeProgress) };
 }
 export function guideTravel(s) {
-  if (s.phase !== 'guide' || s.guide.stage !== 'search' || guideRouteStatus(s).ready) return false;
+  if (s.phase !== 'guide' || s.guide.stage !== 'search' || (guideRouteStatus(s).ready&&!s.guide.walking)) return false;
   const g = s.guide;
+  if(g.explorationVersion===1) {
+    if(g.walking){clearGuideTravel(g);g.message='You stop. Three sets of footsteps stop behind you.';return true;}
+    const site=availableGuideSites(s)[0],path=site&&guidePath(g,site);
+    if(!path?.length)return false;
+    g.walking=true;g.explorationPath=path;g.explorationGoal=site.id;g.explorationLength=pathLength(g,path);g.focused=null;
+    g.message=g.clues.length===3?'You lead the team back to the northeast clearing.':'You follow the footprints. Three sets of boots follow your light.';
+    return true;
+  }
   g.walking = !g.walking;
   g.focused = null;
   g.message = g.walking ? [
@@ -57,15 +142,19 @@ export function guideTravel(s) {
   return true;
 }
 export function nearbyGuideSite(s) {
+  if(s?.phase!=='guide'||s.guide?.stage!=='search')return null;
+  if(s.guide.explorationVersion===1)return availableGuideSites(s).filter(site=>guideClueInReach(s,site)).sort((a,b)=>Math.hypot(a.x-s.guide.x,a.y-s.guide.y)-Math.hypot(b.x-s.guide.x,b.y-s.guide.y))[0]||null;
   return guideRouteStatus(s).ready ? GUIDE_SITES[s.guide.clues.length] : null;
 }
-export function inspectGuide(s) {
+export function inspectGuide(s,id) {
   if (s.phase !== 'guide' || s.guide.stage !== 'search') return null;
-  const site = nearbyGuideSite(s);
+  const site = id===undefined?nearbyGuideSite(s):availableGuideSites(s).find(site=>site.id===id&&(s.guide.explorationVersion===1?guideClueInReach(s,site):site===nearbyGuideSite(s)));
   if (!site) return null;
-  const g = s.guide; g.walking = false; g.clues.push(site.id); g.message = site.text;
-  // The team breaks only after the player reaches the corner and searches the route.
-  if (g.clues.length === GUIDE_SITES.length) {
+  const g = s.guide;clearGuideTravel(g);if(!g.clues.includes(site.id))g.clues.push(site.id);g.message = site.text;
+  // The clearing starts the encounter. The boot print and radio are optional
+  // discoveries during free exploration; the original guided route stays ordered.
+  if (site.id==='corner' && (g.explorationVersion===1||g.clues.length===GUIDE_SITES.length)) {
+    Object.assign(g,routePose(20));g.routeProgress=20;
     g.stage = 'escape'; g.time = 0; g.angle = Math.PI / 2;
     g.team = [0,1,2].map(i => ({ id: i+1, x: g.x+(i-1)*.24, y: g.y+2+i*.7, distance: 0, status: 'running' }));
     g.message = `${site.text} “We are leaving.” Three lights turn toward the southern track. One of them calls your name. Your rifle is still in your hands.`;
@@ -143,6 +232,22 @@ export function advanceGuide(s,dt) {
   const g=s.guide; g.time+=Math.min(dt,1);
   if (g.stage === 'search') {
     if (!g.walking) return;
+    if(g.explorationVersion===1) {
+      let budget=Math.min(dt,1)*WALK_SPEED;
+      while(budget>0&&g.explorationPath.length) {
+        const point=g.explorationPath[0],dx=point.x-g.x,dy=point.y-g.y,distance=Math.hypot(dx,dy);
+        if(distance<.000001){g.explorationPath.shift();continue;}
+        const step=Math.min(budget,distance);
+        g.angle=Math.atan2(dy,dx);g.x+=dx/distance*step;g.y+=dy/distance*step;g.steps+=step;budget-=step;
+        if(step===distance){g.x=point.x;g.y=point.y;g.explorationPath.shift();}
+      }
+      if(!g.explorationPath.length) {
+        const site=GUIDE_SITES.find(site=>site.id===g.explorationGoal);
+        clearGuideTravel(g);
+        g.message=`You stop the team. Your light catches ${site.label.toLowerCase()}.`;
+      }
+      return;
+    }
     const distance = Math.min(STOPS[g.clues.length], g.routeProgress + Math.min(dt,1) * WALK_SPEED);
     g.steps += distance - g.routeProgress;
     g.routeProgress = distance;
@@ -225,6 +330,25 @@ export function answerGuideDebrief(s,id) {
 // New route saves retain the exact walking position and whether travel was active.
 export function restoreGuideRoute(s) {
   const g = s.guide;
+  if(g.explorationVersion!==undefined) {
+    if(g.explorationVersion!==1||g.routeVersion!==1||g.encounterVersion!==2||!Number.isFinite(g.pitch)||g.pitch<-1.1||g.pitch>.65||!guidePositionOpen(g.x,g.y))return false;
+    if(g.routeProgress<0||g.routeProgress>20)return false;
+    if(g.walking) {
+      if(g.stage!=='search'||!Array.isArray(g.explorationPath)||!g.explorationPath.length||g.explorationPath.length>121||!Number.isFinite(g.explorationLength)||g.explorationLength<=0)return false;
+      const goal=availableGuideSites(s).find(site=>site.id===g.explorationGoal);
+      if(!goal)return false;
+      let previous=g;
+      for(const point of g.explorationPath) {
+        if(!point||!guidePositionOpen(point.x,point.y)||point.x%1!==.5||point.y%1!==.5)return false;
+        const distance=Math.hypot(point.x-previous.x,point.y-previous.y);
+        if(distance>1.5)return false;
+        const checks=Math.max(1,Math.ceil(distance/.05));
+        for(let i=1;i<=checks;i++)if(!guidePositionOpen(previous.x+(point.x-previous.x)*i/checks,previous.y+(point.y-previous.y)*i/checks))return false;
+        previous=point;
+      }
+      if(previous.x!==goal.x||previous.y!==goal.y||pathLength(g,g.explorationPath)>g.explorationLength+.000001)return false;
+    } else if(g.explorationPath!==undefined||g.explorationGoal!==undefined||g.explorationLength!==undefined)return false;
+  } else if(g.pitch!==undefined||g.explorationPath!==undefined||g.explorationGoal!==undefined||g.explorationLength!==undefined)return false;
   if (g.routeVersion === undefined) {
     g.routeVersion = 1;
     g.routeProgress = g.stage === 'escape' ? 20 : g.clues.length ? STOPS[g.clues.length - 1] : 0;
@@ -270,6 +394,7 @@ export function restoreGuideRoute(s) {
     if (g.team.filter(person=>person.status==='shot').length>g.fired) return false;
   } else if (g.stage==='debrief') return false;
   if (g.stage==='escape'||g.stage==='debrief') return g.routeProgress === 20 && !g.walking;
+  if(g.explorationVersion===1)return !g.team.length&&g.fired===0;
   if (g.clues.length >= 3 || g.team.length || g.fired) return false;
   const start = g.clues.length ? STOPS[g.clues.length - 1] : 0, end = STOPS[g.clues.length];
   if (g.routeProgress < start || g.routeProgress > end || (g.walking && g.routeProgress === end)) return false;

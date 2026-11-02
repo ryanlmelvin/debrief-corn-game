@@ -24,7 +24,7 @@ function harness(storage=new Map(), unlocked=MINI_GAMES.map(entry=>entry.id)) {
     installHandoff:{update:(...args)=>updates.push(args)},history,toast(){},esc:String,paper:(title,body)=>`<article>${title}${body}</article>`,
     showModal(kind,html){context.modal={kind,html};},
     document:{body:{classList:{remove(){}},dataset:{}}},dialog:{open:false},menuOpen:()=>false,
-    fieldMap:{reset(){}},rogueUI:{render(){}},resolutionUI:{render(){}},syncAudio(){},updateUI(){},
+    fieldMap:{reset(){}},rogueUI:{render(){}},resolutionUI:{render(){}},guide3d:{sync(){}},syncAudio(){},updateUI(){},
     readSave:()=>restore(storage.get('story')),
     begin(mode,fromSave,supplied){context.game=supplied;context.paused=false;vm.runInContext('save()',context);}
   });
@@ -295,11 +295,23 @@ test('playtest tolerates unavailable storage and preserves existing localhost pr
   const url='https://example.test/debrief/';
   assert.equal(playtestSettings(`${url}?playtest=1`,new Map(),true).playtest,true);
   assert.equal(playtestSettings(url,new Map(),true).playtest,false);
-  for(const id of ['dungeon','rescue','transmission']){
+  for(const id of ['dungeon','rescue','transmission','guide']){
     const local=playtestSettings(`http://localhost:4317/?preview=${id}`);
     assert.equal(local.previewGame,id);assert.equal(local.playtest,false);
     assert.equal(local.SAVE_KEY,`debrief-save-v1:/:${id}-preview`);
     assert.equal(local.progressPath,`/${id}-preview/`);
     assert.equal(playtestSettings(`${url}?preview=${id}`).previewGame,null,'published preview links keep their existing restriction');
+  }
+});
+
+test('recovery phone preview uses a separate save on private Wi-Fi hosts and stays disabled on public sites',()=>{
+  for(const host of ['192.168.1.3','10.0.0.5','172.16.1.2','172.31.255.254']){
+    const base=`http://${host}:4317/debrief-corn-game/`;
+    const normal=playtestSettings(base),preview=playtestSettings(`${base}?preview=guide`);
+    assert.equal(preview.previewGame,'guide');
+    for(const key of ['HISTORY_KEY','SAVE_KEY','MINI_GAME_KEY','progressPath'])assert.notEqual(preview[key],normal[key],key);
+  }
+  for(const host of ['ryanlmelvin.github.io','192.169.1.3','172.32.0.1','8.8.8.8']){
+    assert.equal(playtestSettings(`https://${host}/debrief-corn-game/?preview=guide`).previewGame,null);
   }
 });

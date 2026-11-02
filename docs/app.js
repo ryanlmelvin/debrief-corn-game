@@ -5,6 +5,7 @@ import { watchNight, sightingPromptReady } from './watch-story.js';
 import { guideTravel, guideRouteStatus, inspectGuide, spareGuide, fireGuide, focusGuide, nearbyGuideSite, guideDebrief, answerGuideDebrief, isGuideAftermath } from './guide.js';
 import { createGame, startShift, advance, reload, shoot, focusNext, enterField, move, inspect, currentSiteScene, eatCrop, nearbySite, investigationPressure, investigationComplete, beginDebrief, chooseFieldEncounter, continueFieldEncounter, getQuestion, getEnding, endingId, answer, serialize, restore, BRIEFINGS, evidenceForState, ENDINGS, DATES, REPORT_DATES, SHIFT_LENGTH, COMPULSION_NOTICE } from './engine.js';
 import { Renderer, visibleGuideTarget } from './renderer.js';
+import { Guide3D } from './guide-3d-ui.js';
 import { FieldMap } from './field-ui.js';
 import { dialogArtwork, evidenceMount, notebookMarkup, encounterMarkup, interviewRecord } from './art.js';
 import { GameAudio, loadMusic, loadEffects } from './audio.js';
@@ -34,10 +35,17 @@ let modalReturnFocus=null;
 const fieldMap=new FieldMap($('field-exploration'));
 const rogueUI=new RogueUI($('rogue-play'));
 const resolutionUI=new ResolutionGamesUI($('resolution-play'));
+const guide3d=new Guide3D($('guide-exploration'),{
+  onInspect:id=>act('guide-inspect',id),
+  onFire:point=>fire(point),
+  onChange:()=>{},
+  onUnavailable:()=>{toast(game?.guide?.stage==='search'?'The 3D field is unavailable. Use Follow tracks to continue the recovery.':'The 3D field is unavailable. Recovery continues in the illustrated view.');updateUI(true);}
+});
+let guideLoadRequested=false;
 $('investigate-urge').innerHTML=pressureWordMarkup();
 const menu=$('game-menu');
 const menuOpen=()=>menu.matches(':popover-open');
-menu.addEventListener('toggle',()=>{if(menuOpen()){releaseResolutionGame(game);save();}syncAudio();});
+menu.addEventListener('toggle',()=>{if(menuOpen()){releaseResolutionGame(game);guide3d.release();save();}syncAudio();});
 menu.addEventListener('click',event=>{if(event.target.closest('button')&&!event.target.closest('[popovertarget]'))menu.hidePopover();});
 function browserPlaytestEnabled() {
   const requested=new URLSearchParams(location.search).get('playtest');
@@ -50,7 +58,11 @@ function browserPlaytestEnabled() {
 }
 const playtest=browserPlaytestEnabled();
 const previewRequested=new URLSearchParams(location.search).get('preview');
-const previewGame=['localhost','127.0.0.1','[::1]'].includes(location.hostname)&&['dungeon','rescue','transmission'].includes(previewRequested)?previewRequested:null;
+const previewAddress=location.hostname.split('.').map(Number);
+const localPreviewHost=['localhost','127.0.0.1','[::1]'].includes(location.hostname)||
+  (previewAddress.length===4&&previewAddress.every(part=>Number.isInteger(part)&&part>=0&&part<=255)&&
+  (previewAddress[0]===10||previewAddress[0]===192&&previewAddress[1]===168||previewAddress[0]===172&&previewAddress[1]>=16&&previewAddress[1]<=31));
+const previewGame=localPreviewHost&&['dungeon','rescue','transmission','guide'].includes(previewRequested)?previewRequested:null;
 const dungeonPreview=previewGame==='dungeon';
 const previewSuffix=previewGame?`:${previewGame}-preview`:playtest?':playtest':'';
 $('dungeon-restart').hidden=!dungeonPreview;
@@ -163,6 +175,7 @@ function paper(title,body,tag='') {
 }
 function showModal(kind,html,art=null) {
   releaseResolutionGame(game);
+  guide3d.release();
   modalReturnFocus=menuOpen()?$('game-menu-toggle'):null;
   if(menuOpen())menu.hidePopover();
   modalKind=kind;$('dialog-content').innerHTML=html;
@@ -178,7 +191,7 @@ function showModal(kind,html,art=null) {
   $('dialog-title')?.focus({preventScroll:true});
   syncAudio();
 }
-function closeModal() {dialog.close();modalKind='';if(game?.phase==='field')fieldMap.render(game,paused);syncAudio();const target=modalReturnFocus||(resolutionGameActive(game)?$('resolution-play'):game?.phase==='rogue'?$('rogue-play'):game?.phase==='field'?$('field-exploration').querySelector('button.field-go:not([hidden]),button.field-stop:not([hidden])'):canvas);target?.focus({preventScroll:true});modalReturnFocus=null;}
+function closeModal() {dialog.close();modalKind='';if(game?.phase==='field')fieldMap.render(game,paused);guide3d.sync(game,paused||menuOpen()||document.hidden);syncAudio();const target=modalReturnFocus||(resolutionGameActive(game)?$('resolution-play'):game?.phase==='rogue'?$('rogue-play'):game?.phase==='field'?$('field-exploration').querySelector('button.field-go:not([hidden]),button.field-stop:not([hidden])'):canvas);if(guide3d.active&&!modalReturnFocus)guide3d.focus();else target?.focus({preventScroll:true});modalReturnFocus=null;}
 function readMiniGame() {
   try{
     const session=JSON.parse(localStorage.getItem(MINI_GAME_KEY));
@@ -224,15 +237,21 @@ function returnToStory() {
     $('stats').hidden=true;$('tower-hud').hidden=true;$('watch-scoreboard').hidden=true;$('watch-radio').hidden=true;$('investigation-pressure').hidden=true;
     $('mini-game-return').hidden=true;$('dungeon-restart').hidden=true;
     for(const id of ['notebook','menu-radio','assignment','watch-record'])$(id).hidden=true;
-    fieldMap.reset();$('field-exploration').hidden=true;rogueUI.render(null);resolutionUI.render(null);canvas.hidden=false;canvas.tabIndex=0;canvas.setAttribute('aria-hidden','false');
+    fieldMap.reset();$('field-exploration').hidden=true;rogueUI.render(null);resolutionUI.render(null);guide3d.sync(null,true);canvas.hidden=false;canvas.tabIndex=0;canvas.setAttribute('aria-hidden','false');
     saved=readSave();$('resume').hidden=!saved;$('save-status').textContent='STORY PROGRESS PRESERVED';syncAudio();$('new-game').focus({preventScroll:true});
   }
 }
+function createRecoveryPreview() {
+  const recovery=createGame('story');
+  Object.assign(recovery,{phase:'debrief',shift:2,question:2});
+  answer(recovery,'guide');return recovery;
+}
 function begin(mode,fromSave=false,supplied=null) {
+  guide3d.release();
   if(compulsionNotice.matches(':popover-open'))compulsionNotice.hidePopover();
   clearTimeout(compulsionTimer);
   if($('guide-aftermath').matches(':popover-open'))$('guide-aftermath').hidePopover();
-  game=supplied||(fromSave?readSave():createGame(mode));
+  game=supplied||(fromSave?readSave():previewGame==='guide'?createRecoveryPreview():createGame(mode));
   if(!game){toast('The saved game could not be read. You can start a new game.');return;}
   releaseResolutionGame(game);
   soundEvents.reset(game);
@@ -285,7 +304,7 @@ function sceneDialog() {
     const q=guideDebrief(game);
     showModal('guide-debrief',paper('After the recovery.',`<p class="eyebrow">RECOVERY DETAIL / RECORDED INTERVIEW</p><span class="question-num" aria-label="Question ${game.guide.debriefQuestion+1} of 2">${game.guide.debriefQuestion+1} / 2</span><div class="interview-question"><span class="speaker-label">${esc(q.speaker||'SUPERVISOR')}</span><p>${esc(q.prompt)}</p></div><p class="note">${esc(q.context)}</p><div class="choices" role="group" aria-label="Your response"><span class="speaker-label">YOUR RESPONSE</span>${q.options.map((o,i)=>`<button class="choice" data-action="guide-answer" data-value="${o.id}"><span class="response-key" aria-hidden="true">${String.fromCharCode(65+i)}</span><span>${esc(o.label)}${o.detail?`<small>${esc(o.detail)}</small>`:''}</span></button>`).join('')}</div>`, 'RECOVERY DEBRIEF'));
   } else if(game.phase==='guide' && game.guide.steps === 0) {
-    showModal('guide-intro',paper('Between the rows.', '<p>Three recovery personnel wait beneath the tower. You take the rifle. They take lamps.</p><p class="note">“You know the way,” one of them says.</p><p class="small"><span class="touch-help">Tap Lead to follow the path. The team stops at each discovery so you can examine it.</span><span class="keyboard-help"><b>Space</b> or <b>W</b> leads onward or stops. The path turns for you. Press <b>E</b> to examine each discovery.</span></p><button class="primary" data-action="close">Lead them in ↗</button>', 'RECOVERY DETAIL'));
+    showModal('guide-intro',paper('Between the rows.', '<p>Three recovery personnel wait beneath the tower. You take the rifle. They take lamps.</p><p class="note">“You know the way,” one of them says.</p><p>Follow the footprints to the northeast clearing. Examining the boot print and radio along the way is optional.</p><p class="small"><span class="touch-help">Left thumbstick to move. Right thumbstick to look. Tap a nearby clue or Examine. </span><b>WASD and arrow keys on desktop.</b> Drag to look; <b>E</b> to examine.</p><button class="primary" data-action="close">Lead them in ↗</button>', 'RECOVERY DETAIL'));
   } else if(game.phase==='ending') {
     archiveRun();
     const e=getEnding(game);
@@ -304,7 +323,7 @@ function updateUI(force=false) {
   document.body.classList.toggle('dungeon-playing',game.phase==='rogue'&&game.rogue?.route==='dungeon'&&game.rogue.stage==='play');
   document.body.classList.toggle('resolution-playing',resolutionGameActive(game));
   const aftermath=isGuideAftermath(game);
-  $('stats').hidden=aftermath||game.phase==='resolution'||game.phase==='rogue';
+  $('stats').hidden=aftermath||game.phase==='resolution'||game.phase==='rogue'||game.phase==='ending'&&!!game.guide;
   $('pause').hidden=game.phase==='ending';
   const phase=game.phase,field=phase==='field',site=nearbySite(game),active=phase==='tower';
   $('mini-game-return').hidden=!game.practice;
@@ -369,10 +388,17 @@ function updateUI(force=false) {
     $('objective-detail').textContent=rescue?'Match the recorded breath to the radio. Pull only while the roots loosen.':'Watch the moving rows. Radio commands take a moment to reach the light.';
     $('station-status').textContent=previewGame?'LOCAL PLAYTEST':'AFTER THE WATCH';
   }
-  canvas.hidden=field;
-  canvas.setAttribute('aria-hidden',String(phase==='rogue'||resolutionGameActive(game)));
-  canvas.tabIndex=phase==='rogue'||resolutionGameActive(game)?-1:0;
-  $('guide-message').hidden=phase!=='guide'||game.guide?.stage==='debrief'||paused;
+  if(game.guide&&['guide','ending'].includes(phase)&&!guideLoadRequested){
+    guideLoadRequested=true;
+    guide3d.ensure().then(()=>{updateUI(true);save();if(guide3d.active&&!paused&&!dialog.open&&!menuOpen())guide3d.focus();});
+  }
+  const guideVisible=guide3d.sync(game,paused||dialog.open||menuOpen()||document.hidden);
+  canvas.hidden=field||guideVisible;
+  canvas.setAttribute('aria-hidden',String(phase==='rogue'||resolutionGameActive(game)||guideVisible));
+  canvas.tabIndex=phase==='rogue'||resolutionGameActive(game)||guideVisible?-1:0;
+  // The clearing card has just told this part. Leave room to see the departing
+  // people; subsequent rifle feedback still appears beside the controls.
+  $('guide-message').hidden=phase!=='guide'||game.guide?.stage==='debrief'||paused||guideVisible&&(game.guide?.stage==='search'||game.guide?.stage==='escape'&&game.guide.fired===0);
   if (phase === 'guide') updateGuideUI();
   if(aftermath){
     $('phase-label').textContent='RECOVERY DETAIL';
@@ -382,11 +408,18 @@ function updateUI(force=false) {
     canvas.setAttribute('aria-label',`${game.guide.team.filter(t=>t.status==='shot').length} fallen lights in the corn rows. The field is still.`);
   }
   sceneDialog();
+  if(dialog.open)guide3d.release();
   showCompulsionNotice();
   syncAudio();
 }
 function updateGuideUI() {
   const g=game.guide, escaping=g.stage==='escape', route=guideRouteStatus(game);
+  if(g.stage==='search'&&!guide3d.failed){
+    $('controls').innerHTML='';$('stats').hidden=true;
+    $('phase-label').textContent='RECOVERY DETAIL';$('station-status').textContent='RADIO SILENT';
+    $('control-hint').textContent='WASD MOVE · DRAG LOOK · E EXAMINE';
+    return;
+  }
   if(g.stage==='debrief'){
     $('phase-label').textContent='RECOVERY DEBRIEF';$('station-status').textContent='ON RECORD';
     $('objective').textContent='Account for the team.';$('objective-detail').textContent='Your statement stays on tape.';
@@ -396,15 +429,16 @@ function updateGuideUI() {
   const stops=['First crossing','Central crossing','Northeast corner'];
   const destinations=['Lead to the first crossing','Continue to the central crossing','Lead to the northeast corner'];
   const examination=['Examine the boot print','Examine the radio','Search the bare earth'];
-  const remaining=g.team.filter(t=>t.status==='running').length, revealing=escaping&&g.time<.65;
+  const remaining=g.team.filter(t=>t.status==='running').length, revealing=escaping&&(g.time<.65||!guide3d.ready&&!guide3d.failed);
   $('phase-label').textContent='RECOVERY DETAIL';
   $('station-status').textContent='RADIO SILENT';
   $('objective').textContent=escaping?'The team is leaving.':'Lead them through.';
   $('objective-detail').textContent=escaping?(committed?'Your hands will not lower the rifle.':'The team is leaving for the road.'):'Your light leads. The team follows.';
   $('stats').innerHTML=escaping?stat('LIGHTS STILL MOVING',remaining,'/ 3')+stat('RIFLE',6-g.fired,'rounds'):stat('ROUTE SEARCHED',g.clues.length,'/ 3')+stat('FOLLOWING YOU',3,'people');
   $('control-hint').textContent=escaping?(committed?'X AIM · SPACE FIRE':'X AIM · SPACE FIRE · L LOWER RIFLE'):'SPACE / W LEAD OR STOP · E EXAMINE';
-  const description=`Recovery team in the cornfield. ${g.message} ${escaping?`The team is moving toward cover. X aims at a person; Space fires. ${committed?'The order has taken over. You cannot lower the rifle.':'L lowers your rifle and lets them leave. Firing commits you to the order.'}`:`${stops[g.clues.length]}. Space or W leads onward or stops walking. The route turns automatically and stops at each discovery. E examines a discovery.`}`;
+  const description=`Recovery team in the cornfield. ${g.message} ${escaping?`The team is moving toward cover. X aims at a person; Space fires. ${committed?'The order has taken over. You cannot lower the rifle.':'L lowers your rifle and lets them leave. Firing commits you to the order.'}`:`${stops[Math.min(g.clues.length,2)]}. Space or W leads onward or stops walking. The route turns automatically and stops at each discovery. E examines a discovery.`}`;
   if(canvas.getAttribute('aria-label')!==description)canvas.setAttribute('aria-label',description);
+  if(guide3d.active&&escaping)guide3d.canvas.setAttribute('aria-label',description);
   if($('guide-message').textContent!==g.message)$('guide-message').textContent=g.message;
   const key=`guide:${paused}:${g.stage}:${g.clues.length}:${route?.walking}:${route?.ready}:${g.fired}:${remaining}:${revealing}`;
   if(lastControlsKey!==key){
@@ -413,7 +447,7 @@ function updateGuideUI() {
     const focusedAction=focused?document.activeElement.dataset.action:null;
     $('controls').innerHTML=escaping
       ? `<div class="guide-deck guide-decision"><p class="guide-instruction">${committed?'Shoot any that try to escape.':'They are leaving for the road.'}</p><div class="guide-actions"><button data-action="guide-focus">Aim at next light</button><button data-action="guide-fire" ${g.fired>=6||revealing?'disabled':''}>Fire rifle</button>${committed?'':`<button class="primary" data-action="guide-spare" ${revealing?'disabled':''}>Lower rifle · let them leave</button>`}</div><p class="guide-help">${committed?'Your hands will not lower the rifle. Keep firing.':'Once you fire, the order will not let you stop.'}</p></div>`
-      : `<div class="guide-deck"><ol class="guide-route" aria-label="Search route">${stops.map((label,i)=>`<li class="${i<g.clues.length?'searched':i===g.clues.length?'current':''}" ${i===g.clues.length?'aria-current="step"':''}><span>${i<g.clues.length?'✓':String(i+1).padStart(2,'0')}</span>${label}</li>`).join('')}</ol><div class="guide-progress" aria-hidden="true"><i></i></div><button class="${route.ready||!route.walking?'primary':'secondary'}" data-action="${route.ready?'guide-inspect':'guide-travel'}">${route.ready?examination[g.clues.length]:route.walking?'Stop here':destinations[g.clues.length]}</button><p class="guide-help">${route.ready?'The team waits while you examine the ground.':route.walking?'Your light follows the path. You can stop at any time.':'Follow the path. You stop at each discovery.'}</p></div>`;
+      : `<div class="guide-deck"><button class="primary" data-action="${route.ready?'guide-inspect':'guide-travel'}">${route.ready?`Examine ${esc(route.site?.label.toLowerCase()||'the clearing')}`:route.walking?'Stop here':'Follow tracks'}</button></div>`;
     markSeenEndingChoices($('controls'),game,history.collected);
     if(paused)$('controls').querySelectorAll('button').forEach(button=>button.disabled=true);
     if(focused)($('controls').querySelector(`[data-action="${focusedAction}"]`)||$('controls').querySelector('button'))?.focus({preventScroll:true});
@@ -482,7 +516,7 @@ function act(action,value) {
     if(!answerGuideDebrief(game,value))return;
     closeModal();lastModalKey='';save();updateUI(true);return;
   }
-  if(action.startsWith('guide-')&&(!game||game.phase!=='guide'||paused||dialog.open||menuOpen()))return;
+  if(action.startsWith('guide-')&&(!game||game.phase!=='guide'||paused||dialog.open||menuOpen()||!guide3d.ready&&!guide3d.failed))return;
   if(action==='encounter-choice') {
     const outcome=currentEncounter(game)?.choices.find(choice=>choice.id===value)?.result;
     if(!chooseFieldEncounter(game,value))return;
@@ -533,20 +567,38 @@ function act(action,value) {
   }
   if(action==='records'){$('records').click();return;}
   if(action==='guide-travel')guideTravel(game);
-  if(action==='guide-inspect')inspectGuide(game);
+  if(action==='guide-inspect'){
+    const site=inspectGuide(game,value);
+    if(site){
+      showModal('guide-clue',paper(esc(site.label),`<p>${esc(game.guide.message)}</p><button class="primary" data-action="close">Return to the team</button>`,'RECOVERY DETAIL'),{boot:'guide-boot',radio:'guide-radio',corner:'corner'}[site.id]);
+      save();updateUI(true);
+    }
+    return;
+  }
   if(action==='guide-spare')spareGuide(game);
   if(action==='guide-focus'){
     let aim=null;
-    for(let i=0;i<game.guide.team.length;i++){
-      const p=focusGuide(game);if(!p)break;
-      const target=game.guide.team.find(t=>t.id===game.guide.focused);
-      if(visibleGuideTarget(game.guide,target,renderer.view)){aim=p;break;}
+    if(guide3d.active)aim=guide3d.focusNext();
+    else {
+      for(let i=0;i<game.guide.team.length;i++){
+        const p=focusGuide(game);if(!p)break;
+        const target=game.guide.team.find(t=>t.id===game.guide.focused);
+        if(visibleGuideTarget(game.guide,target,renderer.view)){aim=p;break;}
+      }
+      if(aim)renderer.pointer=aim;
     }
-    if(aim)renderer.pointer=aim;
-    else {game.guide.focused=null;toast(game.guide.fired?'They have reached cover. Someone is calling for help.':'The lights have reached cover. You can let them leave.');}
+    if(!aim){game.guide.focused=null;toast(game.guide.fired?'They have reached cover. Someone is calling for help.':'The lights have reached cover. You can let them leave.');}
   }
-  if(action==='guide-fire'){const t=game?.guide?.team.find(t=>t.id===game.guide.focused&&t.status==='running');const p=t&&visibleGuideTarget(game.guide,t,renderer.view);if(t&&!p){game.guide.focused=null;toast(game.guide.fired?'They have reached cover. Someone is calling for help.':'The lights have reached cover. You can let them leave.');return;}if(p)renderer.pointer={x:p.x,y:p.y-p.height*.5};fire(renderer.pointer);}
-  if(action==='close'){closeModal();if(game?.practice&&miniGameComplete(game)){lastModalKey='';sceneDialog();return;}if(game&&(['briefing','debrief','resolution','ending'].includes(game.phase)||game.guide?.stage==='debrief'||game.rogue?.stage==='debrief')){lastModalKey='';updateUI(true);}return;}
+  if(action==='guide-fire'){
+    if(guide3d.active){
+      if(!guide3d.fireAim())toast(game.guide.fired?'They have reached cover. Someone is calling for help.':'The lights have reached cover. You can let them leave.');
+    }else{
+      const t=game?.guide?.team.find(t=>t.id===game.guide.focused&&t.status==='running');const p=t&&visibleGuideTarget(game.guide,t,renderer.view);
+      if(t&&!p){game.guide.focused=null;toast(game.guide.fired?'They have reached cover. Someone is calling for help.':'The lights have reached cover. You can let them leave.');return;}
+      if(p)renderer.pointer={x:p.x,y:p.y-p.height*.5};fire(renderer.pointer);
+    }
+  }
+  if(action==='close'){closeModal();if(game?.practice&&miniGameComplete(game)){lastModalKey='';sceneDialog();return;}if(game&&(['briefing','debrief','resolution','ending'].includes(game.phase)||game.guide?.stage==='debrief'||game.rogue?.stage==='debrief')){lastModalKey='';updateUI(true);}else if(game?.phase==='guide')updateUI(true);return;}
   if(action==='start'){closeModal();startShift(game);canvas.focus({preventScroll:true});}
   if(action==='answer'){closeModal();answer(game,value);}
   if(action==='reload')reload(game);
@@ -580,8 +632,8 @@ $('new-game').addEventListener('click',()=>{
   else begin($('difficulty').value);
 });
 $('resume').addEventListener('click',()=>begin(null,true));
-function togglePause(force) {if(!game||game.phase==='ending'||dialog.open)return;paused=typeof force==='boolean'?force:!paused;if(paused)releaseResolutionGame(game);updateUI();save();syncAudio();}
-$('pause').addEventListener('click',()=>togglePause());$('unpause').addEventListener('click',()=>{togglePause(false);(resolutionGameActive(game)?$('resolution-play'):game?.phase==='rogue'?$('rogue-play'):canvas).focus({preventScroll:true});});
+function togglePause(force) {if(!game||game.phase==='ending'||dialog.open)return;paused=typeof force==='boolean'?force:!paused;if(paused){releaseResolutionGame(game);guide3d.release();}updateUI();save();syncAudio();}
+$('pause').addEventListener('click',()=>togglePause());$('unpause').addEventListener('click',()=>{togglePause(false);if(guide3d.active)guide3d.focus();else (resolutionGameActive(game)?$('resolution-play'):game?.phase==='rogue'?$('rogue-play'):canvas).focus({preventScroll:true});});
 dialog.addEventListener('cancel',event=>{if(modalKind==='mini-result'){event.preventDefault();showMiniGames();}else if(modalKind==='resolution-menu'){event.preventDefault();act('resolution-answer','back');}else if(['briefing','debrief','guide-debrief','dungeon-debrief','resolution','ending','encounter'].includes(modalKind))event.preventDefault();else{event.preventDefault();act('close');}});
 $('manual').addEventListener('click',()=>showModal('manual',paper('Field manual',`<ol class="orders"><li><span>01</span>Watch the corn. Shoot any that try to escape.</li><li><span>02</span>Remain in the watchtower.</li><li><span>03</span>Do not consume the crop.</li><li><span>04</span>Remember any irregularities for your debrief at the end of the night.</li></ol><button class="primary" data-action="close">Close</button>`)));
 
@@ -662,6 +714,7 @@ document.addEventListener('keydown',event=>{
     if(k===' '&&!['BUTTON','A'].includes(event.target.tagName)){event.preventDefault();const target=game.targets.find(t=>t.id===game.focused);if(target)renderer.pointer={x:target.x,y:target.y-34};fire(renderer.pointer);}
   }
   if(game.phase==='guide'){
+    if(game.guide.stage==='search'&&!guide3d.failed)return;
     if(event.repeat||game.guide.stage==='debrief')return;
     const escaping=game.guide.stage==='escape';
     const actions=escaping?{x:['guide-focus'],' ':['guide-fire'],l:['guide-spare']}:{w:['guide-travel'],arrowup:['guide-travel'],e:['guide-inspect'],' ':[nearbyGuideSite(game)?'guide-inspect':'guide-travel']};
@@ -824,7 +877,12 @@ function showProgressTransfer(view = 'files') {
 }
 $('move-progress').addEventListener('click',showProgressTransfer);
 const resumedMiniGame=readMiniGame();
-if(resumedMiniGame){
+if(previewGame==='guide'){
+  document.title='Recovery walk — Local playtest';
+  const previous=readSave();
+  if(previous?.guide)begin(previous.mode,false,previous);
+  else begin('story');
+}else if(resumedMiniGame){
   practiceReturnToGame=resumedMiniGame.returnToGame;practiceReturnPaused=resumedMiniGame.returnPaused;
   begin(resumedMiniGame.game.mode,false,resumedMiniGame.game);
 }else if(previewGame&&!dungeonPreview){
@@ -969,7 +1027,8 @@ if ('serviceWorker' in navigator && ['https:', 'http:'].includes(location.protoc
 
 function frame(now) {
   const dt=lastFrame?Math.min((now-lastFrame)/1000,.1):0;lastFrame=now;
-  if(game&&!paused&&!dialog.open&&!menuOpen()&&!document.hidden&&(!game.practice||!miniGameComplete(game))){
+  const guideLoading=game?.phase==='guide'&&!guide3d.ready&&!guide3d.failed;
+  if(game&&!guideLoading&&!paused&&!dialog.open&&!menuOpen()&&!document.hidden&&(!game.practice||!miniGameComplete(game))){
     advance(game,dt);
     if(game.phase==='tower')updateReloadUI(game, false);
     if(game.phase==='field'&&!game.practice)fieldMap.tick(game,dt,(dx,dy)=>move(game,dx,dy),()=>{
@@ -981,14 +1040,19 @@ function frame(now) {
     const focused=game.targets.find(t=>t.id===game.focused);if(focused)renderer.pointer={x:focused.x,y:focused.y-34};
     if(game.phase==='guide'&&game.guide.focused){
       const target=game.guide.team.find(t=>t.id===game.guide.focused&&t.status==='running');
-      const aim=target&&visibleGuideTarget(game.guide,target,renderer.view);
-      if(aim)renderer.pointer={x:aim.x,y:aim.y-aim.height*.5};
-      else game.guide.focused=null;
+      if(guide3d.active){
+        if(!target||!guide3d.world.visiblePerson(game,target.id))game.guide.focused=null;
+      }else{
+        const aim=target&&visibleGuideTarget(game.guide,target,renderer.view);
+        if(aim)renderer.pointer={x:aim.x,y:aim.y-aim.height*.5};
+        else game.guide.focused=null;
+      }
     }
     if(now-lastUI>100||(game.practice&&miniGameComplete(game))){updateUI();lastUI=now;}
     if(now-lastSave>1200){save();lastSave=now;}
   }
-  if(game?.phase!=='field')renderer.draw(game,now,!game);
+  guide3d.update(game,dt,paused||dialog.open||menuOpen()||document.hidden);
+  if(game?.phase!=='field'&&$('guide-exploration').hidden)renderer.draw(game,now,!game);
   if(resolutionGameActive(game))resolutionUI.render(game,paused||dialog.open||menuOpen()||document.hidden);
   if(game?.phase==='rogue')rogueUI.render(game,paused||dialog.open||menuOpen()||document.hidden);
   requestAnimationFrame(frame);

@@ -22,6 +22,7 @@
   <link rel="stylesheet" href="./resolution-games.css">
   <link rel="stylesheet" href="./rescue.css">
   <link rel="stylesheet" href="./transmission.css">
+  <link rel="stylesheet" href="./guide-3d.css">
   <script type="module" src="./app.js"></script>
 </head>
 <body>
@@ -56,6 +57,7 @@
       <div class="workspace">
         <section class="viewport" aria-label="North field">
           <canvas id="field" width="960" height="600" tabindex="0" aria-label="Watchtower shooting gallery. Click moving corn to fire. Press X to select a crop, Space to fire, R to reload."></canvas>
+          <section id="guide-exploration" aria-label="Recovery search" hidden></section>
           <section id="field-exploration" class="field-exploration" aria-label="Field investigation map" hidden></section>
           <section id="rogue-play" class="rogue-play" aria-label="Beyond protocol" hidden tabindex="-1"></section>
           <section id="resolution-play" class="resolution-play" aria-label="After the watch" hidden tabindex="-1"></section>

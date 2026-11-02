@@ -30,7 +30,7 @@ test('practice completion opens its result even when the final grip lands betwee
     game, paused: false, dialog: { open: false }, menuOpen: () => false, document: { hidden: false },
     lastFrame: 1000, lastUI: 1040, lastSave: 1040,
     advance, miniGameComplete, resolutionGameActive,
-    renderer: { draw() {} }, resolutionUI: { render() {} }, rogueUI: { render() {} },
+    renderer: { draw() {} }, resolutionUI: { render() {} }, rogueUI: { render() {} }, guide3d: { update() {} }, $: () => ({ hidden: true }),
     updateUI() { updates.push({ complete: miniGameComplete(game), phase: game.phase }); },
     save() {}, requestAnimationFrame(callback) { renderFrames.push(callback); }
   });

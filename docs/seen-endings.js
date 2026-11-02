@@ -79,6 +79,10 @@ export function possibleChoiceEndings(game, action, value) {
         continue;
       }
       if (state.phase === 'guide' && ['search', 'escape'].includes(state.guide?.stage)) {
+        // Free exploration, skipped optional clues, either discovery order and
+        // the guided fallback preserve this bound. Live walking/looking/inspection
+        // are deliberately absent from transitions; do not predict their future
+        // rifle timing or prune the four independently collected outcomes.
         Object.keys(ENDINGS).filter(id => !outsideRecovery.has(id)).forEach(id => endings.add(id));
         continue;
       }

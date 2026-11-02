@@ -1,9 +1,9 @@
 import test, { after } from 'node:test';
 import assert from 'node:assert/strict';
-import { createGame, answer, advance, ENDINGS, FIELD_SITES, inspect, move, chooseFieldEncounter, continueFieldEncounter, eatCrop, endingId } from '../docs/engine.js';
+import { createGame, answer, advance, ENDINGS, FIELD_SITES, inspect, move, chooseFieldEncounter, continueFieldEncounter, eatCrop, endingId, serialize, restore } from '../docs/engine.js';
 import { ENCOUNTERS, freshFieldEvents, encounterAfterStep, currentEncounter } from '../docs/encounters.js';
 import { startResolution, chooseResolution, getResolution } from '../docs/alternate-endings.js';
-import { guideTravel, guideRouteStatus, inspectGuide, focusGuide, fireGuide, spareGuide, guideDebrief, answerGuideDebrief } from '../docs/guide.js';
+import { GUIDE_SITES, guideWall, guideTravel, guideRouteStatus, inspectGuide, focusGuide, fireGuide, spareGuide, guideDebrief, answerGuideDebrief, enableGuideExploration, moveGuide } from '../docs/guide.js';
 import { startRogue, chooseRogue, moveRogue, getRogueScene, validRogue, broadcastCursor, broadcastWindow, floodConnections } from '../docs/rogue.js';
 import { createMiniGame } from '../docs/mini-games.js';
 import { possibleChoiceEndings, hasSeenChoiceEndings, markSeenEndingChoices } from '../docs/seen-endings.js';
@@ -117,6 +117,63 @@ function interview(outcome, empty = false, from = ready()) {
   }
   assert.equal(game.guide.outcome, outcome);
   assert.equal(game.guide.stage, 'debrief');
+  return game;
+}
+
+// Test navigation plans with the actual field geometry, then moves using the
+// same analog inputs as the 3D UI. It never assigns positions or collected clues.
+function walkRecoveryTo(game, id) {
+  const site = GUIDE_SITES.find(site => site.id === id);
+  const start = [Math.floor(game.guide.x), Math.floor(game.guide.y)];
+  const target = [Math.floor(site.x), Math.floor(site.y)], key = point => point.join(',');
+  const queue = [start], previous = new Map([[key(start), null]]);
+  for (let cursor = 0; cursor < queue.length && !previous.has(key(target)); cursor++) {
+    const current = queue[cursor];
+    for (const [dx, dy] of [[0, -1], [1, 0], [0, 1], [-1, 0]]) {
+      const next = [current[0] + dx, current[1] + dy];
+      if (previous.has(key(next)) || guideWall(next[0] + .5, next[1] + .5)) continue;
+      previous.set(key(next), current); queue.push(next);
+    }
+  }
+  assert.ok(previous.has(key(target)), `There is a real path to ${id}`);
+  const path = [];
+  for (let point = target; point; point = previous.get(key(point))) path.unshift(point);
+  for (const [cx, cy] of path) {
+    let frames = 0;
+    while (Math.hypot(cx + .5 - game.guide.x, cy + .5 - game.guide.y) > .02) {
+      assert.ok(frames++ < 1000, `Analog movement reaches ${cx},${cy}`);
+      const g = game.guide, dx = cx + .5 - g.x, dy = cy + .5 - g.y;
+      const divisor = Math.max(.1, Math.hypot(dx, dy));
+      assert.equal(moveGuide(game, { forward: (dx * Math.cos(g.angle) + dy * Math.sin(g.angle)) / divisor, strafe: (-dx * Math.sin(g.angle) + dy * Math.cos(g.angle)) / divisor }, .05), true);
+      advance(game, .05);
+      assert.equal(guideWall(g.x, g.y), false);
+    }
+  }
+}
+
+function freeRecoveryEscape(optionalOrder, snapshots = []) {
+  const game = ready();
+  assert.equal(answer(game, 'guide'), true);
+  enableGuideExploration(game);
+  assert.equal(game.guide.explorationVersion, 1);
+  snapshots.push(structuredClone(game));
+  for (const id of optionalOrder) {
+    walkRecoveryTo(game, id);
+    assert.equal(inspectGuide(game, id).id, id);
+    assert.equal(game.guide.stage, 'search', 'Optional clues never start the rifle encounter away from the corner');
+    snapshots.push(structuredClone(game));
+  }
+  assert.deepEqual(game.guide.clues, optionalOrder);
+  assert.equal(fireGuide(game, 0, 0), 'blocked');
+  assert.equal(spareGuide(game), false);
+  walkRecoveryTo(game, 'corner');
+  snapshots.push(structuredClone(game));
+  assert.equal(inspectGuide(game, 'corner').id, 'corner');
+  assert.deepEqual(game.guide.clues, [...optionalOrder, 'corner'], 'The finale never fabricates skipped discoveries');
+  assert.equal(game.guide.stage, 'escape');
+  assert.equal(game.guide.time, 0);
+  assert.deepEqual(restore(serialize(game)), game, 'Partial discovery histories round-trip at the real finale');
+  snapshots.push(structuredClone(game));
   return game;
 }
 
@@ -784,6 +841,92 @@ test('recovery interview answers retain the interruption possibility only while 
       assertTerminalHint(game, 'guide-answer', last.id, ending);
     }
   }
+});
+
+test('skipping both optional recovery clues, either one, or neither retains all four ending identities', () => {
+  const orders = [
+    [], ['boot'], ['radio'], ['boot', 'radio'], ['radio', 'boot']
+  ];
+  for (const order of orders) {
+    const entry = ready(), before = structuredClone(entry);
+    assert.deepEqual(possibleChoiceEndings(entry, 'answer', 'guide'), guideEndings);
+    for (const unseen of guideEndings) assert.equal(hasSeenChoiceEndings(entry, 'answer', 'guide', historyExcept(unseen)), false, `${unseen} remains reachable after ${order}`);
+    assert.equal(hasSeenChoiceEndings(entry, 'answer', 'guide', guideEndings), true);
+    assert.deepEqual(entry, before);
+    const escape = freeRecoveryEscape(order);
+    // The final clue/corner tap retains the same guard against accidental fire.
+    assert.equal(possibleChoiceEndings(escape, 'guide-spare'), null);
+    assert.equal(hasSeenChoiceEndings(escape, 'guide-spare', undefined, Object.keys(ENDINGS)), false);
+    advance(escape, .7);
+    for (const [outcome, ending] of [['spared', 'guide'], ['secured', 'guide_shot'], ['arrested', 'guide_arrested']]) {
+      for (const empty of outcome === 'spared' ? [false] : [false, true]) {
+        const game = structuredClone(escape);
+        if (outcome === 'spared') assert.equal(spareGuide(game), true);
+        else if (outcome === 'secured') {
+          if (empty) for (let round = 0; round < 3; round++) assert.equal(fireGuide(game, 0, 0), 'miss');
+          for (let person = 0; person < 3; person++) {
+            const aim = focusGuide(game);
+            assert.ok(aim); assert.equal(fireGuide(game, aim.x, aim.y), 'person');
+          }
+        } else {
+          for (let round = 0; round < (empty ? 6 : 1); round++) assert.equal(fireGuide(game, 0, 0), 'miss');
+          for (let tick = 0; tick < 90 && game.guide.stage === 'escape'; tick++) advance(game, 1);
+        }
+        assert.equal(game.guide.outcome, outcome);
+        assert.equal(game.guide.stage, 'debrief');
+        const first = guideDebrief(game).options[0];
+        const possibilities = sorted(empty ? [ending] : [ending, 'guide_interrupted']);
+        assert.deepEqual(possibleChoiceEndings(game, 'guide-answer', first.id), possibilities);
+        for (const unseen of possibilities) assert.equal(hasSeenChoiceEndings(game, 'guide-answer', first.id, historyExcept(unseen)), false);
+        assert.equal(hasSeenChoiceEndings(game, 'guide-answer', first.id, possibilities), true);
+        assert.equal(answerGuideDebrief(game, first.id), true);
+        if (!empty) {
+          const rifle = guideDebrief(game).options.find(option => option.action === 'rifle');
+          assert.ok(rifle);
+          assertTerminalHint(game, 'guide-answer', rifle.id, 'guide_interrupted');
+        } else assert.equal(guideDebrief(game).options.some(option => option.action === 'rifle'), false);
+        assertTerminalHint(game, 'guide-answer', guideDebrief(game).options[0].id, ending);
+      }
+    }
+  }
+});
+
+test('optional-clue recovery previews leave navigation, testimony, collection history and randomness unchanged', () => {
+  const snapshots = [], escape = freeRecoveryEscape([], snapshots);
+  freeRecoveryEscape(['boot'], snapshots);
+  freeRecoveryEscape(['radio'], snapshots);
+  freeRecoveryEscape(['radio', 'boot'], snapshots);
+  advance(escape, .6); snapshots.push(structuredClone(escape));
+  advance(escape, .1); snapshots.push(structuredClone(escape));
+  const interviewed = structuredClone(escape);
+  assert.equal(spareGuide(interviewed), true); snapshots.push(interviewed);
+  const history = { collected: [...guideEndings], runs: [{ id: 'prior-recovery', reports: [{ answer: 'Prior testimony.' }] }] };
+  const priorHistory = JSON.stringify(history), random = Math.random;
+  let randomCalls = 0;
+  try {
+    Math.random = () => { randomCalls++; return .5; };
+    for (const game of snapshots) {
+      const saved = JSON.stringify(game);
+      // Live analog movement, camera controls, path following and discovery
+      // taps are not stable ending choices and receive no speculative hints.
+      for (const [action, value] of [['guide-move', 'forward'], ['guide-look', 'left'], ['guide-travel'], ['guide-inspect', 'corner'], ['guide-fire'], ['guide-focus']]) {
+        assert.equal(possibleChoiceEndings(game, action, value), null);
+        assert.equal(hasSeenChoiceEndings(game, action, value, Object.keys(ENDINGS)), false);
+      }
+      for (const [action, value] of [['guide-spare'], ['guide-answer', guideDebrief(game)?.options[0]?.id]]) {
+        possibleChoiceEndings(game, action, value);
+        hasSeenChoiceEndings(game, action, value, history.collected);
+      }
+      assert.equal(JSON.stringify(game), saved, 'previews preserve positions, clues, ammo, save state, transcript and RNG');
+      assert.equal(JSON.stringify(history), priorHistory);
+    }
+  } finally { Math.random = random; }
+  assert.equal(randomCalls, 0);
+  const locked = snapshots.find(game => game.guide.stage === 'escape' && game.guide.time === 0);
+  assert.equal(hasSeenChoiceEndings(locked, 'guide-spare', undefined, history.collected), false);
+  assert.deepEqual(possibleChoiceEndings(escape, 'guide-spare'), ['guide', 'guide_interrupted']);
+  for (const unseen of ['guide', 'guide_interrupted']) assert.equal(hasSeenChoiceEndings(escape, 'guide-spare', undefined, historyExcept(unseen)), false);
+  assert.equal(hasSeenChoiceEndings(escape, 'guide-spare', undefined, ['guide', 'guide_interrupted']), true);
 });
 
 test('field previews recognize immediate endings without treating ordinary exploration as a closed path', () => {

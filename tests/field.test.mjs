@@ -96,6 +96,7 @@ test('automatic travel halts behind pause, menu, dialogs, and a background tab',
   const frame=source.slice(source.indexOf('function frame(now)'));
   for(const gate of ['paused','dialog','menu','hidden']) {
     let ticks=0;const context={game:field(),paused:gate==='paused',dialog:{open:gate==='dialog'},menuOpen:()=>gate==='menu',document:{hidden:gate==='hidden'},lastFrame:0,lastUI:0,lastSave:0,advance(){},fieldMap:{tick(){ticks++;}},updateUI(){},save(){},renderer:{draw(){}},requestAnimationFrame(){},resolutionGameActive};
+    context.guide3d={update(){}};
     vm.createContext(context);vm.runInContext(frame,context);vm.runInContext('frame(1000)',context);assert.equal(ticks,0,gate);
     context.paused=false;context.dialog.open=false;context.document.hidden=false;context.menuOpen=()=>false;
     vm.runInContext('frame(1100)',context);assert.equal(ticks,1);
@@ -128,6 +129,7 @@ test('arriving at an already inspected drain only reopens a card when the lanter
     const context={game,paused:false,dialog:{open:false},menuOpen:()=>false,document:{hidden:false},lastFrame:0,lastUI:0,lastSave:0,advance(){},
       fieldMap:{tick(_game,_dt,_step,arrive){arrive();}},act(action){actions.push(action);},nearbySite,investigationComplete,rogueOptions,
       updateUI(){},save(){},renderer:{draw(){}},requestAnimationFrame(){},resolutionGameActive};
+    context.guide3d={update(){}};
     vm.createContext(context);vm.runInContext(frame,context);vm.runInContext('frame(1000)',context);
     assert.deepEqual(actions,!inspected||id==='drain'&&lantern?['inspect']:[],`${id}: inspected=${inspected}, lantern=${lantern}`);
   }

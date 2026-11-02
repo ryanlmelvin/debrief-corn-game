@@ -9,6 +9,8 @@ export const FIELD_ART = {
   drain: { file: 'field-drain', alt: 'Pale roots spread across a muddy drainage ditch and dark water.' },
   tower: { file: 'station-kit', alt: 'A worn field radio, binoculars, pocket notebook and brass cartridges on the tower sill.' },
   retrieval: { file: 'field-retrieval', alt: 'Three recovery workers in worn field clothing enter the corn, each carrying a light.' },
+  'guide-boot': { file: 'encounter-tracks', alt: 'Two trails of boot prints lead toward pale roots and a dirty survey ribbon.' },
+  'guide-radio': { file: 'encounter-radio', alt: 'A scratched field radio half buried in wet soil between corn rows.' },
   hazmat: { file: 'field-hazmat', alt: 'A second recovery team in pale hooded hazmat suits and dark respirators enters the corn, each carrying a light.' },
   sighting: { file: 'field-sighting', alt: 'A distant pale human figure disappears between corn rows, seen from the watchtower.' },
   stove: { file: 'pump-stove', alt: 'Corn steams on a camping stove beside a clean plate, butter and salt in the dirty pump shed.' },

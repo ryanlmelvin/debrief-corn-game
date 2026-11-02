@@ -496,10 +496,10 @@ export function restore(raw) {
       const g=s.guide;
       if (!g || typeof g.message !== 'string' || !['search','escape','debrief'].includes(g.stage) || !['x','y','angle','steps','time','fired'].every(k => Number.isFinite(g[k]))) return null;
       if (g.x<1 || g.x>=12 || g.y<1 || g.y>=12 || g.steps<0 || g.time<0 || !Number.isInteger(g.fired) || g.fired<0 || g.fired>6) return null;
-      if (!Array.isArray(g.clues) || g.clues.length>3 || !g.clues.every((id,i)=>id===['boot','radio','corner'][i])) return null;
+      if (!Array.isArray(g.clues) || g.clues.length>3 || new Set(g.clues).size!==g.clues.length || !g.clues.every((id,i)=>g.explorationVersion===1?['boot','radio','corner'].includes(id):id===['boot','radio','corner'][i])) return null;
       if (!Array.isArray(g.team) || g.team.length>3 || !g.team.every(t=>Number.isInteger(t.id)&&t.id>=1&&t.id<=3&&Number.isFinite(t.x)&&Number.isFinite(t.y)&&Number.isFinite(t.distance)&&['running','shot','escaped'].includes(t.status))) return null;
       if (new Set(g.team.map(t=>t.id)).size!==g.team.length) return null;
-      if (['escape','debrief'].includes(g.stage) && (g.team.length!==3 || g.clues.length!==3)) return null;
+      if (['escape','debrief'].includes(g.stage) && (g.team.length!==3 || (g.explorationVersion===1?!g.clues.includes('corner'):g.clues.length!==3))) return null;
       if (!restoreGuideRoute(s)) return null;
     }
     // Saves from the removed interstitial now resume directly on the map.

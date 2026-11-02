@@ -319,14 +319,14 @@ test('guide controls retain focus during travel and move it to the next useful a
   const ui=source.slice(source.indexOf('function updateGuideUI()'),source.indexOf('function act('));
   const game=begin(),document={activeElement:null};
   let controlWrites=0,messageWrites=0,labelWrites=0,markup='',message='',label='';
-  const progress={style:{}},nodes=new Map();
+  const nodes=new Map();
   const controls={buttons:[],contains(element){return this.buttons.includes(element);},
     set innerHTML(value){
       markup=value;controlWrites++;
       this.buttons=[...value.matchAll(/<button[^>]*data-action="([^"]+)"/g)].map(match=>({dataset:{action:match[1]},focus(){document.activeElement=this;}}));
     },
     querySelector(selector){
-      if(selector==='.guide-progress i')return markup.includes('guide-progress')?progress:null;
+      if(selector==='.guide-progress i')return null;
       if(selector==='button')return this.buttons[0]||null;
       const action=selector.match(/data-action="([^"]+)"/)?.[1];
       return this.buttons.find(button=>button.dataset.action===action)||null;
@@ -334,7 +334,7 @@ test('guide controls retain focus during travel and move it to the next useful a
   };
   nodes.set('controls',controls);
   nodes.set('guide-message',{get textContent(){return message;},set textContent(value){message=value;messageWrites++;}});
-  const context=vm.createContext({game,document,paused:false,lastControlsKey:'',guideRouteStatus,
+  const context=vm.createContext({game,document,paused:false,lastControlsKey:'',guideRouteStatus,guide3d:{failed:true},esc:String,
     markSeenEndingChoices(){},history:{collected:[]},
     $:id=>{if(!nodes.has(id))nodes.set(id,{});return nodes.get(id);},
     stat:()=>'',canvas:{getAttribute(){return label;},setAttribute(name,value){label=value;labelWrites++;}}});
@@ -344,10 +344,10 @@ test('guide controls retain focus during travel and move it to the next useful a
   assert.equal(document.activeElement.dataset.action,'guide-travel');
   const travelWrites=controlWrites,travelMessages=messageWrites,travelLabels=labelWrites;
   for(let frame=0;frame<3;frame++){advance(game,.1);vm.runInContext('updateGuideUI()',context);}
-  assert.equal(controlWrites,travelWrites,'Moving updates progress without replacing focused controls.');
+  assert.equal(controlWrites,travelWrites,'Moving does not replace focused controls.');
   assert.equal(messageWrites,travelMessages,'Unchanged narration is not sent repeatedly to the status region.');
   assert.equal(labelWrites,travelLabels,'Unchanged canvas descriptions are not rewritten during movement.');
-  assert.ok(parseFloat(progress.style.width)>0);
+  assert.ok(game.guide.routeProgress>0);
   while(!guideRouteStatus(game).ready)advance(game,.1);
   vm.runInContext('updateGuideUI()',context);
   assert.equal(document.activeElement.dataset.action,'guide-inspect');
@@ -365,7 +365,7 @@ test('guide keyboard shortcuts follow the current action and respect focused but
   const source=readFileSync(new URL('../docs/app.js',import.meta.url),'utf8');
   const keyboard=source.slice(source.indexOf("document.addEventListener('keydown'"),source.indexOf("document.addEventListener('visibilitychange'"));
   const calls=[],game=begin();let keydown;
-  const context=vm.createContext({game,paused:false,dialog:{open:false},menuOpen:()=>false,resolutionGameActive,
+  const context=vm.createContext({game,paused:false,dialog:{open:false},menuOpen:()=>false,resolutionGameActive,guide3d:{failed:true},
     document:{addEventListener(type,handler){if(type==='keydown')keydown=handler;}},
     compulsionNotice:{matches:()=>false},$:()=>({matches:()=>false}),nearbyGuideSite:s=>guideRouteStatus(s).ready,
     act(...args){calls.push(args);},togglePause(){}});
