@@ -7,7 +7,7 @@ const code=app.slice(app.indexOf('function refreshInstallGuide()'),app.indexOf("
 function harness(storage,installed=false){
   const elements={}, events={};
   const $=id=>elements[id]??= {isConnected:true,addEventListener(name,fn){this[name]=fn;}};
-  const context={navigator:{storage},window:{addEventListener:(name,fn)=>events[name]=fn},isInstalled:()=>installed,installHandoff:{update:async()=>true},game:null,readSave:()=>null,history:{collected:[],runs:[]},showProgressTransfer(){context.transferOpened=true;},$: $,modalKind:'',dialog:{open:false},installPrompt:null,save(){},paper:(...args)=>args,showModal(kind){context.modalKind=kind;context.dialog.open=true;},toast(){}};
+  const context={navigator:{storage},window:{matchMedia:()=>({addEventListener(){}}),addEventListener:(name,fn)=>events[name]=fn},isInstalled:()=>installed,installHandoff:{update:async()=>true},game:null,readSave:()=>null,history:{collected:[],runs:[]},showProgressTransfer(){context.transferOpened=true;},$: $,modalKind:'',dialog:{open:false},installPrompt:null,save(){},paper:(...args)=>args,showModal(kind){context.modalKind=kind;context.dialog.open=true;},toast(){}};
   vm.runInNewContext(code,context);
   $('install').click();
   return {elements,events,context};
@@ -35,6 +35,8 @@ test('native install cancellation retains manual guidance and installed mode hid
   await h.elements['install-now'].click();
   assert.match(h.elements['install-status'].textContent,/canceled/);
   const installed=harness(undefined,true);
+  assert.equal(installed.elements.install.textContent,'Device settings');
+  assert.equal(h.elements.install.textContent,'Install on device');
   assert.match(installed.elements['install-status'].textContent,/installed app/);
 });
 test('installation offers a working recovery path for an already-installed app',()=>{

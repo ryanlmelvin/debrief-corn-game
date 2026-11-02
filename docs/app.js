@@ -64,7 +64,8 @@ if(playtest){
   document.title='DEBRIEF — Playtest';
   $('mini-games').textContent='Mini games · All unlocked';
 }
-const isInstalled = () => window.matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
+let installedThisSession=false;
+const isInstalled = () => installedThisSession || window.matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
 const installHandoff=new InstallHandoff(document,progressPath,isInstalled);
 let game=null, paused=false, modalKind='', lastModalKey='', lastControlsKey='', lastLog='', lastFrame=0, lastSave=0, lastUI=0, toastTimer, installPrompt=null;
 let audioContext=null, soundscape=null, soundEnabled=false, storageWarned=false;
@@ -839,6 +840,7 @@ if(resumedMiniGame){
 }else if(playtest)showMiniGames();
 
 function refreshInstallGuide() {
+  $('install').textContent=isInstalled() ? 'Device settings' : 'Install on device';
   if(modalKind !== 'install' || !dialog.open)return;
   const button=$('install-now');
   button.hidden=isInstalled() || !installPrompt;
@@ -846,7 +848,7 @@ function refreshInstallGuide() {
 }
 function showInstallGuide() {
   save();
-  showModal('install',paper('Install on device.',`
+  showModal('install',paper(isInstalled() ? 'Device settings.' : 'Install on device.',`
     <p class="small" id="install-status" role="status"></p>
     <p class="small" id="install-progress-status" role="status">Preparing your progress for installation…</p>
     <button class="primary" id="install-now" hidden>Install now ↗</button>
@@ -911,7 +913,9 @@ function showInstallGuide() {
 }
 window.addEventListener('beforeinstallprompt',event=>{event.preventDefault();installPrompt=event;refreshInstallGuide();});
 $('install').addEventListener('click',showInstallGuide);
-window.addEventListener('appinstalled',()=>{installPrompt=null;refreshInstallGuide();toast('Debrief installed.');});
+window.matchMedia('(display-mode: standalone)').addEventListener('change',refreshInstallGuide);
+refreshInstallGuide();
+window.addEventListener('appinstalled',()=>{installedThisSession=true;installPrompt=null;refreshInstallGuide();toast('Debrief installed.');});
 if ('serviceWorker' in navigator && ['https:', 'http:'].includes(location.protocol)) {
   let waitingWorker = null, applyingUpdate = false, refreshing = false;
   const showUpdate = () => {
