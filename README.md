@@ -1,10 +1,10 @@
 # Debrief
 
-A playable rural horror game based on **Debrief**, the short story by **[Ryan L. Melvin](https://ryanlmelvin.com)**.
+A playable rural horror game based on “Debrief”, the short story by **[Ryan L. Melvin](https://ryanlmelvin.com)**.
 
 Work three watchtower shifts. Shoot corn that tries to escape, distinguish human figures from moving crops, try to resist an intrusive urge to investigate, and choose what goes into the official debrief. After the sighting, roots gradually fill the stationary word “investigate” across the watchtower view. Holding your post until relief leads straight to the map with a brief notice that you could no longer resist; your later testimony remembers whether you chose to leave or were compelled. Inspect all three locations and return to the tower for debrief; your evidence changes your answers and available endings.
 
-This is a first playable adaptation, with original additional scenes and twenty-four endings. The source manuscript has not been copied into the project. The application records and environmental anomalies are fictional story elements.
+This is a first playable adaptation, with original additional scenes and twenty-four endings. The supplied redacted story is available as a PDF. The application records and environmental anomalies are fictional story elements.
 
 ## Play locally
 
@@ -171,9 +171,7 @@ Copyright (C) 2026 [Ryan L. Melvin](https://ryanlmelvin.com).
 
 The game code, assets, and adaptation content distributed in this repository are licensed under the GNU General Public License, version 3 (GPL-3.0-only). See [LICENSE](LICENSE).
 
-The original short story **Debrief** by [Ryan L. Melvin](https://ryanlmelvin.com) is a separate work, is not included in this repository or the deployed site, and is not covered by this license. All rights to the original manuscript are reserved. The license grants no permission to publish or redistribute that manuscript.
-
-Keep manuscript files outside this repository. Publish only the game adaptation; do not add the original story, excerpts supplied separately, or manuscript attachments.
+The short story “Debrief” by [Ryan L. Melvin](https://ryanlmelvin.com) is licensed under [CC BY-SA-4.0](https://creativecommons.org/licenses/by-sa/4.0/). [Read the supplied redacted story (PDF)](docs/DebriefRedacted.pdf). The story license is separate from the game’s GPLv3 license. Only the explicitly supplied redacted PDF is published; keep other manuscript files outside this repository.
 
 If an older offline installation keeps showing outdated interviews, open [Update Debrief](https://ryanlmelvin.github.io/debrief-corn-game/update.html) and select **Load latest game**. This activates the published version without clearing saved progress.
 

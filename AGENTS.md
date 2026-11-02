@@ -7,7 +7,7 @@ The user wants changes published as work proceeds so they can test directly on G
 - Bump the cache version in `docs/sw.js` whenever shipped assets change. Preserve the in-game “Update ready. Download?” flow, which saves progress, activates the waiting worker, and reloads.
 - Preserve the existing background art and color scheme unless the user asks to change them.
 - Run `npm test` and `npm run check` before publishing.
-- Never include the original short-story manuscript in the repository or deployment.
+- Only the user-authorized redacted story PDF (`docs/DebriefRedacted.pdf`) may be included in the repository and deployment; keep other original manuscript files out.
 
 ## Ending-choice hint safety
 
