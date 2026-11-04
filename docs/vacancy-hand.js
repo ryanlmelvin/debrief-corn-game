@@ -2,6 +2,9 @@ import * as THREE from './vendor/three/three.module.js';
 
 const PAPER_WIDTH = 2;
 const PAPER_HEIGHT = 2.95;
+// Sideways tilt changes each paper's depth across its face. Leave enough room
+// for those edges and the dossier thickness, not just the cards' centers.
+const CARD_DEPTH_STEP = .2;
 const finite = (value, fallback) => Number.isFinite(value) ? value : fallback;
 const DEAL_CARD_MS = 440;
 const DEAL_STAGGER_MS = 75;
@@ -28,10 +31,11 @@ export function vacancyHandLayout(count, selectedIndex = -1, aspect = 1.6) {
   const size = Math.max(0, Math.min(10, Math.floor(finite(count, 0))));
   const ratio = Math.max(.3, Math.min(8, finite(aspect, 1.6)));
   const middle = (size - 1) / 2, spread = size > 5 ? .7 : Math.max(.86, Math.min(1.35, ratio * .38));
+  const selectedLift = Math.max(.72, (size - 1) * CARD_DEPTH_STEP + .22);
   const cards = Array.from({ length: size }, (_, index) => {
       const side = index - middle, selected = index === selectedIndex;
       return { x: side * spread, y: -.13 - Math.abs(side) * .09 + (selected ? .37 : 0),
-        z: index * .045 + (selected ? .72 : 0), rotationX: -.09,
+        z: index * CARD_DEPTH_STEP + (selected ? selectedLift : 0), rotationX: -.09,
         rotationY: -side * .035, rotationZ: -side * .105,
         scale: selected ? 1.035 : 1 };
     });
