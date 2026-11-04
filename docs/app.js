@@ -909,6 +909,7 @@ if(previewGame==='guide'){
 }else if(playtest)showMiniGames();
 
 function refreshInstallGuide() {
+  $('start-install').hidden=isInstalled();
   $('install').textContent=isInstalled() ? 'Device settings' : 'Install on device';
   if(modalKind !== 'install' || !dialog.open)return;
   const button=$('install-now');
@@ -922,11 +923,27 @@ function showInstallGuide() {
     <p class="small" id="install-progress-status" role="status">Preparing your progress for installation…</p>
     <button class="primary" id="install-now" hidden>Install now ↗</button>
     <button class="secondary" id="install-transfer">Back up / restore</button>
-    <ul class="small">
-      <li><b>iPhone / iPad:</b> Open this page in Safari, open Share (sometimes inside the page menu), choose Add to Home Screen, enable Open as Web App if offered, then tap Add.</li>
-      <li><b>Android:</b> Open the browser menu and choose Install app or Add to Home screen, then confirm.</li>
-      <li><b>Computer:</b> Look for the install icon in the address bar or Install app in the browser menu. In Safari on Mac, use File → Add to Dock. If unavailable, try a browser that supports installation.</li>
-    </ul>
+      <details open>
+        <summary>iPhone or iPad</summary>
+        <ol>
+          <li>Open Debrief in Safari.</li>
+          <li>Tap Share (the square with an up arrow). You may need to tap the … menu first.</li>
+          <li>Choose Add to Home Screen. If missing, find it under Edit Actions.</li>
+          <li>Turn on Open as Web App if shown, then tap Add.</li>
+        </ol>
+      </details>
+      <details open>
+        <summary>Android</summary>
+        <ol>
+          <li>Open Debrief in Chrome.</li>
+          <li>Tap the ⋮ menu, then Add to home screen or Install app.</li>
+          <li>Choose Install if offered and follow the prompts.</li>
+        </ol>
+      </details>
+      <details>
+        <summary>Computer</summary>
+        <p>In Chrome or Edge, look for Install in the address bar or browser menu. On a Mac in Safari, choose File → Add to Dock.</p>
+      </details>
     <p class="small">Open the new icon once online to prepare for offline play. Installation carries progress on supported browsers. After installation, browser and app saves may advance separately. For an app already installed, or if progress is missing, use Back up / restore.</p>
     <h3>Protect saves</h3>
     <p class="small">Keep saves during automatic browser cleanup.</p>
@@ -982,9 +999,13 @@ function showInstallGuide() {
 }
 window.addEventListener('beforeinstallprompt',event=>{event.preventDefault();installPrompt=event;refreshInstallGuide();});
 $('install').addEventListener('click',showInstallGuide);
+$('start-install').addEventListener('click',()=>{
+  showInstallGuide();
+  modalReturnFocus=$('start-install');
+});
 window.matchMedia('(display-mode: standalone)').addEventListener('change',refreshInstallGuide);
 refreshInstallGuide();
-window.addEventListener('appinstalled',()=>{installedThisSession=true;installPrompt=null;refreshInstallGuide();toast('Debrief installed.');});
+window.addEventListener('appinstalled',()=>{installedThisSession=true;installPrompt=null;refreshInstallGuide();if(modalKind==='install' && dialog.open)closeModal();toast('Debrief installed.');});
 if ('serviceWorker' in navigator && ['https:', 'http:'].includes(location.protocol)) {
   let waitingWorker = null, applyingUpdate = false, refreshing = false;
   const showUpdate = () => {

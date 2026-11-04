@@ -15,6 +15,7 @@ function harness(storage,installed=false){
 test('installation guide stays available without native prompt or storage API',()=>{
   const h=harness();
   assert.equal(h.context.modalKind,'install');
+  assert.equal(h.elements['start-install'].hidden,false);
   assert.equal(h.elements['install-now'].hidden,true);
   assert.equal(h.elements['protect-storage'].disabled,true);
   assert.match(h.elements['storage-status'].textContent,/cannot request/);
@@ -36,6 +37,7 @@ test('native install cancellation retains manual guidance and installed mode hid
   assert.match(h.elements['install-status'].textContent,/canceled/);
   const installed=harness(undefined,true);
   assert.equal(installed.elements.install.textContent,'Device settings');
+  assert.equal(installed.elements['start-install'].hidden,true);
   assert.equal(h.elements.install.textContent,'Install on device');
   assert.match(installed.elements['install-status'].textContent,/installed app/);
 });
