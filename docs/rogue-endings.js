@@ -3,15 +3,21 @@ import { dungeonDebriefEnding } from './dungeon-debrief.js';
 // Original outcomes for the optional breaks in protocol. Share captions live
 // separately so the public cards never contain these ending transcripts.
 export const ROGUE_ENDINGS = {
+  pump_rupture: { code: '24', title: 'I couldn’t handle the pressure.', art: 'drain',
+    stamp: 'TREATMENT LINE RUPTURED',
+    text: 'The third release tears a pipe from the wall. Treatment pours beneath the pump-house door. You reach for the shutoff, but roots have closed around the wheel. Outside, the flooded rows lean toward the drainage ditch. The fence lifts out of the ground one post at a time. Dispatch asks how many specimens have crossed. You can no longer tell where one ends and the next begins.',
+    last: 'The perimeter goes with them.'
+  },
+  signal_lost: { code: '25', title: 'I gave away my voice.', art: 'tower',
+    stamp: 'VOICE RETAINED',
+    text: 'You miss the carrier again. The needles settle anyway. From the radio comes your voice, giving your name and watch number without hesitation. You release the transmit switch. It keeps talking. Beneath your boots, the soil opens around the cable. The voice finishes your debrief while you try to remember the first word.',
+    last: 'The department finally has a statement it can use.'
+  },
+
   dungeon_escape: {
     code: '23', title: 'Dungeon Crawler Corn.', art: 'drain', stamp: 'SUBTERRANEAN EXIT',
     text: 'The third brass key turns in the gate. You climb out of the ditch with your rifle slung over a torn uniform. Behind you, the lantern lights three flights of wet steps and the broken roots that guarded them. Ahead is an unfamiliar road. There is no tower. No fence. You check the chamber, put the lantern down, and start walking before anyone can call you back for debrief.',
     last: 'The drain was never meant to keep things out.'
-  },
-  dungeon_lost: {
-    code: '24', title: 'Below the root line.', art: 'drain', stamp: 'LANTERN RECOVERED',
-    text: 'The lantern rolls into the water. Without it, the corridors are only roots, and the roots are only corridors. You reach for your rifle, but something pins your wrist beneath the water. Above you, your relief shines a flashlight into the drainage channel. You gather everything you have left into one shout. From up there, it sounds like a blocked pipe.',
-    last: 'The next descent begins with a lantern waiting on the steps.'
   },
   corn_escape: {
     code: '16', title: 'I was the corn.', art: 'corner', stamp: 'SPECIMEN AT LARGE',
@@ -61,16 +67,6 @@ export function rogueEnding(s) {
   };
   if (r.route === 'corn' && r.patternVersion === 2 && s.ending === 'corn_uprising') return {
     text: 'You wait for the headlights to pass, cross back, and lift the gate latch. The rows follow your tracks to the shoulder. A driver brakes for the first stalk. The rest keep coming. Soon the road is still, and the field is moving. At the station, the supervisor has locked the front door. Through the glass, you watch him turn the dead bolt a second time.'
-  };
-  if (r.route === 'flood' && s.ending === 'breach') return {
-    stamp: 'TREATMENT LINE RUPTURED',
-    text: 'The third release tears a pipe from the wall. Treatment pours beneath the pump-house door. You reach for the shutoff, but roots have closed around the wheel. Outside, the flooded rows lean toward the drainage ditch. The fence lifts out of the ground one post at a time. Dispatch asks how many specimens have crossed. You can no longer tell where one ends and the next begins.',
-    last: 'The perimeter goes with them.'
-  };
-  if (r.route === 'broadcast' && s.ending === 'assimilation') return {
-    stamp: 'VOICE RETAINED',
-    text: 'You miss the carrier again. The needles settle anyway. From the radio comes your voice, giving your name and watch number without hesitation. You release the transmit switch. It keeps talking. Beneath your boots, the soil opens around the cable. The voice finishes your debrief while you try to remember the first word.',
-    last: 'The department finally has a statement it can use.'
   };
   if (r.route === 'corn' && s.ending === 'assimilation' && r.hits === 3 && r.lastHit === 'car') return {
     stamp: ROGUE_ENDINGS.roadkill.stamp,

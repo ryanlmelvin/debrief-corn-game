@@ -86,7 +86,7 @@ test('real practice endings never earn collection badges or transcripts, then an
   if(practice.rogue.stage==='intro')assert.equal(chooseRogue(practice,'begin'),true);
   for(let turn=0;practice.phase==='rogue'&&turn<100;turn++)assert.equal(chooseRogue(practice,practice.rogue.route==='corn'?'root':'wait'),true);
   assert.equal(practice.phase,'ending');
-  assert.equal(endingId(practice),'dungeon_lost');
+  assert.equal(endingId(practice),'assimilation');
   a.context.game=practice;a.run('archiveRun();archiveRun();archiveRun();');
   assert.equal(a.run('history.runs.length'),0);
   assert.equal(a.run('history.collected.length'),0);

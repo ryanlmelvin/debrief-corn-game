@@ -94,7 +94,9 @@ test('reckless opportunities are reachable, location gated, and reject invalid s
   assert.equal(startRogue(s, 'flood'), false);
   assert.equal(startRogue(s, 'unknown'), false);
   s.exposure = 70;
-  assert.equal(rogueOptions(s)[0].disabled, false);
+  assert.equal(rogueOptions(s)[0].disabled, true);
+  assert.equal(startRogue(s, 'corn'), false);
+  s.exposure = 100;
   s.player = { x:3, y:3 }; s.inspected.push('pump');
   assert.equal(rogueOptions(s)[2].disabled, false);
   assert.equal(startRogue(s, 'corn'), true);
@@ -187,11 +189,11 @@ test('corn movement rejects diagonal, non-finite and repeated moves; legacy hits
     if(hit===2)assert.equal(s.rogue.y,4);
     roundTrip(s);
   }
-  assert.equal(s.ending,'assimilation');
+  assert.equal(s.ending,'corn_contained');
   const ending=getEnding(s);
-  assert.equal(ending.title,ENDINGS.assimilation.title);
-  assert.equal(ending.code,ENDINGS.assimilation.code);
-  assert.equal(ending.stamp,'SPECIMEN ROOTED');
+  assert.equal(ending.title,ENDINGS.corn_contained.title);
+  assert.equal(ending.code,ENDINGS.corn_contained.code);
+  assert.equal(ending.stamp,'SPECIMEN CONTAINED');
   assert.match(ending.text,/rifle finds you/);
   assert.deepEqual(getEnding(roundTrip(s)),ending);
 });
@@ -339,7 +341,7 @@ for(const [crossing,id,kind,code,stamp] of [[0,'corn_contained','bullet','21','S
     assert.equal(ending.code,code);assert.equal(ending.title,ENDINGS[id].title);assert.equal(ending.stamp,stamp);
     assert.match(ending.text,kind==='car'?/headlights/:/rifle|guard/);
     assert.deepEqual(getEnding(roundTrip(s)),ending);
-    for(const patch of [{hits:2},{patternVersion:1},{lastHit:kind==='car'?'bullet':'car'},{y:8},{crossing:kind==='car'?0:2}]) {
+    for(const patch of [{hits:2},...(kind==='car'?[{patternVersion:1}]:[]),{lastHit:kind==='car'?'bullet':'car'},{y:8},{crossing:kind==='car'?0:2}]) {
       const forged=structuredClone(s);Object.assign(forged.rogue,patch);
       assert.equal(restore(serialize(forged)),null,'a death record must match its actual cause and third hit');
     }
@@ -370,10 +372,10 @@ test('missed signals cost exactly one strike per press and three misses have a s
     assert.equal(chooseRogue(s,'lock'),false);
     roundTrip(s);
   }
-  assert.equal(s.ending,'assimilation');assert.equal(s.rogue.locks,0);
+  assert.equal(s.ending,'signal_lost');assert.equal(s.rogue.locks,0);
   const ending=getEnding(s);
-  assert.equal(ending.title,ENDINGS.assimilation.title);
-  assert.equal(ending.code,ENDINGS.assimilation.code);
+  assert.equal(ending.title,ENDINGS.signal_lost.title);
+  assert.equal(ending.code,ENDINGS.signal_lost.code);
   assert.equal(ending.stamp,'VOICE RETAINED');
   assert.match(ending.text,/radio comes your voice/);
   assert.deepEqual(getEnding(roundTrip(s)),ending);
@@ -399,11 +401,11 @@ test('three disconnected releases rupture the perimeter and cannot repeat reward
   for(let i=1;i<=3;i++) {
     assert.equal(chooseRogue(s,'release'),true);assert.equal(s.rogue.hits,i);roundTrip(s);
   }
-  assert.equal(s.ending,'breach');
+  assert.equal(s.ending,'pump_rupture');
   assert.equal(s.breaches,0);
   const ending=getEnding(s);
-  assert.equal(ending.title,ENDINGS.breach.title);
-  assert.equal(ending.code,ENDINGS.breach.code);
+  assert.equal(ending.title,ENDINGS.pump_rupture.title);
+  assert.equal(ending.code,ENDINGS.pump_rupture.code);
   assert.equal(ending.stamp,'TREATMENT LINE RUPTURED');
   assert.doesNotMatch(ending.text,/sixth movement/i);
   assert.match(ending.text,/pipe from the wall/);
@@ -432,7 +434,28 @@ test('older saves remain compatible and forged or out-of-bounds rogue states are
     const wrongCommit=structuredClone(s);wrongCommit.reports.at(-1).rogueRoute='other';assert.equal(restore(serialize(wrongCommit)),null);
     const wrongPhase=structuredClone(s);wrongPhase.phase='field';assert.equal(validRogue(wrongPhase),false);
   }
-  for(const ending of ['corn_escape','corn_uprising','radio_ghost','field_voice','flood','corn_contained','roadkill','dungeon_escape','dungeon_lost']) {
+  for(const ending of ['corn_escape','corn_uprising','radio_ghost','field_voice','flood','corn_contained','roadkill','dungeon_escape','pump_rupture','signal_lost']) {
     const forged=field();forged.phase='ending';forged.ending=ending;assert.equal(restore(serialize(forged)),null);
   }
+});
+
+for (const [route, oldId, newId] of [['broadcast','assimilation','signal_lost'],['flood','breach','pump_rupture']]) {
+ test(`legacy ${route} failure restores as its distinct ending`, () => {
+  const s=begin(route);
+  for(let strike=0;strike<3;strike++) {
+   if(route==='broadcast') while(s.rogue.time<s.rogue.lockReadyAt || broadcastCursor(s)>.25) advance(s,.01);
+   assert.equal(chooseRogue(s,route==='broadcast'?'lock':'release'),true);
+  }
+  assert.equal(s.ending,newId);
+  s.ending=s.rogue.outcome=oldId;
+  const reports=structuredClone(s.reports), restored=restore(serialize(s));
+  assert.ok(restored);assert.equal(restored.ending,newId);assert.deepEqual(restored.reports,reports);
+ });
+}
+test('Corn cannot be entered voluntarily at any exposure below 100', () => {
+ for(const exposure of [0,69.9,70,75,99.9]) {
+  const s=field();s.exposure=exposure;const before=serialize(s);
+  assert.equal(startRogue(s,'corn'),false);assert.equal(serialize(s),before);
+ }
+ assert.equal(Object.hasOwn(ENDINGS,'dungeon_lost'),false);
 });

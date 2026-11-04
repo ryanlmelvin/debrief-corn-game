@@ -68,26 +68,13 @@ test('the first real radio remains discoverable across seeds without choosing an
   }
 });
 
-test('surrender is a high-exposure choice at the roots and figures, including every presentation', () => {
-  for (const id of ['lamp-keeper', 'root-knot', 'your-outline']) for (const variant of [0, 1, 2]) {
-    const locked = atEncounter(id, 69.9, variant), snapshot = serialize(locked);
-    assert.equal(currentEncounter(locked).choices.some(option => option.id === 'surrender'), false);
-    assert.equal(chooseFieldEncounter(locked, 'surrender'), false);
-    assert.equal(serialize(locked), snapshot);
-    const game = atEncounter(id, 70, variant);
-    assert.ok(currentEncounter(game).choices.some(option => option.id === 'surrender'));
-    assert.equal(chooseFieldEncounter(game, 'surrender'), true);
-    assert.equal(game.phase, 'rogue');
-    assert.equal(game.rogue.route, 'corn');
-    assert.equal(game.exposure, 100);
-    assert.deepEqual(game.fieldEvents.journal, [{ id, choice: 'surrender', delta: 0, x: 4, y: 4 }]);
-    assert.equal(game.fieldEvents.pending, null);
-    roundTrip(game);
-    assert.equal(chooseRogue(game, 'back'), false, 'the transformation cannot be withdrawn');
-    assert.equal(chooseRogue(game, 'root'), true);
-    assert.equal(game.ending, 'assimilation');
-    roundTrip(game);
-  }
+test('surrender is unavailable in every encounter presentation below 100 exposure', () => {
+ for (const id of ['lamp-keeper','root-knot','your-outline']) for (const variant of [0,1,2]) for (const exposure of [69.9,70,99.9]) {
+  const game = atEncounter(id, exposure, variant), snapshot = serialize(game);
+  assert.equal(currentEncounter(game).choices.some(option => option.id === 'surrender'), false);
+  assert.equal(chooseFieldEncounter(game, 'surrender'), false);
+  assert.equal(serialize(game), snapshot);
+ }
 });
 
 test('contextual routes reject unrelated encounters, idle field calls, and already answered cards', () => {

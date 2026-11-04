@@ -3,12 +3,12 @@ import { getDungeonDebriefScene, validDungeonDebrief } from './dungeon-debrief.j
 
 // Deliberately broken protocol: self-contained simulations, safe to save mid-step.
 const ROUTES = ['corn', 'broadcast', 'flood', 'dungeon'];
-const NEW_ENDINGS = ['corn_escape', 'corn_uprising', 'radio_ghost', 'field_voice', 'flood', 'corn_contained', 'roadkill', 'dungeon_escape', 'dungeon_lost'];
+const NEW_ENDINGS = ['corn_escape', 'corn_uprising', 'radio_ghost', 'field_voice', 'flood', 'corn_contained', 'roadkill', 'dungeon_escape', 'pump_rupture', 'signal_lost'];
 const RESULT = {
   corn: ['corn_escape', 'corn_uprising', 'assimilation', 'corn_contained', 'roadkill'],
-  broadcast: ['radio_ghost', 'field_voice', 'assimilation'],
-  flood: ['flood', 'breach'],
-  dungeon: ['dungeon_escape', 'dungeon_lost']
+  broadcast: ['radio_ghost', 'field_voice', 'signal_lost'],
+  flood: ['flood', 'pump_rupture'],
+  dungeon: ['dungeon_escape']
 };
 const LANES = [1, 2, 3, 5, 6, 7];
 const PIPE_KINDS = ['elbow', 'straight', 'elbow', 'elbow', 'elbow', 'elbow', 'straight', 'elbow', 'straight'];
@@ -24,7 +24,7 @@ export function rogueOptions(s) {
   const atPump = s.player.x === 3 && s.player.y === 3 && s.inspected.includes('pump');
   const lantern = s.fieldEvents?.flags.includes('lantern');
   return [
-    { id: 'corn', label: 'Stop resisting the field.', detail: s.exposure >= 70 ? '100 exposure.' : 'The roots are waiting. Requires 70 exposure.', disabled: !idle || s.exposure < 70 },
+    { id: 'corn', label: 'Stop resisting the field.', detail: '', disabled: true },
     { id: 'broadcast', label: 'Transmit on every frequency.', detail: 'Something beneath the static knows your voice.', disabled: !idle },
     { id: 'flood', label: 'Reverse the treatment pumps.', detail: atPump ? 'The pipes run both ways.' : 'Return to the pump house after inspecting it.', disabled: !idle || !atPump },
     { id: 'dungeon', label: 'Climb into the drainage channel.', detail: !lantern ? 'Too dark without a lantern.' : atDrain ? 'Your lantern reveals stairs beneath the waterline.' : 'Bring your lantern to the drainage channel and inspect it.', disabled: !idle || !atDrain || !lantern }
@@ -167,7 +167,7 @@ export function chooseRogue(s, id) {
     } else {
       r.hits++;
       r.message = `The signal bites back. ${3 - r.hits} missed locks remain.`;
-      if (r.hits === 3) end(s, 'assimilation', 'signal-lost', 'The field learned my voice before I could use it.');
+      if (r.hits === 3) end(s, 'signal_lost', 'signal-lost', 'The field learned my voice before I could use it.');
     }
     return true;
   }
@@ -183,7 +183,7 @@ export function chooseRogue(s, id) {
     else {
       r.hits++;
       r.message = `A disconnected pipe shudders. ${3 - r.hits} releases remain.`;
-      if (r.hits === 3) end(s, 'breach', 'rupture', 'The pressure tore through the perimeter before the outlet was connected.');
+      if (r.hits === 3) end(s, 'pump_rupture', 'rupture', 'The pressure tore through the perimeter before the outlet was connected.');
     }
     return true;
   }
@@ -256,7 +256,7 @@ function checkCorn(s) {
   r.hits++;
   r.lastHit = hazard.kind;
   if (r.hits === 3) {
-    const ending = r.patternVersion === 2 ? (hazard.kind === 'car' ? 'roadkill' : 'corn_contained') : 'assimilation';
+    const ending = hazard.kind === 'car' ? 'roadkill' : 'corn_contained';
     end(s, ending, 'rooted', hazard.kind === 'car' ? 'The headlights found me. I could not cross the road.' : 'The rifle found me. I could not keep moving.');
     return;
   }
@@ -272,7 +272,6 @@ function finishDungeon(s) {
     s.rogue.message = 'You reach the surface. The supervisor is waiting for your report.';
   }
   else if (status === 'lost') {
-    if (s.practice) { s.rogue.dungeon.hp = 0; end(s, 'dungeon_lost', 'lost', 'Exposure reached 100 beneath the roots.'); return; }
     delete s.rogue;
     s.phase = 'field';
     startRogue(s, 'corn');
@@ -355,6 +354,13 @@ export function validRogue(s) {
   const r = s.rogue;
   if (r === undefined) return s.phase !== 'rogue' && !NEW_ENDINGS.includes(s.ending);
   if (!r || typeof r !== 'object' || Array.isArray(r) || !ROUTES.includes(r.route) || !['intro', 'play', 'choice', 'debrief', 'done'].includes(r.stage)) return false;
+  // Reclassify completed legacy failures without replaying inputs or touching testimony.
+  if (s.phase === 'ending' && r.stage === 'done' && r.outcome === s.ending) {
+    const replacement = r.route === 'flood' && s.ending === 'breach' ? 'pump_rupture'
+      : r.route === 'broadcast' && s.ending === 'assimilation' ? 'signal_lost'
+      : r.route === 'corn' && s.ending === 'assimilation' && r.hits === 3 ? (r.lastHit === 'car' ? 'roadkill' : 'corn_contained') : null;
+    if (replacement) s.ending = r.outcome = replacement;
+  }
   // Early preview saves had one crossing. Preserve an already-earned finale.
   if (r.route === 'corn' && r.crossing === undefined) r.crossing = r.stage === 'choice' || ['corn_escape', 'corn_uprising'].includes(r.outcome) ? 2 : 0;
   // Do not replace live published volleys with a new pattern during an update.
@@ -375,7 +381,7 @@ export function validRogue(s) {
   if (r.stage !== 'intro' && !dungeonInterview) {
     const rootedWithoutRunning = r.route === 'corn' && r.outcome === 'assimilation' && r.hits === 0;
     if (r.stage === 'done') {
-      const choice = rootedWithoutRunning ? 'root' : ({ corn_escape: 'escape', corn_uprising: 'gate', corn_contained: 'rooted', roadkill: 'rooted', radio_ghost: 'warn', field_voice: 'command', flood: 'release', breach: 'rupture', dungeon_escape: 'surface', dungeon_lost: 'lost' }[r.outcome] || (r.route === 'corn' ? 'rooted' : 'signal-lost'));
+      const choice = rootedWithoutRunning ? 'root' : ({ corn_escape: 'escape', corn_uprising: 'gate', corn_contained: 'rooted', roadkill: 'rooted', radio_ghost: 'warn', field_voice: 'command', flood: 'release', pump_rupture: 'rupture', dungeon_escape: 'surface' }[r.outcome] || (r.route === 'corn' ? 'rooted' : 'signal-lost'));
       if (!matchesReport(s.reports.at(-1), choice) || !rootedWithoutRunning && !matchesReport(s.reports.at(-2), 'begin')) return false;
     } else if (!matchesReport(s.reports.at(-1), 'begin')) return false;
   }
@@ -386,14 +392,14 @@ export function validRogue(s) {
     if (r.refuge === 8 && r.y <= 4 || r.stage === 'play' && r.y === 0) return false;
     if (r.stage === 'choice' && (r.y !== 0 || r.refuge !== 4 || r.crossing !== 2)) return false;
     if (['corn_escape', 'corn_uprising'].includes(r.outcome) && (r.y !== 0 || r.refuge !== 4 || r.crossing !== 2 || r.hits === 3)) return false;
-    if (['corn_contained', 'roadkill'].includes(r.outcome) && (r.patternVersion !== 2 || r.hits !== 3 || [0, 4, 8].includes(r.y) || r.lastHit !== (r.outcome === 'roadkill' ? 'car' : 'bullet'))) return false;
+    if (['corn_contained', 'roadkill'].includes(r.outcome) && (r.hits !== 3 || [0, 4, 8].includes(r.y) || r.lastHit !== (r.outcome === 'roadkill' ? 'car' : 'bullet'))) return false;
     if (r.outcome === 'corn_contained' && r.crossing === 2) return false;
     if (r.outcome === 'assimilation' && r.hits !== 3 && (r.hits !== 0 || r.time !== 0 || r.x !== 5 || r.y !== 8 || r.crossing !== 0 || r.refuge !== 8)) return false;
   } else if (r.route === 'broadcast') {
     if (!integer(r.locks, 0, 3) || !finite(r.lockReadyAt, 0, r.time + .350001)) return false;
     if (r.stage === 'intro' && (r.locks || r.lockReadyAt)) return false;
     if ((r.stage === 'choice' || ['radio_ghost', 'field_voice'].includes(r.outcome)) && (r.locks !== 3 || r.hits === 3)) return false;
-    if (r.stage === 'play' && r.locks === 3 || r.outcome === 'assimilation' && (r.hits !== 3 || r.locks === 3)) return false;
+    if (r.stage === 'play' && r.locks === 3 || r.outcome === 'signal_lost' && (r.hits !== 3 || r.locks === 3)) return false;
   } else if (r.route === 'dungeon') {
     if (r.hits !== 0 || r.time !== 0 || !integer(s.rounds, 0, 6) || !integer(s.reserve, 0, Number.MAX_SAFE_INTEGER) || !migrateDungeon(s) || !validDungeon(r.dungeon, r.stage, r.outcome)) return false;
     if (r.debrief === undefined) {
@@ -405,7 +411,7 @@ export function validRogue(s) {
     if (r.debrief !== undefined && !validDungeonDebrief(s)) return false;
   } else {
     if (!Array.isArray(r.tiles) || r.tiles.length !== 9 || !r.tiles.every(tile => integer(tile, 0, 3)) || !integer(r.turns, 0, 1000000) || r.time !== 0 || r.stage === 'choice') return false;
-    if (r.stage === 'intro' && r.turns !== 0 || r.outcome === 'flood' && (r.hits === 3 || !floodConnections(s).connected) || r.outcome === 'breach' && (r.hits !== 3 || floodConnections(s).connected)) return false;
+    if (r.stage === 'intro' && r.turns !== 0 || r.outcome === 'flood' && (r.hits === 3 || !floodConnections(s).connected) || r.outcome === 'pump_rupture' && (r.hits !== 3 || floodConnections(s).connected)) return false;
   }
   return true;
 }

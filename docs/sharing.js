@@ -24,7 +24,8 @@ export const ENDING_SHARES = {
   corn_contained: { code: '21', line: 'I became target practice.', art: 'field-sighting', alt: 'Corn stands beyond the watchtower at night.' },
   roadkill: { code: '22', line: 'I didn’t look both ways.', art: 'field-corner', alt: 'A fence marks the edge of a dark cornfield.' },
   dungeon_escape: { code: '23', line: 'Dungeon Crawler Corn.', art: 'field-drain', alt: 'Pale roots spread across a muddy drainage ditch and dark water.' },
-  dungeon_lost: { code: '24', line: 'Below the root line.', art: 'field-drain', alt: 'Pale roots spread across a muddy drainage ditch and dark water.' }
+  pump_rupture: { code: '24', line: 'I couldn’t handle the pressure.', art: 'field-drain', alt: 'Pale roots spread across a muddy drainage ditch and dark water.' },
+  signal_lost: { code: '25', line: 'I gave away my voice.', art: 'encounter-radio', alt: 'A field radio waits in the dark.' }
 };
 
 export const GUIDE_TEAM_SHARE = ENDING_SHARES.guide_shot;

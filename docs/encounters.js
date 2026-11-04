@@ -5,7 +5,6 @@ import { neededEncounterIds } from './ending-paths.js';
 // Original field encounters for the game adaptation. No source manuscript text.
 const choice=(id,label,delta,result,flag=null,requires=null)=>({id,label,delta,result,flag,requires});
 const broadcastChoice=()=>({...choice('broadcast','Transmit on every frequency.',0,'You hold the transmit switch. Every channel answers with your breathing.'),route:'broadcast'});
-const surrenderChoice=()=>({...choice('surrender','Stop resisting the field.',0,'You stop pulling away. The roots close around your boots.'),route:'corn',minExposure:70});
 const has=(s,flag)=>s.fieldEvents.flags.includes(flag);
 export const ENCOUNTERS=[
   {id:'first-call',night:0,step:3,art:'radio',title:'Your voice. From the soil.',
@@ -59,7 +58,6 @@ export const ENCOUNTERS=[
       choice('back','Back away with the light held steady.',0,'The figure beside the lantern does not follow. Its shadow reaches the crossing before you do.'),
       choice('ask','Ask who sent the relief.',4,'The figure beside the lantern gives your name. Then the name of the person who trained you. You have never spoken that name here.','named'),
       choice('hand','Offer a hand to pull it free.',7,'The figure beside the lantern closes a cold hand around your fingers. Its boots stay in the soil. When you let go, your palm smells of wet grain.','touched'),
-      surrenderChoice()
     ]},
   {id:'two-towers',night:1,step:23,art:'two-towers',title:'Two lights above the rows.',
     text:'You see two tower lights through the crop, although there should only be one watchtower. From one comes the radio call you expected. From the other comes the sound of someone climbing your ladder.',
@@ -82,7 +80,6 @@ export const ENCOUNTERS=[
       choice('around','Step around without touching the roots.',0,'The pale roots loosen as your shadow passes over the knot. You keep walking.'),
       choice('lift','Lift the knot with a fallen stalk.',5,'You lift the knot of roots with the fallen stalk. The roots hold the shape of an empty shoe. Beneath the roots is a print from the sole of your own boot.','lifted-roots'),
       choice('twine','Lay your survey twine across the knot.',-3,'The root tips follow your survey twine away from your boots. You leave it stretched across the furrow and take the clear ground.','led-roots','twine'),
-      surrenderChoice()
     ]},
   {id:'your-outline',night:2,step:16,art:'your-outline',title:'Your coat. Your height.',
     text:s=>has(s,'touched')?'You see the figure you tried to pull free of the soil last night. It stands behind the lantern and holds up a hand. Your palm aches where the figure gripped it. The figure is wearing a coat identical to yours.':'You see a figure with your height and build standing beyond the lantern, facing away. The figure wears a coat identical to yours, down to the pale repair on the sleeve. Its shoulders rise when you breathe.',
@@ -90,7 +87,6 @@ export const ENCOUNTERS=[
       choice('ground','Keep the beam on the ground and pass.',0,'You watch your boots until the lantern is behind you. There are only two feet in the light.'),
       choice('name','Call your own name.',4,'The figure in the matching coat turns its head a little too far. From behind you, your voice says, “Here.”','called-name'),
       choice('stand','Stand beside the outline.',7,'You stand beside the figure in the matching coat. For one breath, you cannot tell which shadow is yours. You step away. One of the shadows stays.','stood-beside'),
-      surrenderChoice()
     ]},
   {id:'last-follower',night:2,step:23,art:'last-follower',title:'Something wants to come back.',
     text:s=>has(s,'looked-back')?'As you approach the watchtower, you see a corn stalk bend behind you, like the stalk you caught straightening when you turned your light on the first night. Your radio says, very quietly, “Hold the door.”':'As you approach the watchtower, the radio on your belt speaks without static. “Hold the door.” Behind you, the dry leaves start moving against the wind.',

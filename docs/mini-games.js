@@ -113,6 +113,7 @@ export function miniGameComplete(s) {
   if (s.practice === 'watch') return s.phase !== 'tower';
   if (RESOLUTION_GAMES.includes(s.practice)) return s.resolution?.activity?.kind === s.practice &&
     (['complete', 'failed'].includes(s.resolution.activity.state.stage) || s.practice === 'transmission' && s.exposure >= 100);
+  if (s.practice === 'dungeon' && s.rogue?.route === 'corn') return true;
   return s.rogue?.route === s.practice && (s.phase === 'ending' || s.rogue.stage === 'choice');
 }
 
@@ -152,7 +153,7 @@ export function miniGameResult(s) {
   } else {
     success = s.ending === 'dungeon_escape';
     title = success ? 'Back above ground.' : 'The roots closed in.';
-    message = `Floor ${s.rogue.dungeon.floor + 1} of 3 · ${s.rogue.dungeon.turn} turns · ${s.rogue.dungeon.kills} roots stopped.`;
+    message = s.rogue.route === 'corn' ? 'Exposure reached 100 beneath the roots.' : `Floor ${s.rogue.dungeon.floor + 1} of 3 · ${s.rogue.dungeon.turn} turns · ${s.rogue.dungeon.kills} roots stopped.`;
   }
   const reply = id === 'dungeon' && success && s.rogue.debrief?.answers.length === 3
     ? s.reports.find(report => report.dungeonDebriefIndex === 2)?.supervisorReply : null;

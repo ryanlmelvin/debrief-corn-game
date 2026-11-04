@@ -458,7 +458,7 @@ export function restore(raw) {
         if (s.rogue !== undefined || !['tower', 'field', 'ending'].includes(s.phase) || s.phase === 'ending' && s.ending !== 'breach') return null;
       } else if (RESOLUTION_GAMES.includes(s.practice)) {
         if (s.phase !== 'resolution' || s.resolution?.route !== s.practice || s.resolution?.step !== 2 || !s.resolution?.activity || s.ending !== null || s.rogue !== undefined) return null;
-      } else if (s.rogue?.route !== s.practice || !['rogue', 'ending'].includes(s.phase)) return null;
+      } else if ((s.rogue?.route !== s.practice && !(s.practice === 'dungeon' && s.rogue?.route === 'corn' && s.exposure === 100)) || !['rogue', 'ending'].includes(s.phase)) return null;
     }
     if (!Number.isInteger(s.shift) || s.shift < 0 || s.shift > 2 || !Number.isInteger(s.question) || s.question < 0 || s.question > 3) return null;
     for (const key of ['time','rounds','reserve','reload','kills','shots','breaches','exposure','trust','honesty','rng','nextSpawn','nextId','fieldSteps']) if (!Number.isFinite(s[key])) return null;

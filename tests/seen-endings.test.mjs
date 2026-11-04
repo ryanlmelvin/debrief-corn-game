@@ -1222,7 +1222,7 @@ function rogueField(route) {
     assert.equal(chooseFieldEncounter(game, 'take'), true);
     assert.equal(continueFieldEncounter(game), true);
   }
-  Object.assign(game, { phase: 'field', entered: true, departure: 'chosen', exposure: 75, player: { x: 3, y: 3 } });
+  Object.assign(game, { phase: 'field', entered: true, departure: 'chosen', exposure: !route || route === 'corn' ? 100 : 75, player: { x: 3, y: 3 } });
   game.inspected.push('pump');
   if (route === 'dungeon') {
     game.player = { x: 7, y: 5 };
@@ -1284,12 +1284,12 @@ function finishBroadcast(game, ending) {
     do {
       advance(game, .01);
       assert.ok(frames++ < 1000);
-    } while (game.rogue.time < game.rogue.lockReadyAt || (ending === 'assimilation'
+    } while (game.rogue.time < game.rogue.lockReadyAt || (ending === 'signal_lost'
       ? broadcastCursor(game) >= broadcastWindow(game).min - .01 && broadcastCursor(game) <= broadcastWindow(game).max + .01
       : broadcastCursor(game) < broadcastWindow(game).min + .01 || broadcastCursor(game) > broadcastWindow(game).max - .01));
     assert.equal(chooseRogue(game, 'lock'), true);
   }
-  if (ending !== 'assimilation') assert.equal(chooseRogue(game, ending === 'radio_ghost' ? 'warn' : 'command'), true);
+  if (ending !== 'signal_lost') assert.equal(chooseRogue(game, ending === 'radio_ghost' ? 'warn' : 'command'), true);
   assert.equal(endingId(game), ending);
 }
 
@@ -1298,7 +1298,7 @@ test('radio encounter choices retain real signal failures, both messages and wit
     const entry = contextualEncounter(id);
     assert.ok(currentEncounter(entry).choices.some(choice => choice.id === 'broadcast'));
     assertOpenEntryHint(entry, 'encounter-choice', 'broadcast');
-    for (const ending of ['radio_ghost', 'field_voice', 'assimilation']) {
+    for (const ending of ['radio_ghost', 'field_voice', 'signal_lost']) {
       const game = structuredClone(entry);
       assert.equal(chooseFieldEncounter(game, 'broadcast'), true);
       assert.equal(game.rogue.route, 'broadcast');
@@ -1324,23 +1324,14 @@ test('radio encounter choices retain real signal failures, both messages and wit
   }
 });
 
-test('high-exposure encounter surrender retains all five Corn outcomes reached by actual inputs', () => {
-  for (const id of ['lamp-keeper', 'root-knot', 'your-outline']) {
-    const entry = contextualEncounter(id, 70);
-    assertOpenEntryHint(entry, 'encounter-choice', 'surrender');
-    const entered = structuredClone(entry);
-    assert.equal(chooseFieldEncounter(entered, 'surrender'), true);
-    assert.equal(entered.exposure, 100);
-    assert.equal(entered.rogue.route, 'corn');
-    assert.equal(possibleChoiceEndings(entered, 'rogue-choice', 'back'), null);
-    assertTerminalHint(entered, 'rogue-choice', 'root', 'assimilation');
-    for (const ending of transmissionExposureEndings) {
-      const game = structuredClone(entered);
-      finishExposedCorn(game, ending);
-      assert.equal(endingId(game), ending);
-      assert.equal(hasSeenChoiceEndings(entry, 'encounter-choice', 'surrender', historyExcept(ending)), false);
-    }
-  }
+test('early surrender is absent from encounters at every exposure', () => {
+ for (const exposure of [69,70,99,100]) for (const id of ['lamp-keeper','root-knot','your-outline']) {
+  const game = contextualEncounter(id, exposure), before = structuredClone(game);
+  assert.equal(currentEncounter(game).choices.some(c => c.id === 'surrender'), false);
+  assert.equal(possibleChoiceEndings(game, 'encounter-choice', 'surrender'), null);
+  assert.equal(chooseFieldEncounter(game, 'surrender'), false);
+  assert.deepEqual(game, before);
+ }
 });
 
 test('unavailable contextual encounter choices fail closed without changing saves or collection history', () => {
@@ -1369,7 +1360,7 @@ test('unavailable contextual encounter choices fail closed without changing save
   let randomCalls = 0;
   try {
     Math.random = () => { randomCalls++; return .5; };
-    for (const [game, value] of [[contextualEncounter('first-call'), 'broadcast'], [contextualEncounter('root-knot', 70), 'surrender']]) {
+    for (const [game, value] of [[contextualEncounter('first-call'), 'broadcast']]) {
       const saved = JSON.stringify(game);
       for (let preview = 0; preview < 3; preview++) {
         assert.equal(hasSeenChoiceEndings(game, 'encounter-choice', value, history.collected), true);
@@ -1388,7 +1379,7 @@ test('pump card entry retains real release failures, successful flooding and wit
   Object.assign(entry, { phase: 'field', entered: true, departure: 'chosen', player: { x: 3, y: 3 } });
   assert.ok(inspect(entry));
   assertOpenEntryHint(entry, 'rogue-start', 'flood');
-  for (const ending of ['flood', 'breach', 'consumption']) {
+  for (const ending of ['flood', 'pump_rupture', 'consumption']) {
     const game = structuredClone(entry);
     assert.equal(startRogue(game, 'flood'), true);
     assertOpenEntryHint(game, 'rogue-choice', 'back');
@@ -1455,7 +1446,7 @@ test('drain previews and repeated withdrawals preserve saves, transcripts, histo
       const introduction = JSON.stringify(game);
       for (const choice of ['begin', 'back']) {
         possibleChoiceEndings(game, 'rogue-choice', choice);
-        for (const id of ['dungeon_escape', 'dungeon_lost', 'witness']) {
+        for (const id of ['dungeon_escape', 'pump_rupture', 'signal_lost', 'witness']) {
           assert.equal(hasSeenChoiceEndings(game, 'rogue-choice', choice, historyExcept(id)), false);
         }
         assert.equal(JSON.stringify(game), introduction);
@@ -1655,15 +1646,15 @@ test('committed recovery cannot reach the drain, including after interview choic
     game.player = { x: 7, y: 5 };
     if (!game.inspected.includes('drain')) game.inspected.push('drain');
     const before = structuredClone(game);
-    assert.equal(startRogue(game, 'dungeon'), false);
+    for (const route of ['dungeon','flood','broadcast']) assert.equal(startRogue(game, route), false);
     assert.equal(possibleChoiceEndings(game, 'rogue-start', 'dungeon'), null);
     assert.deepEqual(game, before);
     if (game.guide.stage === 'debrief') {
       const first = guideDebrief(game).options[0];
       assert.equal(answerGuideDebrief(game, first.id), true);
-      assert.equal(startRogue(game, 'dungeon'), false);
+      for (const route of ['dungeon','flood','broadcast']) assert.equal(startRogue(game, route), false);
       const remaining = possibleChoiceEndings(game, 'guide-answer', guideDebrief(game).options[0].id);
-      assert.ok(remaining.every(id => !['dungeon_escape', 'dungeon_lost'].includes(id)));
+      assert.ok(remaining.every(id => !['dungeon_escape'].includes(id)));
     }
   }
   assert.deepEqual(sorted(possibleChoiceEndings(ready(), 'answer', 'guide')), guideEndings);
@@ -1798,11 +1789,6 @@ test('a future ending cannot be silently dropped from conservative nonterminal b
   }
 });
 
-test('archived dungeon loss remains conservatively bounded', () => {
- const game = rogueField('dungeon');
- assert.equal(hasSeenChoiceEndings(game, 'rogue-start', 'dungeon', historyExcept('dungeon_lost')), false);
- conservativeFixtures.add('dungeon_lost');
-});
 
 test('dungeon exposure thresholds preserve incoming exposure and previews', () => {
  for (const exposure of [0, 70, 95]) {

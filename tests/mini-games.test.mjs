@@ -58,7 +58,7 @@ test('practice pump success and rupture keep their marker through real puzzle ou
   assert.equal(solved.ending,'flood');result(solved,true);
   const broken=createMiniGame('flood','story',42);
   for(let i=0;i<3;i++)assert.equal(chooseRogue(broken,'release'),true);
-  assert.equal(broken.ending,'breach');result(broken,false);
+  assert.equal(broken.ending,'pump_rupture');result(broken,false);
 });
 
 test('practice radio misses complete without changing the assignment provenance', () => {
@@ -70,7 +70,7 @@ test('practice radio misses complete without changing the assignment provenance'
     }
     assert.equal(chooseRogue(s,'lock'),true);
   }
-  assert.equal(s.ending,'assimilation');result(s,false);
+  assert.equal(s.ending,'signal_lost');result(s,false);
 });
 
 test('practice radio completion stops at the final signal without needing an ending choice', () => {
@@ -97,7 +97,7 @@ test('practice corn loss uses the real collisions and remains practice after res
 test('practice dungeon defeat and escape remain practice at both terminal outcomes', () => {
   const lost=createMiniGame('dungeon','story',42);
   for(let turn=0;turn<30&&lost.phase!=='ending';turn++)assert.equal(chooseRogue(lost,lost.rogue.route==='corn'?'root':'wait'),true);
-  assert.equal(lost.ending,'dungeon_lost');result(lost,false);
+  assert.equal(lost.ending,'assimilation');result(lost,false);
   let escaped=createMiniGame('dungeon','story',42);
   const directions={R:[1,0],L:[-1,0],U:[0,-1],D:[0,1]};
   for(const action of 'RRRFRDDRRUURRFRRDDDDDDDDRRFRRDDRRDDFFRRRRDDLLRRDDRRRFADDRRFUURRRRRDDDDDDDD') {

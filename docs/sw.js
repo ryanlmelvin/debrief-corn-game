@@ -1,6 +1,6 @@
 // Bump this version whenever a shipped asset changes. An active game keeps its
 // current worker; the new version activates after all old game tabs close.
-const VERSION = 'debrief-v134-handover-order';
+const VERSION = 'debrief-v135-distinct-failures';
 const DEVELOPMENT = ['localhost', '127.0.0.1', '[::1]'].includes(self.location.hostname);
 const SCOPE = new URL('./', self.location.href).pathname;
 const CACHE_PREFIX = `debrief:${SCOPE}:`;
@@ -9,7 +9,7 @@ const FILES = ['./story.html','./DebriefRedacted.pdf','./drain-entry.js','./asse
 FILES.push('./corn-world.js','./corn-3d-ui.js','./corn-controls.js','./corn-3d.css');
 FILES.push('./vacancy.js','./vacancy-ui.js','./vacancy-hand.js','./vacancy.css','./assets/vacancy-office.png');
 FILES.push('./guide-3d-ui.js','./guide-people.js','./guide-world.js','./guide-thumbsticks.js','./guide-3d.css','./vendor/three/three.module.js','./vendor/three/three.core.js');
-for (const code of ['01','02','02-team','03','04','05','06','07','08','09','10','11','12','13','14','15','16','17','18','19','20','21','22','23','24']) FILES.push(`./share/${code}/`, `./share/${code}/preview.jpg`);
+for (const code of ['01','02','02-team','03','04','05','06','07','08','09','10','11','12','13','14','15','16','17','18','19','20','21','22','23','24','25']) FILES.push(`./share/${code}/`, `./share/${code}/preview.jpg`);
 self.addEventListener('install',event=>event.waitUntil((async()=>{
   const cache=await caches.open(CACHE);
   // A new worker must not populate its new cache with an older HTTP-cached build.

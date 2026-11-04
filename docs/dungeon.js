@@ -240,7 +240,7 @@ export function validDungeon(d, stage, outcome, legacy = false) {
   if (stage === 'debrief') return escaped && outcome === null;
   if (stage !== 'done') return false;
   if (outcome === 'dungeon_escape') return escaped;
-  return outcome === 'dungeon_lost' && d.status === 'lost' && d.hp === 0;
+  return false;
 }
 
 // Local prototype saves predate the rifle. Keep the real watch ammunition and
