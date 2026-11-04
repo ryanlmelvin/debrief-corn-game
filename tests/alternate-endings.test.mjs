@@ -144,7 +144,7 @@ test('every scene can be left before commitment and the conditional promotion ca
   }
   const s = enter('vacancy');
   chooseResolution(s, 'vacancy-accept');
-  assert.match(getResolution(s).context, /he stays until you also approve/);
+  assert.match(getResolution(s).context, /release stays conditional.*final approval/);
   chooseResolution(s, 'vacancy-sign');
   assert.match(getResolution(s).options.find(option => option.id === 'vacancy-question').detail, /Tear up his release/);
   assert.equal(chooseResolution(s, 'vacancy-question'), true);

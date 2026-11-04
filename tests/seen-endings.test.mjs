@@ -11,7 +11,9 @@ import { REVIEWED_ENDING_HINTS } from '../scripts/check-ending-hints.mjs';
 import { resolutionGameAction, resolutionGameActive } from '../docs/resolution-games.js';
 import { rescueStatus } from '../docs/rescue.js';
 import { transmissionStatus, transmissionHorror, TRANSMISSION_DELAY } from '../docs/transmission.js';
-import { solveResolutionGame } from './helpers/resolution-play.mjs';
+import { vacancyStatus } from '../docs/vacancy.js';
+import { EVIDENCE } from '../docs/evidence-scenes.js';
+import { solveResolutionGame, failVacancyGame } from './helpers/resolution-play.mjs';
 
 const guideEndings = ['guide', 'guide_arrested', 'guide_interrupted', 'guide_shot'];
 const transmissionExposureEndings = ['assimilation', 'corn_contained', 'roadkill', 'corn_escape', 'corn_uprising'];
@@ -62,7 +64,7 @@ after(() => {
   assert.deepEqual(sorted(conservativeFixtures), sorted(conservativeIds), 'Every conservatively bounded ending needs an all-other-endings-seen regression that prevents a misleading marker.');
 });
 
-function ready(...routes) {
+function readyWithAnswers(routes, answers) {
   const game = createGame('story', 42);
   Object.assign(game, { phase: 'debrief', shift: 2, question: 0 });
   for (const route of routes) {
@@ -79,10 +81,11 @@ function ready(...routes) {
       game.reports.push(...[0, 1].map(shift => ({ shift, choice: 'question', question: 'Sign?', answer: 'No.', redacted: false })));
     }
   }
-  assert.equal(answer(game, 'truth'), true);
-  assert.equal(answer(game, 'evidence'), true);
+  for (const choice of answers) assert.equal(answer(game, choice), true);
   return game;
 }
+
+function ready(...routes) { return readyWithAnswers(routes, ['truth', 'evidence']); }
 
 function enter(route, game = ready(route)) {
   assert.equal(startResolution(game), true);
@@ -288,7 +291,7 @@ function alignRescue(game) {
 function finishAfterResolutionWithdrawal(game, ending) {
   if (game.phase === 'resolution') assert.equal(chooseResolution(game, 'back'), true);
   assert.equal(game.phase, 'debrief');
-  if (ending === 'dissent' || ending === 'witness') {
+  if (ending === 'compliance' || ending === 'dissent' || ending === 'witness') {
     assert.equal(answer(game, ending === 'witness' ? 'expose' : 'sign'), true);
   } else if (Object.hasOwn(paths, ending)) {
     enter(ending, game);
@@ -314,6 +317,197 @@ function finishAfterResolutionWithdrawal(game, ending) {
   assert.equal(game.phase, 'ending');
   assert.equal(endingId(game), ending);
 }
+
+function vacancyAtDesk(game = ready('vacancy', 'rescue', 'relief', 'witness_present')) {
+  game.evidence = Object.keys(EVIDENCE);
+  // These real deals allow scrutiny failures as well as the guaranteed win.
+  game.runId = game.fieldEvents.journal.some(entry => entry.id === 'first-call' && entry.choice === 'record') ? '1' : '8';
+  enter('vacancy', game);
+  for (const id of ['vacancy-accept', 'vacancy-sign']) assert.equal(chooseResolution(game, id), true);
+  assert.equal(resolutionGameActive(game), true);
+  return game;
+}
+
+function failVacancy(game) {
+  failVacancyGame(game);
+  assert.equal(vacancyStatus(game.resolution.activity.state).stage, 'failed');
+}
+
+function vacancyChoices() {
+  const game = ready('vacancy', 'rescue', 'relief', 'witness_present'), choices = [];
+  game.evidence = Object.keys(EVIDENCE);
+  game.runId = '1';
+  const record = (state, action, value) => choices.push({ game: structuredClone(state), action, value });
+  record(game, 'answer', 'follow-lead');
+  assert.equal(answer(game, 'follow-lead'), true);
+  for (const value of ['vacancy', 'vacancy-accept', 'vacancy-sign']) {
+    record(game, 'resolution-answer', value);
+    assert.equal(chooseResolution(game, value), true);
+  }
+  record(game, 'resolution-answer', 'back');
+  record(game, 'resolution-answer', 'vacancy-question');
+  const failed = structuredClone(game);
+  failVacancy(failed);
+  record(failed, 'resolution-answer', 'back');
+  const observed = new Set();
+  solveResolutionGame(game, state => {
+    const status = vacancyStatus(state.resolution.activity.state), key = `${status.round}/${status.stage}`;
+    if (observed.has(key)) return;
+    observed.add(key);
+    record(state, 'resolution-answer', 'back');
+  });
+  assert.equal(game.resolution.activity.state.stage, 'complete');
+  record(game, 'resolution-answer', 'vacancy-question');
+  return choices;
+}
+
+test('vacancy entry, automatic file changes, refusal and failure retain proven withdrawal endings and the full conservative bound', () => {
+  const all = Object.keys(ENDINGS);
+  const reachable = ['vacancy', 'rescue', 'relief', 'witness_present', 'dissent', ...guideEndings];
+  for (const { game, action, value } of vacancyChoices()) {
+    const before = structuredClone(game);
+    assert.deepEqual(possibleChoiceEndings(game, action, value), sorted(all));
+    for (const ending of reachable) {
+      const actual = structuredClone(game);
+      assert.equal(action === 'answer' ? answer(actual, value) : chooseResolution(actual, value), true);
+      finishAfterResolutionWithdrawal(actual, ending);
+      assert.equal(hasSeenChoiceEndings(game, action, value, historyExcept(ending)), false,
+        `${action}/${value} must retain its real ${ending} continuation`);
+    }
+    for (const ending of all) assert.equal(hasSeenChoiceEndings(game, action, value, historyExcept(ending)), false);
+    assert.equal(hasSeenChoiceEndings(game, action, value, all), true);
+    assert.deepEqual(game, before);
+  }
+});
+
+test('vacancy success alone unlocks the exact approval hint, and failed interviews only allow withdrawal', () => {
+  const game = vacancyAtDesk(), all = Object.keys(ENDINGS);
+  const assertUnfinished = state => {
+    const status = vacancyStatus(state.resolution.activity.state);
+    if (status.stage === 'complete') return;
+    assert.equal(getResolution(state).options.find(option => option.id === 'vacancy-approve')?.disabled, true);
+    assert.equal(chooseResolution(state, 'vacancy-approve'), false);
+    assert.equal(possibleChoiceEndings(state, 'resolution-answer', 'vacancy-approve'), null);
+    for (const value of ['end-turn', 'play:unknown', 'draft:unknown', 'complete', ...status.hand.map(card => `play:${card.id}`)]) {
+      assert.equal(possibleChoiceEndings(state, 'resolution-game', value), null);
+      assert.equal(hasSeenChoiceEndings(state, 'resolution-game', value, all), false);
+    }
+  };
+  assertUnfinished(game);
+  solveResolutionGame(game, assertUnfinished);
+  assertTerminalHint(game, 'resolution-answer', 'vacancy-approve', 'vacancy');
+  assert.equal(hasSeenChoiceEndings(game, 'resolution-answer', 'back', ['vacancy']), false);
+  assert.equal(hasSeenChoiceEndings(game, 'resolution-answer', 'vacancy-question', ['vacancy']), false);
+  const failed = vacancyAtDesk();
+  failVacancy(failed);
+  assert.deepEqual(getResolution(failed).options.filter(option => !option.disabled).map(option => option.id), ['back']);
+  for (const value of ['vacancy-approve', 'vacancy-question']) {
+    assert.equal(chooseResolution(failed, value), false);
+    assert.equal(possibleChoiceEndings(failed, 'resolution-answer', value), null);
+    assert.equal(hasSeenChoiceEndings(failed, 'resolution-answer', value, all), false);
+  }
+  assert.equal(chooseResolution(failed, 'back'), true);
+  assert.equal(failed.phase, 'debrief');
+  assert.equal(failed.ending, null);
+});
+
+test('spending relief too early in the final vacancy hand cannot produce an approval hint', () => {
+  const game = vacancyAtDesk(), all = Object.keys(ENDINGS);
+  let finalHand;
+  solveResolutionGame(game, state => {
+    if (!finalHand && vacancyStatus(state.resolution.activity.state).round === 3) finalHand = structuredClone(state);
+  });
+  assert.ok(finalHand);
+  const failed = structuredClone(finalHand), hand = vacancyStatus(failed.resolution.activity.state).hand;
+  const support = hand.find(card => ['comply', 'redact'].includes(card.move));
+  const plan = ['procedure-scope', support.id, 'procedure-precedent', ...hand.filter(card => card.move === 'sign').map(card => card.id)];
+  for (const id of plan) {
+    const save = serialize(failed);
+    assert.equal(possibleChoiceEndings(failed, 'resolution-game', `play:${id}`), null);
+    assert.equal(hasSeenChoiceEndings(failed, 'resolution-game', `play:${id}`, all), false);
+    assert.equal(serialize(failed), save);
+    assert.equal(resolutionGameAction(failed, `play:${id}`), true);
+  }
+  const result = vacancyStatus(failed.resolution.activity.state);
+  assert.equal(result.stage, 'failed');
+  assert.ok(result.progress >= result.goal, 'approval progress alone is insufficient when the same card crosses the scrutiny cap');
+  assert.equal(possibleChoiceEndings(failed, 'resolution-answer', 'vacancy-approve'), null);
+  assert.deepEqual(possibleChoiceEndings(failed, 'resolution-answer', 'back'), sorted(all));
+  for (const ending of all) assert.equal(hasSeenChoiceEndings(failed, 'resolution-answer', 'back', historyExcept(ending)), false);
+  assert.equal(hasSeenChoiceEndings(failed, 'resolution-answer', 'back', all), true);
+  for (const ending of ['dissent', ...guideEndings]) {
+    const continuation = structuredClone(failed);
+    assert.equal(chooseResolution(continuation, 'back'), true);
+    finishAfterResolutionWithdrawal(continuation, ending);
+  }
+  solveResolutionGame(finalHand);
+  assertTerminalHint(finalHand, 'resolution-answer', 'vacancy-approve', 'vacancy');
+});
+
+test('vacancy withdrawal and refusal preserve a routine final report after both successful and failed interviews', () => {
+  for (const outcome of ['active', 'complete', 'failed']) {
+    const game = vacancyAtDesk(readyWithAnswers(['vacancy'], ['comply', 'redact']));
+    if (outcome === 'complete') solveResolutionGame(game);
+    if (outcome === 'failed') failVacancy(game);
+    for (const value of outcome === 'failed' ? ['back'] : ['back', 'vacancy-question']) {
+      const actual = structuredClone(game);
+      assert.equal(chooseResolution(actual, value), true);
+      finishAfterResolutionWithdrawal(actual, 'compliance');
+      assert.equal(hasSeenChoiceEndings(game, 'resolution-answer', value, historyExcept('compliance')), false);
+      assert.equal(hasSeenChoiceEndings(game, 'resolution-answer', value, Object.keys(ENDINGS)), true);
+    }
+  }
+});
+
+test('vacancy previews preserve saves, card order, testimony, collection history and randomness through risky and calming plays', () => {
+  const game = vacancyAtDesk(), snapshots = [structuredClone(game)];
+  const failed = structuredClone(game);
+  failVacancyGame(failed, state => snapshots.push(structuredClone(state)));
+  solveResolutionGame(game, state => snapshots.push(structuredClone(state)));
+  const history = { collected: Object.keys(ENDINGS), runs: [{ id: 'previous', reports: [] }] };
+  const priorHistory = JSON.stringify(history), random = Math.random;
+  let randomCalls = 0;
+  try {
+    Math.random = () => { randomCalls++; return .5; };
+    for (const state of snapshots) {
+      const save = serialize(state);
+      assert.deepEqual(restore(save), state, 'every real card decision survives saving');
+      const cardChoices = vacancyStatus(state.resolution.activity.state).hand.map(card => ['resolution-game', `play:${card.id}`]);
+      for (const [action, value] of [['resolution-answer', 'back'], ['resolution-answer', 'vacancy-approve'], ['resolution-answer', 'vacancy-question'], ['resolution-game', 'end-turn'], ['resolution-game', 'draft:unknown'], ...cardChoices]) {
+        possibleChoiceEndings(state, action, value);
+        hasSeenChoiceEndings(state, action, value, history.collected);
+        if (action === 'resolution-game') assert.equal(hasSeenChoiceEndings(state, action, value, history.collected), false);
+        assert.equal(serialize(state), save);
+        assert.equal(JSON.stringify(history), priorHistory);
+      }
+    }
+  } finally {
+    Math.random = random;
+  }
+  assert.equal(randomCalls, 0);
+});
+
+test('locked vacancy leads, unsupported card inputs and practice cannot acquire collection hints', () => {
+  const locked = ready(), all = Object.keys(ENDINGS);
+  assert.equal(startResolution(locked), true);
+  const before = structuredClone(locked);
+  assert.equal(getResolution(locked).options.find(option => option.id === 'vacancy').disabled, true);
+  assert.equal(chooseResolution(locked, 'vacancy'), false);
+  assert.equal(possibleChoiceEndings(locked, 'resolution-answer', 'vacancy'), null);
+  assert.equal(hasSeenChoiceEndings(locked, 'resolution-answer', 'vacancy', all), false);
+  for (const value of ['play:unknown', 'draft:unknown', 'end-turn', 'complete']) assert.equal(resolutionGameAction(locked, value), false);
+  assert.deepEqual(locked, before);
+  const practice = createMiniGame('vacancy', 'story', 42);
+  assert.ok(practice);
+  const untouched = structuredClone(practice);
+  for (const [action, value] of [['resolution-answer', 'back'], ['resolution-answer', 'vacancy-approve'], ['resolution-answer', 'vacancy-question'], ['resolution-game', 'end-turn']]) {
+    assert.equal(possibleChoiceEndings(practice, action, value), null);
+    assert.equal(hasSeenChoiceEndings(practice, action, value, all), false);
+  }
+  assert.deepEqual(practice, untouched);
+  solveResolutionGame(practice);
+  assert.equal(hasSeenChoiceEndings(practice, 'resolution-answer', 'vacancy-approve', all), false);
+});
 
 test('rescue entry and withdrawals retain every ending demonstrated by real continuation paths', () => {
   const all = Object.keys(ENDINGS);

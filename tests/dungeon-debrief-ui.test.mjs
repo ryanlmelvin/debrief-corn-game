@@ -26,7 +26,7 @@ function escaped(practice) {
 function ui(game) {
   const modals=[],saves=[];
   const context=vm.createContext({game,paused:false,modalKind:'',lastModalKey:'',dialog:{open:false},menuOpen:()=>false,
-    getRogueScene,chooseRogue,moveRogue,miniGameComplete,miniGameResult,getEnding,ENDINGS,resolutionGameActive,
+    getRogueScene,chooseRogue,moveRogue,miniGameComplete,miniGameResult,getEnding,ENDINGS,resolutionGameActive,resolutionUI:{presenting:false},
     esc:String,paper:(title,body)=>`${title}${body}`,miniGamePaper:(title,body)=>`${title}${body}`,
     sightingPromptReady:()=>false,isGuideAftermath:()=>false,archives:0,
     archiveRun(){context.archives++;},

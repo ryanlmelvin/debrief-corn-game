@@ -51,8 +51,9 @@ export function possibleChoiceEndings(game, action, value) {
   // Practice has no ending-collection provenance, even when it uses the same
   // scenes and terminal transitions as an assignment.
   if (!game || game.practice || game.phase === 'ending' || !transition) return null;
-  // Minigame inputs include both timed controls and turn-based combat. Do not
-  // infer the remaining crawl (or a later timed click) from one rendered input.
+  // Minigame inputs include timing, turn-based combat and the vacancy card
+  // rounds. Their public controls are deliberately absent from transitions;
+  // only stable final commitments may acquire a precise ending hint.
   if (action === 'rogue-choice' && !['intro', 'choice', 'debrief'].includes(game.rogue?.stage)) return null;
   try {
     const next = clone(game);
@@ -69,7 +70,7 @@ export function possibleChoiceEndings(game, action, value) {
         endings.add(id);
         continue;
       }
-      // Open gameplay includes timing, exposure, random events and later nights.
+      // Open gameplay includes timing, card plays, exposure and later nights.
       // We make no claims about pruning it: every registered ending stays possible.
       if (['briefing', 'tower', 'decision', 'field'].includes(state.phase) ||
           (state.phase === 'debrief' && state.shift < 2) ||

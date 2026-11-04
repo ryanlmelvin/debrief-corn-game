@@ -1,8 +1,9 @@
 import { createRescue, advanceRescue, rescueAction, validRescue } from './rescue.js';
 import { createTransmission, advanceTransmission, transmissionAction, validTransmission, TRANSMISSION_EXPOSURE_COST } from './transmission.js';
 import { startRogue } from './rogue.js';
+import { createVacancy, validVacancy, vacancyAction } from './vacancy.js';
 
-export const RESOLUTION_GAMES = ['rescue', 'transmission'];
+export const RESOLUTION_GAMES = ['rescue', 'transmission', 'vacancy'];
 
 export function resolutionFirstCall(s) {
   const choice = s.fieldEvents?.journal?.find(entry => entry.id === 'first-call')?.choice;
@@ -12,32 +13,33 @@ export function resolutionFirstCall(s) {
 export function createResolutionActivity(s, route) {
   if (route === 'rescue') return { kind: route, state: createRescue(s.rng) };
   if (route === 'transmission') return { kind: route, state: createTransmission(s.rng, resolutionFirstCall(s)) };
+  if (route === 'vacancy') return { kind: route, state: createVacancy(s) };
   return null;
 }
 
-export function validResolutionActivity(activity, route) {
+export function validResolutionActivity(activity, route, game) {
   return !!activity && Object.keys(activity).length === 2 && activity.kind === route &&
-    (route === 'rescue' ? validRescue(activity.state) : route === 'transmission' && validTransmission(activity.state));
+    (route === 'rescue' ? validRescue(activity.state) : route === 'transmission' ? validTransmission(activity.state) : route === 'vacancy' && validVacancy(activity.state, game));
 }
 
 export function resolutionGameActive(s) {
   const r = s?.resolution;
   return s?.phase === 'resolution' && r?.step === 2 &&
     !(s.practice === 'transmission' && s.exposure >= 100) &&
-    validResolutionActivity(r.activity, r.route) && r.activity.state.stage !== 'complete';
+    validResolutionActivity(r.activity, r.route) && !['complete', 'failed'].includes(r.activity.state.stage);
 }
 
 export function resolutionGameAction(s, action) {
   if (!resolutionGameActive(s)) return false;
   const { kind, state } = s.resolution.activity;
-  return kind === 'rescue' ? rescueAction(state, action) : transmissionAction(state, action);
+  return kind === 'rescue' ? rescueAction(state, action) : kind === 'vacancy' ? vacancyAction(state, action) : transmissionAction(state, action);
 }
 
 export function advanceResolutionGame(s, dt) {
   if (!resolutionGameActive(s)) return;
   const { kind, state } = s.resolution.activity;
   if (kind === 'rescue') advanceRescue(state, dt);
-  else {
+  else if (kind === 'transmission') {
     // Charge new collision events, never the saved retry count. This also keeps
     // the cost exact when an old save's display counter has reached its limit.
     let collisions = 0;

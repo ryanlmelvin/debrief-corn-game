@@ -299,7 +299,7 @@ test('every guide result opens both debrief questions before it can be archived'
   for(const outcome of ['spared','secured','arrested']){
     const game=explore();if(outcome==='spared')spareGuide(game);else if(outcome==='secured')for(let i=0;i<3;i++)hitNext(game);else for(let i=0;i<6;i++)fireGuide(game,0,0);
     let archived=0;const dialogs=[];
-    const context=vm.createContext({game,lastModalKey:'',sightingPromptReady,guideDebrief,isGuideAftermath,getEnding,ENDINGS,resolutionGameActive,
+    const context=vm.createContext({game,lastModalKey:'',sightingPromptReady,guideDebrief,isGuideAftermath,getEnding,ENDINGS,resolutionGameActive,resolutionUI:{presenting:false},
       paper:(title,body,tag)=>({title,body,tag}),esc:String,
       archiveRun(){archived++;},showModal(kind,paper){dialogs.push({kind,...paper});}});
     vm.runInContext(scene+';sceneDialog();sceneDialog();',context);

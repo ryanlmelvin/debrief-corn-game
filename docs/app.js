@@ -17,7 +17,7 @@ import { pressureWordMarkup } from './pressure-word.js';
 import { DialogPager } from './pager.js';
 import { endingShareData, shareEnding } from './sharing.js';
 import { decisionQuestion } from './decision-copy.js';
-import { chooseResolution } from './alternate-endings.js';
+import { chooseResolution, availableResolutions } from './alternate-endings.js';
 import { resolutionMarkup } from './resolution-ui.js';
 import { resolutionGameActive, resolutionGameAction, releaseResolutionGame } from './resolution-games.js';
 import { ResolutionGamesUI } from './resolution-games-ui.js';
@@ -34,7 +34,7 @@ const pager=new DialogPager(dialog);
 let modalReturnFocus=null;
 const fieldMap=new FieldMap($('field-exploration'));
 const rogueUI=new RogueUI($('rogue-play'),{onMove:(dx,dy)=>act('rogue-move',`${dx},${dy}`)??false});
-const resolutionUI=new ResolutionGamesUI($('resolution-play'));
+const resolutionUI=new ResolutionGamesUI($('resolution-play'),{onPresentationEnd:()=>{if(game)updateUI(true);}});
 const guide3d=new Guide3D($('guide-exploration'),{
   onInspect:id=>act('guide-inspect',id),
   onFire:point=>fire(point),
@@ -62,7 +62,7 @@ const previewAddress=location.hostname.split('.').map(Number);
 const localPreviewHost=['localhost','127.0.0.1','[::1]'].includes(location.hostname)||
   (previewAddress.length===4&&previewAddress.every(part=>Number.isInteger(part)&&part>=0&&part<=255)&&
   (previewAddress[0]===10||previewAddress[0]===192&&previewAddress[1]===168||previewAddress[0]===172&&previewAddress[1]>=16&&previewAddress[1]<=31));
-const previewGame=localPreviewHost&&['dungeon','rescue','transmission','guide'].includes(previewRequested)?previewRequested:null;
+const previewGame=localPreviewHost&&['dungeon','rescue','transmission','guide','vacancy'].includes(previewRequested)?previewRequested:null;
 const dungeonPreview=previewGame==='dungeon';
 const previewSuffix=previewGame?`:${previewGame}-preview`:playtest?':playtest':'';
 $('dungeon-restart').hidden=!dungeonPreview;
@@ -206,22 +206,24 @@ function miniGamePaper(title,body) {
 }
 function showMiniGames() {
   save();
-  const art={watch:'watch-corn',corn:'field-corner',broadcast:'encounter-radio',flood:'field-pump',dungeon:'field-drain',rescue:'ending-rescue',transmission:'ending-transmission'};
+  const art={watch:'watch-corn',corn:'field-corner',broadcast:'encounter-radio',flood:'field-pump',dungeon:'field-drain',rescue:'ending-rescue',transmission:'ending-transmission',vacancy:'ending-vacancy'};
   const cards=MINI_GAMES.map(entry=>{
-    const unlocked=playtest||history.miniGames.includes(entry.id);
+    const unlocked=playtest||history.miniGames.includes(entry.id)||previewGame===entry.id;
     const status=unlocked?'<span class="mini-game-status" aria-hidden="true">↗</span>':'<span class="mini-game-status"><svg viewBox="0 0 20 24" aria-hidden="true"><path d="M5 10V6a5 5 0 0 1 10 0v4M2 10h16v12H2z"/><path d="M10 14v4"/></svg><span>Locked</span></span>';
     return `<button class="mini-game-card${unlocked?'':' is-locked'}" data-action="mini-game-start" data-value="${entry.id}"${unlocked?'':' disabled'}><span class="mini-game-thumb" style="background-image:url('./assets/${art[entry.id]}.webp')" aria-hidden="true"></span><span><b>${esc(entry.title)}</b><small>${unlocked?esc(entry.description):'Reach it in the story to unlock.'}</small></span>${status}</button>`;
   }).join('');
   showModal('mini-games',miniGamePaper(playtest?'Mini games · Playtest':'Mini games',`<p class="small">${playtest?'All mini games are unlocked for testing. Test progress is separate from your normal story progress.':'Reach games in the story to unlock practice.'} Practice doesn’t award endings.</p><div class="mini-game-list">${cards}</div><div class="paper-actions">${game?.practice?'<button class="secondary" data-action="mini-game-return">Return to story</button>':''}${playtest?'<button class="secondary" data-action="playtest-exit">Return to normal game</button>':''}<button class="secondary" data-action="close">${game?.practice&&!miniGameComplete(game)?'Back to practice':'Close'}</button></div>`));
 }
 function launchMiniGame(id,preview=false) {
-  if(!playtest&&!history.miniGames.includes(id)&&!(preview&&previewGame===id))return;
-  const next=createMiniGame(id,game?.mode||$('difficulty').value);
+  if(!playtest&&!history.miniGames.includes(id)&&previewGame!==id)return;
+  const deckSource=game?.practice ? game.practice==='vacancy'&&game.practiceDeckSource==='current'?game:storyBeforePractice||readSave() : game||readSave();
+  const next=createMiniGame(id,game?.mode||$('difficulty').value,Date.now(),deckSource);
   if(!next)return;
   if(!game?.practice){
     save();storyBeforePractice=game;practiceReturnToGame=!!game;practiceReturnPaused=paused;
   }
   begin(next.mode,false,next);
+  if(id==='vacancy'&&(preview||next.practiceDeckSource==='example'))showModal('vacancy-preview',paper('The Handover',`<p>${next.practiceDeckSource==='current'?'Your starting deck comes from the evidence and debrief answers in your saved run.':'This hand uses an example run. To use your own evidence and answers, load a backup of a run that qualifies for the station handover.'}</p><div class="paper-actions"><button class="primary" data-action="close">Play three rounds</button><button class="secondary" data-action="vacancy-backup">Load my progress backup</button></div>`));
 }
 function returnToStory() {
   if(!game?.practice)return;
@@ -233,7 +235,7 @@ function returnToStory() {
   if(next){begin(next.mode,false,next);if(wasPaused){paused=true;updateUI(true);}}
   else{
     game=null;paused=false;lastModalKey='';lastControlsKey='';
-    document.body.classList.remove('playing','dungeon-playing','resolution-playing');delete document.body.dataset.phase;
+    document.body.classList.remove('playing','dungeon-playing','resolution-playing','vacancy-playing');delete document.body.dataset.phase;
     $('welcome').hidden=false;$('sidebar').hidden=true;$('pause').hidden=true;$('pause-layer').hidden=true;
     $('stats').hidden=true;$('tower-hud').hidden=true;$('watch-scoreboard').hidden=true;$('watch-radio').hidden=true;$('investigation-pressure').hidden=true;
     $('mini-game-return').hidden=true;$('dungeon-restart').hidden=true;
@@ -265,7 +267,7 @@ function begin(mode,fromSave=false,supplied=null) {
   else if(game.phase==='rogue')$('rogue-play').focus({preventScroll:true});
 }
 function sceneDialog() {
-  if(!game||resolutionGameActive(game))return;
+  if(!game||resolutionGameActive(game)||resolutionUI.presenting)return;
   if(game.phase==='rogue'&&game.rogue?.route==='dungeon'&&game.rogue.stage==='debrief'){
     const scene=getRogueScene(game);
     const key=`dungeon-debrief:${game.runId}:${scene.index}`;
@@ -320,9 +322,12 @@ function sceneDialog() {
 function stat(label,value,sub='',percent=null,warning=false) {return `<div class="stat ${warning?'warning':''}"><label>${label}</label><strong>${value}</strong><small> ${sub}</small>${percent!==null?`<div class="meter"><span style="width:${Math.min(100,Math.max(0,percent))}%"></span></div>`:''}</div>`;}
 function updateUI(force=false) {
   if(!game)return;
+  resolutionUI.render(game,paused||dialog.open||menuOpen()||document.hidden);
+  const resolutionVisible=resolutionGameActive(game)||resolutionUI.presenting;
   document.body.dataset.phase=game.phase;
   document.body.classList.toggle('dungeon-playing',game.phase==='rogue'&&game.rogue?.route==='dungeon'&&game.rogue.stage==='play');
-  document.body.classList.toggle('resolution-playing',resolutionGameActive(game));
+  document.body.classList.toggle('resolution-playing',resolutionVisible);
+  document.body.classList.toggle('vacancy-playing',resolutionVisible&&game.resolution?.activity?.kind==='vacancy');
   const aftermath=isGuideAftermath(game);
   $('stats').hidden=aftermath||game.phase==='resolution'||game.phase==='rogue'||game.phase==='ending'&&!!game.guide;
   $('pause').hidden=game.phase==='ending';
@@ -383,11 +388,11 @@ function updateUI(force=false) {
     if(game.rogue.route==='corn')$('control-hint').textContent='ARROWS / WASD TO HOP · SWIPE OR USE ARROWS ON PHONE';
     if(game.rogue.route==='dungeon')$('control-hint').textContent='ARROWS / WASD · F / SPACE FIRE · R RELOAD · PERIOD WAIT';
   }
-  resolutionUI.render(game,paused||dialog.open||menuOpen());
   if(resolutionGameActive(game)){
     const rescue=game.resolution.activity.kind==='rescue';
-    $('objective').textContent=rescue?'Free the person at the lantern.':'Guide your earlier self.';
-    $('objective-detail').textContent=rescue?'Match the recorded breath to the radio. Pull only while the roots loosen.':'Watch the moving rows. Radio commands take a moment to reach the light.';
+    const vacancy=game.resolution.activity.kind==='vacancy';
+    $('objective').textContent=vacancy?'Close three sections of the report.':rescue?'Free the person at the lantern.':'Guide your earlier self.';
+    $('objective-detail').textContent=vacancy?'Build your case and keep scrutiny low enough to earn each stamp.':rescue?'Match the recorded breath to the radio. Pull only while the roots loosen.':'Watch the moving rows. Radio commands take a moment to reach the light.';
     $('station-status').textContent=previewGame?'LOCAL PLAYTEST':'AFTER THE WATCH';
   }
   if(game.guide&&['guide','ending'].includes(phase)&&!guideLoadRequested){
@@ -503,9 +508,10 @@ function act(action,value) {
   if(action==='share-ending'){if(game?.phase==='ending'&&!game.practice)shareDisposition(endingId(game),getEnding(game).stamp);return;}
   if(action==='share-record'){const run=history.runs[Number(value)];if(run)shareDisposition(run.ending,run.stamp);return;}
   if(action==='resolution-game'){
-    if(!game||paused||dialog.open||menuOpen()||!resolutionGameAction(game,value))return;
+    if(!game||paused||dialog.open||menuOpen()||resolutionUI.presenting||!resolutionGameAction(game,value))return;
     save();updateUI(true);return;
   }
+  if(action==='vacancy-backup'){showProgressTransfer();return;}
   if(action==='resolution-answer'){
     if(!game||game.phase!=='resolution'||paused||menuOpen())return;
     if(!['resolution','resolution-menu'].includes(modalKind)&&!(resolutionGameActive(game)&&!dialog.open&&value==='back'))return;
@@ -690,6 +696,7 @@ document.addEventListener('keydown',event=>{
   if(k==='p'||k==='escape'){event.preventDefault();togglePause();return;}
   if(paused)return;
   if(resolutionGameActive(game)){
+    if(game.resolution.activity.kind==='vacancy')return;
     const onButton=['BUTTON','A'].includes(event.target.tagName);
     const stage=game.resolution.activity.state.stage;
     const action=game.resolution.activity.kind==='transmission'?{w:'wait',a:'advance',t:'turn'}[k]:stage==='align'?{arrowleft:'earlier',arrowright:'later',...(!onButton?{enter:'align'}:{})}[k]:(k===' '&&(!onButton||event.target.closest('[data-hold]'))?'pull':null);
@@ -866,6 +873,7 @@ function showProgressTransfer(view = 'files') {
           if(snapshot.save){game=null;begin('story',true);}else closeModal();
           installHandoff.update(game?.practice?saved:(game||saved),history);
           toast('Progress restored. Your unlocks, endings, and transcripts are ready.');
+          if(previewGame==='vacancy'&&snapshot.save&&!availableResolutions(saved).find(route=>route.id==='vacancy').disabled)launchMiniGame('vacancy',true);
         } catch {$('progress-restore-status').textContent='This browser could not save the transfer. Your existing progress has been kept. Try allowing site storage.';}
       });
     } catch {if(importStatus.isConnected)importStatus.textContent='That progress could not be read. Copy the full code again, or open a Debrief progress backup.';}
@@ -889,7 +897,7 @@ if(previewGame==='guide'){
   practiceReturnToGame=resumedMiniGame.returnToGame;practiceReturnPaused=resumedMiniGame.returnPaused;
   begin(resumedMiniGame.game.mode,false,resumedMiniGame.game);
 }else if(previewGame&&!dungeonPreview){
-  document.title=`${previewGame==='rescue'?'Roots & Recordings':'The Other Tower'} — Local playtest`;
+  document.title=`${previewGame==='vacancy'?'The Handover':previewGame==='rescue'?'Roots & Recordings':'The Other Tower'} — Local playtest`;
   launchMiniGame(previewGame,true);
 }else if(dungeonPreview){
   document.title='Dungeon Crawler Corn — Local playtest';
@@ -1057,7 +1065,7 @@ function frame(now) {
   }
   guide3d.update(game,dt,paused||dialog.open||menuOpen()||document.hidden);
   if(game?.phase!=='field'&&$('guide-exploration').hidden)renderer.draw(game,now,!game);
-  if(resolutionGameActive(game))resolutionUI.render(game,paused||dialog.open||menuOpen()||document.hidden);
+  if(resolutionGameActive(game)||resolutionUI.presenting)resolutionUI.render(game,paused||dialog.open||menuOpen()||document.hidden);
   if(game?.phase==='rogue')rogueUI.render(game,paused||dialog.open||menuOpen()||document.hidden);
   requestAnimationFrame(frame);
 }

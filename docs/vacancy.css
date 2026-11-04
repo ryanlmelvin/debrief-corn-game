@@ -1,0 +1,89 @@
+/* The interview fills the game viewport; its familiar desk becomes the arena. */
+.resolution-play:has(.vacancy-game){padding:0;display:block;overflow:hidden;background:#111710}
+.resolution-game-board:has(>.vacancy-game){position:absolute;inset:0;min-height:0}
+.resolution-play:has(.vacancy-game)>.resolution-game-exit{position:absolute;top:max(11px,env(safe-area-inset-top));left:max(14px,env(safe-area-inset-left));z-index:5;text-align:left}
+.resolution-play:has(.vacancy-game)>.resolution-game-exit button{min-height:40px;padding:8px 10px;background:#111a12b8;border-color:#73815a88;font-size:0}
+.resolution-play:has(.vacancy-game)>.resolution-game-exit button::after{content:'← Leave interview';font-size:10px}
+body.vacancy-playing .masthead{justify-content:flex-end;pointer-events:none}
+body.vacancy-playing .masthead .wordmark{display:none}
+body.vacancy-playing .masthead nav{pointer-events:auto}
+.vacancy-game{position:absolute;inset:0;overflow:hidden;isolation:isolate;color:var(--ink);background:linear-gradient(180deg,#101a1233 0%,#121b1322 45%,#131e1333 78%,#0c160f99 100%),url('./assets/vacancy-office.png') 66% 55%/cover}
+.vacancy-game::before{content:'';position:absolute;inset:0;z-index:-1;pointer-events:none;box-shadow:inset 0 0 150px #07100caa;background:radial-gradient(ellipse at 50% 61%,#cbb47717,transparent 68%)}
+.vacancy-heading{position:absolute;top:calc(60px + env(safe-area-inset-top));left:max(22px,env(safe-area-inset-left));right:max(22px,env(safe-area-inset-right));display:flex;align-items:flex-start;justify-content:space-between;gap:12px;z-index:4}
+.vacancy-file-heading{max-width:76%;text-shadow:0 2px 4px #0009}
+.vacancy-file-heading>span{display:block;font-size:9px;color:#c6ba92;letter-spacing:1.3px;margin-bottom:4px}
+.vacancy-heading h2{font:400 16px/1.2 ui-monospace,SFMono-Regular,Consolas,monospace;margin:0;color:#eee8cf}
+.vacancy-help{height:36px;width:36px;min-height:36px;background:#17231ac9;border:1px solid #8e967066;border-radius:50%;color:#e0d8b7;font-size:16px;touch-action:manipulation}
+.vacancy-arena{position:absolute;inset:calc(117px + env(safe-area-inset-top)) 0 calc(clamp(220px,35dvh,360px) + 18px);min-height:165px}
+.vacancy-opponent{position:absolute;right:20%;top:0;bottom:0;width:32%;max-width:340px;min-width:190px}
+.vacancy-opponent-status{position:relative;z-index:1;display:flex;align-items:flex-start;justify-content:space-between;gap:12px;background:#101b12cc;border-bottom:1px solid #7a875777;padding:9px 11px;text-shadow:0 1px 3px #0008}
+.vacancy-opponent-status>span{font-size:9px;letter-spacing:1px;line-height:1.5;color:#ddd4b2}
+.vacancy-scrutiny{min-width:90px;flex:1;max-width:135px}
+.vacancy-scrutiny>span{display:flex;align-items:center;justify-content:space-between;gap:9px;font-size:8px;line-height:1.5;color:#bfc4a5}
+.vacancy-scrutiny strong{font-size:11px;color:#ded5b6;font-weight:400;white-space:nowrap}
+.vacancy-scrutiny meter{display:block;appearance:none;-webkit-appearance:none;width:100%;height:5px;border:0;border-radius:0;background:#384330;margin-top:5px}
+.vacancy-scrutiny meter::-webkit-meter-bar{border:0;border-radius:0;background:#384330}.vacancy-scrutiny meter::-webkit-meter-optimum-value{background:#a9b78b}.vacancy-scrutiny meter::-webkit-meter-suboptimum-value{background:#d8bb7b}.vacancy-scrutiny meter::-webkit-meter-even-less-good-value{background:#c18c6c}.vacancy-scrutiny meter::-moz-meter-bar{background:#a9b78b}
+.vacancy-scrutiny.is-disputed strong{color:#e1b398}.vacancy-scrutiny.is-disputed meter::-moz-meter-bar{background:#c18c6c}
+.vacancy-report{position:absolute;left:13%;top:140px;transform:rotate(-5deg);width:138px;z-index:1}
+.vacancy-report-paper{position:relative;padding:17px 17px 13px;background:#c8b887;color:#283422;border:1px solid #a29160;box-shadow:3px 5px 0 #897b51,7px 9px 15px #050c09aa}
+.vacancy-report-paper::before{content:'';position:absolute;top:-12px;left:-1px;width:68px;height:13px;background:#c8b887;border:1px solid #a29160;border-bottom:0;border-radius:4px 5px 0 0}
+.vacancy-approval{display:block;font:700 38px/1 ui-monospace,monospace}.vacancy-approval small{font-size:17px;font-weight:400;color:#5f6545}
+.vacancy-approval-label{display:block;margin:0 0 6px;font-size:8px;letter-spacing:1px;color:#485639}
+.vacancy-report-paper progress{appearance:none;-webkit-appearance:none;display:block;width:100%;height:5px;border:0;border-radius:0;background:#aa9e75;margin-top:10px;accent-color:#405736}
+.vacancy-report-paper progress::-webkit-progress-bar{background:#aa9e75}.vacancy-report-paper progress::-webkit-progress-value{background:#405736}.vacancy-report-paper progress::-moz-progress-bar{background:#405736}
+.vacancy-approved-stamp{position:absolute;left:50%;top:50%;display:block;width:max-content;max-width:none;text-align:center;border:5px double #334c2b;color:#334c2b;padding:9px 14px;font:800 clamp(27px,4.8vw,42px)/1 ui-monospace,SFMono-Regular,Consolas,monospace;letter-spacing:2px;transform:translate(-50%,-50%) rotate(-12deg);text-shadow:1px 0 #79805b,0 1px #79805b;background:#c8b88722;animation:vacancy-stamp .22s cubic-bezier(.2,.9,.3,1.2) both}
+.vacancy-approving .vacancy-report{left:50%;top:48%;width:clamp(210px,30vw,300px);z-index:5;transform:translate(-50%,-50%) rotate(-5deg)}
+.vacancy-approving .vacancy-report-paper{min-height:142px;padding:22px;box-shadow:4px 6px 0 #897b51,9px 14px 28px #050c09bb}
+.vacancy-approving .vacancy-approval,.vacancy-approving .vacancy-approval-label,.vacancy-approving .vacancy-report-paper progress{opacity:.3}
+.vacancy-approving .vacancy-card-selectors,.vacancy-approving .vacancy-hand-previous,.vacancy-approving .vacancy-hand-next{visibility:hidden}
+.vacancy-dealing .vacancy-hand-previous,.vacancy-dealing .vacancy-hand-next{opacity:.35}
+.vacancy-presentation-paused *{animation-play-state:paused!important}
+.vacancy-hand-area{position:absolute;left:0;right:0;bottom:calc(12px + env(safe-area-inset-bottom));height:clamp(220px,35dvh,360px);z-index:3;max-width:1300px;margin:auto}
+.vacancy-hand-surface{position:absolute;inset:0;overflow:hidden}
+.vacancy-hand-canvas{display:block!important;position:static!important;width:100%!important;height:100%!important;min-height:0!important;max-height:none!important;aspect-ratio:auto!important;object-fit:contain!important;touch-action:pan-y;cursor:pointer!important}
+.vacancy-hand-previous,.vacancy-hand-next{position:absolute;z-index:2;top:53%;width:44px;min-height:44px;padding:0;border:1px solid #9aa57844;background:#132016b0;color:#d5d7b5;font:30px/1 Georgia,serif;touch-action:manipulation}
+.vacancy-hand-previous{left:max(6px,env(safe-area-inset-left))}.vacancy-hand-next{right:max(6px,env(safe-area-inset-right))}
+.vacancy-inspecting .vacancy-hand-previous,.vacancy-inspecting .vacancy-hand-next{top:auto;bottom:8px}
+.vacancy-card-selectors{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0);clip-path:inset(50%);white-space:nowrap}
+.vacancy-card-selectors:focus-within,.vacancy-hand-unavailable .vacancy-card-selectors{position:absolute;inset:8px 55px;width:auto;height:auto;overflow:auto;clip:auto;clip-path:none;white-space:normal;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;background:#142016ed;padding:8px;z-index:3}
+.vacancy-card-selectors button{min-width:0;min-height:50px;padding:9px;color:#283620;background:#d9d4b8;border-color:#8d9778;font:11px/1.35 ui-monospace,monospace;touch-action:manipulation}
+.vacancy-card-selectors button[aria-pressed="true"]{outline:2px solid var(--gold);outline-offset:1px;background:#eee6c4}
+.vacancy-hand-unavailable .vacancy-hand-surface{display:none}
+.vacancy-inspector{position:absolute;z-index:7;inset:calc(105px + env(safe-area-inset-top)) 18px calc(155px + env(safe-area-inset-bottom));display:flex;align-items:center;justify-content:center;pointer-events:none}
+.vacancy-memo{position:relative;width:auto;max-width:100%;height:min(570px,100%);aspect-ratio:2/3;max-height:100%;display:flex;flex-direction:column;background:#d9d4b8;color:#263122;padding:20px 22px 18px;box-shadow:3px 5px 0 #141d13,5px 7px 0 #777d5d88,0 20px 60px #000c,0 0 0 100vmax #050d0866;border:1px solid #a8ad87;border-top:5px solid #999773;min-width:0;pointer-events:auto;transform:rotate(-1deg);animation:vacancy-card-rise .2s ease-out both}
+.vacancy-memo-evidence{border-top-color:#a68d57;background:#d7d0ac}.vacancy-memo-procedure{border-top-color:#8f9d73;background:#c8d0b0}
+.vacancy-memo-evidence::before{content:'';position:absolute;top:-18px;left:-1px;width:90px;height:18px;border:1px solid #a68d57;border-bottom:0;border-radius:5px 6px 0 0;background:#c7b480}
+.vacancy-memo-testimony::after,.vacancy-memo-procedure::after{content:'';position:absolute;top:-10px;left:18px;width:12px;height:34px;border:2px solid #74796b;border-radius:7px;box-shadow:1px 1px 1px #0004;transform:rotate(-6deg);pointer-events:none}
+.vacancy-paper-close{position:absolute;right:5px;top:4px;width:44px;height:44px;min-height:44px;border:0;background:transparent;color:#4c583d;font:26px/1 ui-monospace,monospace;touch-action:manipulation}
+.vacancy-memo-source{flex:0 0 auto;font-size:9px;line-height:1.4;letter-spacing:.4px;color:#586147;margin:0 30px 9px 0;text-transform:uppercase}
+.vacancy-memo h3{flex:0 0 auto;font:700 21px/1.25 ui-monospace,SFMono-Regular,Consolas,monospace;margin:0 22px 14px 0;color:#2d3825}
+.vacancy-memo-quote{flex:1;min-height:0;overflow:auto;overscroll-behavior:contain;touch-action:pan-y;font:13px/1.65 ui-monospace,SFMono-Regular,Consolas,monospace;color:#35432d;margin:0;padding:0 0 13px;border-bottom:1px solid #8e987a99;white-space:pre-wrap;overflow-wrap:anywhere;background:repeating-linear-gradient(transparent 0,transparent calc(1.65em - 1px),#89916f25 calc(1.65em - 1px),#89916f25 1.65em)}
+.vacancy-memo-footer{flex:0 0 auto;display:flex;justify-content:space-between;align-items:center;gap:10px;margin-top:13px}
+.vacancy-card-effect{font-size:11px;line-height:1.5;color:#34462b;margin:0}
+.vacancy-memo-footer button,.vacancy-rules>.primary{min-height:46px;padding:11px 17px;font-size:11px;line-height:1.3;justify-content:center;flex-shrink:0;background:#34452b;color:#eee8cf;border-color:#34452b;touch-action:manipulation}
+.vacancy-game button:focus-visible,.vacancy-memo-quote:focus-visible{outline:2px solid var(--gold);outline-offset:3px}
+.vacancy-rules{transform:none;aspect-ratio:auto;width:430px;height:auto}.vacancy-rules-copy{overflow:auto;min-height:0;font:13px/1.6 ui-monospace,monospace}.vacancy-rules-copy p{margin:0 0 14px}.vacancy-rules>.primary{flex:0 0 auto;margin-top:10px;align-self:flex-end}
+.vacancy-paper-flight{position:absolute!important;max-width:none;max-height:none;margin:0;pointer-events:none!important;box-shadow:2px 4px 6px #0009;animation:vacancy-card-play .35s ease-in both;z-index:8;overflow:hidden}
+.vacancy-paper-return{animation-name:vacancy-card-return}
+@keyframes vacancy-card-rise{from{opacity:.5;transform:translateY(95px) scale(.72) rotate(-5deg)}to{opacity:1;transform:translateY(0) scale(1) rotate(-1deg)}}
+@keyframes vacancy-card-play{0%{opacity:1;transform:translate(0,0) scale(1) rotate(-1deg)}75%{opacity:.95;transform:translate(var(--flight-x),var(--flight-y)) scale(.28) rotate(-7deg)}100%{opacity:0;transform:translate(var(--flight-x),var(--flight-y)) scale(.26) rotate(-7deg)}}
+@keyframes vacancy-card-return{0%{opacity:1;transform:translate(0,0) scale(1) rotate(-1deg)}100%{opacity:0;transform:translate(var(--flight-x),var(--flight-y)) scale(.35) rotate(-3deg)}}
+@keyframes vacancy-stamp{0%{opacity:0;transform:translate(-50%,-50%) scale(1.65) rotate(-12deg)}70%{opacity:.9;transform:translate(-50%,-50%) scale(.96) rotate(-12deg)}100%{opacity:1;transform:translate(-50%,-50%) scale(1) rotate(-12deg)}}
+@media(min-width:1200px){.vacancy-arena{max-width:1200px;width:100%;margin:auto}.vacancy-opponent{right:20%;width:32%}.vacancy-report{left:17%;top:140px}.vacancy-hand-previous{left:3%}.vacancy-hand-next{right:3%}}
+@media(max-width:760px){
+ .vacancy-heading{top:calc(58px + env(safe-area-inset-top));left:14px;right:14px;gap:10px}.vacancy-heading h2{font-size:13px}.vacancy-file-heading>span{font-size:8px;margin-bottom:4px}.vacancy-help{width:34px;height:34px;min-height:34px;font-size:14px}
+ .vacancy-arena{inset:calc(109px + env(safe-area-inset-top)) 0 calc(clamp(220px,35dvh,360px) + 18px)}
+ .vacancy-opponent{right:15%;width:65%;min-width:0}.vacancy-opponent-status{padding:6px 7px;gap:6px;flex-direction:column}.vacancy-opponent-status>span{font-size:8px}.vacancy-scrutiny{width:100%;max-width:none;min-width:0}.vacancy-scrutiny>span{font-size:7px}.vacancy-scrutiny strong{font-size:10px}.vacancy-scrutiny meter{height:4px;margin-top:3px}
+ .vacancy-report{left:8%;top:136px;width:126px}.vacancy-report-paper{padding:12px 12px 10px}.vacancy-approval{font-size:29px}.vacancy-approval small{font-size:13px}.vacancy-approval-label{font-size:7px}.vacancy-report-paper progress{margin-top:8px;height:4px}
+ .vacancy-hand-previous,.vacancy-hand-next{width:38px;min-height:44px;font-size:27px;top:58%}.vacancy-hand-previous{left:3px}.vacancy-hand-next{right:3px}
+ .vacancy-inspector{left:17px;right:17px;top:calc(111px + env(safe-area-inset-top));bottom:calc(150px + env(safe-area-inset-bottom))}.vacancy-memo{padding:16px;border-top-width:4px}.vacancy-memo h3{font-size:19px;margin-bottom:11px}.vacancy-memo-source{font-size:8px}.vacancy-memo-quote{font-size:12px;line-height:1.6}.vacancy-card-effect{font-size:10px}.vacancy-memo-footer button{font-size:11px;padding:11px 15px}.vacancy-rules-copy{font-size:12px}
+}
+@media(max-height:740px) and (max-width:760px){.vacancy-arena{bottom:calc(30dvh + 15px)}.vacancy-hand-area{height:30dvh;min-height:180px}.vacancy-report{top:116px;width:111px}.vacancy-report-paper{padding:9px}.vacancy-approval{font-size:25px}.vacancy-inspector{top:100px;bottom:125px}}
+@media(max-width:350px){.vacancy-heading h2{font-size:12px}.vacancy-report{left:6%;top:124px;width:103px}.vacancy-memo h3{font-size:17px}.vacancy-memo-quote{font-size:11px}}
+@media(max-height:500px) and (min-width:601px){
+ .vacancy-heading{top:53px;left:16px}.vacancy-file-heading>span{font-size:7px}.vacancy-heading h2{font-size:12px}.vacancy-help{width:30px;height:30px;min-height:30px}
+ .vacancy-arena{inset:91px 0 48px;min-height:0}.vacancy-report{left:7%;top:90px;width:112px}.vacancy-report-paper{padding:9px}.vacancy-approval{font-size:25px}.vacancy-opponent{right:4%;top:-7px;width:27%;min-width:0}.vacancy-opponent-status{padding:5px 7px;gap:6px}.vacancy-opponent-status>span{font-size:7px}.vacancy-scrutiny{min-width:0}.vacancy-scrutiny>span{font-size:6px}
+ .vacancy-hand-area{left:25%;right:25%;bottom:10px;height:57dvh;min-height:0}.vacancy-hand-previous{left:-24px}.vacancy-hand-next{right:-24px}
+ .vacancy-inspector{inset:58px 18px 16px}.vacancy-memo{width:min(340px,42vw);aspect-ratio:auto;max-width:390px;padding:12px 16px}.vacancy-memo h3{font-size:17px;margin-bottom:8px}.vacancy-memo-quote{font-size:11px}.vacancy-memo-source{margin-bottom:6px}.vacancy-memo-footer{margin-top:8px}.vacancy-memo-footer button{min-height:40px}.vacancy-rules-copy{font-size:11px}.vacancy-rules-copy p{margin-bottom:9px}
+}
+@media(prefers-reduced-motion:reduce){.vacancy-game *{scroll-behavior:auto!important;transition:none!important;animation:none!important}}

@@ -1,9 +1,10 @@
-import { createGame, startShift, enterField, inspect, SHIFT_LENGTH, ENDINGS } from './engine.js';
+import { createGame, startShift, enterField, inspect, answer, SHIFT_LENGTH, ENDINGS } from './engine.js';
 import { startRogue, chooseRogue } from './rogue.js';
 import { startResolution, chooseResolution } from './alternate-endings.js';
 import { RESOLUTION_GAMES } from './resolution-games.js';
-import { ENDING_PATHS } from './ending-paths.js';
+import { ENDING_PATHS, endingPathRequirements } from './ending-paths.js';
 import { ENCOUNTERS } from './encounters.js';
+import { EVIDENCE_SCHEDULE } from './evidence-scenes.js';
 
 export const MINI_GAMES = Object.freeze([
   { id: 'watch', title: 'Watchtower', description: 'Hold the post for one watch. Contain the corn, reload, and protect the perimeter.' },
@@ -12,7 +13,8 @@ export const MINI_GAMES = Object.freeze([
   { id: 'flood', title: 'Pump Puzzle', description: 'Rotate the pipes to connect the treatment pump to the field outlet.' },
   { id: 'dungeon', title: 'Dungeon Crawler Corn', description: 'Take your rifle beneath the drain. Find three keys and climb back out.' },
   { id: 'rescue', title: 'Roots & Recordings', description: 'Match the two voices. Pull while the roots loosen and free both boots.' },
-  { id: 'transmission', title: 'The Other Tower', description: 'Guide your earlier self through moving rows with delayed radio commands.' }
+  { id: 'transmission', title: 'The Other Tower', description: 'Guide your earlier self through moving rows with delayed radio commands.' },
+  { id: 'vacancy', title: 'The Handover', description: 'Use your evidence and testimony to close three reports against the supervisor.' }
 ].map(game => Object.freeze(game)));
 
 /** Keep persisted unlocks small, unique, and in the menu's stable display order. */
@@ -33,7 +35,7 @@ export function getMiniGameUnlocks(state) {
     .map(report => report.rogueRoute).filter(id => id !== 'watch');
   for (const report of reports) {
     if (report?.kind === 'resolution' && report.resolutionGame === report.resolutionRoute &&
-        report.resolutionStep === 1 && report.choice === { rescue: 'rescue-carry', transmission: 'transmission-listen' }[report.resolutionGame] &&
+        report.resolutionStep === 1 && report.choice === { rescue: 'rescue-carry', transmission: 'transmission-listen', vacancy: 'vacancy-sign' }[report.resolutionGame] &&
         RESOLUTION_GAMES.includes(report.resolutionGame)) unlocked.push(report.resolutionGame);
   }
   // All genuine story states beyond the first briefing have entered a watch.
@@ -46,11 +48,36 @@ export function getMiniGameUnlocks(state) {
 }
 
 /** Every practice session owns a fresh game object and a persistent provenance marker. */
-export function createMiniGame(id, mode = 'story', seed = Date.now()) {
+export function createMiniGame(id, mode = 'story', seed = Date.now(), source = null) {
   if (!MINI_GAMES.some(game => game.id === id)) return null;
   const s = createGame(mode, seed);
   startShift(s);
+  // The private deck shuffle binds to this identity before its activity is made.
+  s.runId = `practice-${id}-${s.runId}`;
   if (RESOLUTION_GAMES.includes(id)) {
+    if (id === 'vacancy') {
+      const fromRun = source && endingPathRequirements(source, 'vacancy').every(item => item.met);
+      if (fromRun) {
+        s.evidence = [...source.evidence];
+        s.evidenceScenes = { ...source.evidenceScenes };
+        s.fieldEvents = JSON.parse(JSON.stringify(source.fieldEvents));
+        s.fieldEvents.pending = null;
+        s.fieldEvents.journey = null;
+        if (source.resolution?.recordingsRelinquished) s.fieldEvents.journal = s.fieldEvents.journal.filter(entry => !(['first-call', 'future-call'].includes(entry.id) && entry.choice === 'record'));
+        s.reports = source.reports.filter(report => !report.kind).map(report => ({ ...report }));
+      } else {
+        // The direct local preview can run before a phone has any saved progress.
+        // Build its clearly labelled example through the same debrief choices.
+        for (let shift = 0; shift < 3; shift++) {
+          Object.assign(s, { phase: 'debrief', shift, question: 0 });
+          s.evidence.push(...Object.values(EVIDENCE_SCHEDULE).map(exhibits => exhibits[shift]));
+          for (const action of shift === 0 ? ['comply', 'redact', 'sign'] : shift === 1 ? ['truth', 'redact', 'sign'] : ['truth', 'evidence']) {
+            if (!answer(s, action)) return null;
+          }
+        }
+      }
+      s.practiceDeckSource = fromRun ? 'current' : 'example';
+    }
     Object.assign(s, { phase: 'debrief', shift: 2, question: 2, targets: [] });
     // Practice supplies the route's actual journal prerequisites, then enters
     // through the same scenes/actions as a normal assignment.
@@ -63,7 +90,7 @@ export function createMiniGame(id, mode = 'story', seed = Date.now()) {
       if (selected.flag && !s.fieldEvents.flags.includes(selected.flag)) s.fieldEvents.flags.push(selected.flag);
     }
     if (!startResolution(s) || !chooseResolution(s, id)) return null;
-    for (const action of { rescue: ['rescue-radio', 'rescue-carry'], transmission: ['transmission-tower', 'transmission-listen'] }[id]) if (!chooseResolution(s, action)) return null;
+    for (const action of { rescue: ['rescue-radio', 'rescue-carry'], transmission: ['transmission-tower', 'transmission-listen'], vacancy: ['vacancy-accept', 'vacancy-sign'] }[id]) if (!chooseResolution(s, action)) return null;
   } else if (id !== 'watch') {
     // Practice skips the assignment, while route setup and every playable action
     // still pass through the same transition functions used by the story.
@@ -78,7 +105,6 @@ export function createMiniGame(id, mode = 'story', seed = Date.now()) {
     if (!startRogue(s, id) || !chooseRogue(s, 'begin')) return null;
   }
   s.practice = id;
-  s.runId = `practice-${id}-${s.runId}`;
   return s;
 }
 
@@ -86,7 +112,7 @@ export function miniGameComplete(s) {
   if (!s || !MINI_GAMES.some(game => game.id === s.practice)) return false;
   if (s.practice === 'watch') return s.phase !== 'tower';
   if (RESOLUTION_GAMES.includes(s.practice)) return s.resolution?.activity?.kind === s.practice &&
-    (s.resolution.activity.state.stage === 'complete' || s.practice === 'transmission' && s.exposure >= 100);
+    (['complete', 'failed'].includes(s.resolution.activity.state.stage) || s.practice === 'transmission' && s.exposure >= 100);
   return s.rogue?.route === s.practice && (s.phase === 'ending' || s.rogue.stage === 'choice');
 }
 
@@ -119,6 +145,10 @@ export function miniGameResult(s) {
     title = success ? 'You found your way back.' : 'The field found you.';
     message = success ? `All three crossings cleared · ${s.resolution.activity.state.commands} commands sent · ${s.resolution.activity.state.setbacks} crossings retried.` :
       'Exposure reached 100. Watch the moving rows and try again.';
+  } else if (id === 'vacancy') {
+    success = s.resolution.activity.state.stage === 'complete';
+    title = success ? 'Three sections stamped.' : 'Handover withheld.';
+    message = success ? 'The keys are on the desk. In the story, you can sign the completed report or refuse the handover.' : 'The supervisor keeps the keys. Use your debrief answers to reduce scrutiny as you build the files.';
   } else {
     success = s.ending === 'dungeon_escape';
     title = success ? 'Back above ground.' : 'The roots closed in.';

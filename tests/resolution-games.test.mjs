@@ -149,7 +149,7 @@ test('Transmission practice stops before the ending and cannot escape into the s
   assert.deepEqual(restore(complete), s);
 });
 
-test('the second release upgrades unfinished first-release routes and preserves both generations of achieved endings', () => {
+test('the current release upgrades unfinished first-release routes and preserves achieved endings', () => {
   for (const version of [undefined, 1]) {
     const old = storyTransmission();
     delete old.resolution.activity;
@@ -157,7 +157,7 @@ test('the second release upgrades unfinished first-release routes and preserves 
     for (const report of old.reports) delete report.resolutionGame;
     const resumed = restore(serialize(old));
     assert.ok(resumed);
-    assert.equal(resumed.resolution.version, 2);
+    assert.equal(resumed.resolution.version, 3);
     assert.equal(resumed.resolution.activity.state.crossing, 0);
     assert.equal(chooseResolution(resumed, 'transmission-broadcast'), false);
     solveResolutionGame(resumed);chooseResolution(resumed, 'transmission-broadcast');
@@ -172,7 +172,7 @@ test('the second release upgrades unfinished first-release routes and preserves 
   assert.deepEqual(restore(serialize(rescue)), rescue, 'first-release rescue endings retain earned play');
   const activeRescue = storyRescue();activeRescue.resolution.version = 1;
   const upgraded = restore(serialize(activeRescue));
-  assert.equal(upgraded.resolution.version, 2);
+  assert.equal(upgraded.resolution.version, 3);
   assert.deepEqual(upgraded.resolution.activity, activeRescue.resolution.activity);
 });
 
