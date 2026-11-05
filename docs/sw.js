@@ -1,6 +1,6 @@
 // Bump this version whenever a shipped asset changes. An active game keeps its
 // current worker; the new version activates after all old game tabs close.
-const VERSION = 'debrief-v139-difficulty-spacing';
+const VERSION = 'debrief-v140-itch-hosting';
 const DEVELOPMENT = ['localhost', '127.0.0.1', '[::1]'].includes(self.location.hostname);
 const SCOPE = new URL('./', self.location.href).pathname;
 const CACHE_PREFIX = `debrief:${SCOPE}:`;
@@ -17,6 +17,8 @@ self.addEventListener('install',event=>event.waitUntil((async()=>{
   await Promise.all(FILES.map(async file=>{
     const canonical=new URL(file,self.location.href);
     const download=new URL(canonical);
+    // itch.io's CDN serves files only; keep directory cache keys for Pages URLs.
+    if(download.pathname.endsWith('/'))download.pathname+='index.html';
     download.searchParams.set('release',VERSION);
     const response=await fetch(download.href,{cache:'reload'});
     if(!response.ok)throw new Error(`Could not download ${file}: ${response.status}`);

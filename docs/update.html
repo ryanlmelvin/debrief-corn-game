@@ -7,7 +7,7 @@
 <h1>Update Debrief</h1>
 <p id="status" role="status">Your saved shift stays on this device.</p>
 <button id="update">Load latest game</button>
-<p><a href="./">Return to the game</a></p>
+<p><a href="./index.html">Return to the game</a></p>
 <script>
 const button = document.getElementById('update');
 const status = document.getElementById('status');
@@ -29,9 +29,9 @@ button.onclick = async () => {
       });
     }
     if (reg.waiting) {
-      navigator.serviceWorker.addEventListener('controllerchange', () => location.replace('./'), { once: true });
+      navigator.serviceWorker.addEventListener('controllerchange', () => location.replace('./index.html'), { once: true });
       reg.waiting.postMessage({ type: 'SKIP_WAITING' });
-    } else location.replace('./');
+    } else location.replace('./index.html');
   } catch {
     status.textContent = 'The update could not download. Check your connection and try again.';
     button.disabled = false;

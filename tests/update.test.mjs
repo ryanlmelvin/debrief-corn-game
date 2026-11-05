@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync, readdirSync } from 'node:fs';
+import { readFileSync, readdirSync, statSync } from 'node:fs';
 import vm from 'node:vm';
 
 const app = readFileSync(new URL('../docs/app.js', import.meta.url), 'utf8');
@@ -84,6 +84,58 @@ test('new offline cache downloads release-specific assets without reusing HTTP c
   assert.ok(saved.some(item=>item.url==='https://example.com/game/style.css'));
   assert.ok(saved.some(item=>item.url==='https://example.com/game/'));
   assert.ok(saved.every(item=>!new URL(item.url).search));
+});
+
+test('offline installation works without directory indexes and preserves Pages directory URLs', async () => {
+  const events = {}, stored = new Map(), requests = [];
+  const workerURL = 'https://html.example.com/html/12345/sw.js';
+  const cache = {
+    put: async (url, response) => stored.set(url, response),
+    match: async request => stored.get(new URL(request.url || request, workerURL).href)
+  };
+  vm.runInNewContext(readFileSync(new URL('../docs/sw.js', import.meta.url), 'utf8'), {
+    URL,
+    self: { location: new URL(workerURL), addEventListener: (name, fn) => { events[name] = fn; } },
+    caches: { open: async () => cache },
+    fetch: async request => {
+      const url = new URL(request.url || request);
+      requests.push(url.pathname);
+      // itch.io returns 403 for directory requests, even when index.html exists.
+      return { ok: !url.pathname.endsWith('/'), status: 403, source: url.pathname };
+    }
+  });
+  let installation;
+  events.install({ waitUntil: promise => { installation = promise; } });
+  await installation;
+  assert.ok(requests.every(path => !path.endsWith('/')));
+  for (const [path, source] of [
+    ['./', 'index.html'],
+    ['index.html', 'index.html'],
+    ['share/01/', 'share/01/index.html'],
+    ['share/02-team/', 'share/02-team/index.html']
+  ]) {
+    let response;
+    events.fetch({
+      request: { method: 'GET', url: new URL(path, workerURL).href, mode: 'navigate' },
+      respondWith: promise => { response = promise; }
+    });
+    assert.equal((await response).source, `/html/12345/${source}`);
+  }
+});
+
+test('local page navigation and installed launch target real files on file-only hosts', () => {
+  const docs = new URL('../docs/', import.meta.url);
+  for (const file of readdirSync(docs, { recursive: true }).filter(name => name.endsWith('.html'))) {
+    const pageURL = new URL(file, docs);
+    const page = readFileSync(pageURL, 'utf8');
+    for (const [, href] of page.matchAll(/<a\b[^>]*\bhref="([^"]+)"/g)) {
+      const target = new URL(href, pageURL);
+      if (target.protocol !== 'file:') continue;
+      assert.ok(statSync(target).isFile(), `${file} links to a directory: ${href}`);
+    }
+  }
+  const manifest = JSON.parse(readFileSync(new URL('manifest.webmanifest', docs), 'utf8'));
+  assert.ok(statSync(new URL(manifest.start_url, docs)).isFile());
 });
 
 test('story reader refreshes online and falls back to the cached document offline', async () => {

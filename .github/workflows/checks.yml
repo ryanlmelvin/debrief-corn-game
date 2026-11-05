@@ -1,8 +1,9 @@
-name: Game checks
+name: Game checks and itch.io deployment
 
 on:
   push:
   pull_request:
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -19,3 +20,61 @@ jobs:
         run: npm test
       - name: Check shipped assets and ending audit
         run: npm run check
+
+  deploy-itch:
+    name: Deploy to itch.io
+    needs: game-checks
+    if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    concurrency:
+      group: itch-io-web-html
+      queue: max
+      cancel-in-progress: false
+    env:
+      ITCH_PROJECT: versking/debrief
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      # A rerun of an old commit must not replace a newer release.
+      - name: Check that this is still the latest main commit
+        id: release
+        shell: bash
+        run: |
+          latest_commit="$(git ls-remote --exit-code origin refs/heads/main | cut -f1)"
+          if [[ "$GITHUB_SHA" == "$latest_commit" ]]; then
+            echo 'current=true' >> "$GITHUB_OUTPUT"
+          else
+            echo 'Skipping an older commit; main has a newer version.' >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Check itch.io credentials
+        if: steps.release.outputs.current == 'true'
+        env:
+          BUTLER_API_KEY: ${{ secrets.BUTLER_API_KEY }}
+        run: |
+          if [[ -z "$BUTLER_API_KEY" ]]; then
+            echo '::error::Add the BUTLER_API_KEY repository secret in Settings > Secrets and variables > Actions, then rerun this workflow.'
+            exit 1
+          fi
+
+      - name: Install Butler
+        if: steps.release.outputs.current == 'true'
+        run: |
+          mkdir -p "$RUNNER_TEMP/butler"
+          curl --fail --location --retry 3 \
+            https://broth.itch.zone/butler/linux-amd64/LATEST/archive/default \
+            --output "$RUNNER_TEMP/butler.zip"
+          unzip -q "$RUNNER_TEMP/butler.zip" -d "$RUNNER_TEMP/butler"
+          chmod +x "$RUNNER_TEMP/butler/butler"
+          "$RUNNER_TEMP/butler/butler" version
+
+      - name: Upload the browser game
+        if: steps.release.outputs.current == 'true'
+        env:
+          BUTLER_API_KEY: ${{ secrets.BUTLER_API_KEY }}
+        run: |
+          "$RUNNER_TEMP/butler/butler" push docs "$ITCH_PROJECT:web-html" --userversion "$GITHUB_SHA"
+          echo "Uploaded commit $GITHUB_SHA to $ITCH_PROJECT:web-html." >> "$GITHUB_STEP_SUMMARY"

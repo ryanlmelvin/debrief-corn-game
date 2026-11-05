@@ -16,7 +16,7 @@ test('every ending has a distinct static link preview without ending prose', () 
     assert.ok(page.includes(`<meta property="og:url" content="${data.url}">`));
     assert.ok(page.includes(`<meta property="og:image" content="${data.url}preview.jpg">`));
     assert.match(page, /name="twitter:card" content="summary_large_image"/);
-    assert.match(page, /href="\.\.\/\.\.\/">Find your own ending/);
+    assert.match(page, /href="\.\.\/\.\.\/index\.html">Find your own ending/);
     assert.doesNotMatch(page, /<script|http-equiv="refresh"/i);
     for (const e of Object.values(ENDINGS)) {
       assert.ok(!page.includes(e.text));

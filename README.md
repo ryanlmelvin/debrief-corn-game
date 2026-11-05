@@ -73,6 +73,21 @@ Play online: https://ryanlmelvin.github.io/debrief-corn-game/
 
 With sound enabled, the investigate pressure starts as a distant low drone. The pulse and close, beating tones build as the outdoor ambience recedes. The entire mix cuts to silence when the compulsion wins; ordinary ambience returns after the map notice closes. Quiet crickets establish the outdoor ambience and recede with pressure. Successful walking adds soft footsteps and occasional leaves; radio encounters use brief static, and the extra-step encounter adds one delayed footstep after you stop. Story encounters keep their soundscape, while pause, menus, other documents, and background tabs mute the sound. All effects, including delayed cues, cut off during compulsion. Resuming a save or unmuting never replays an old encounter cue. The four CC0 effects add about 187 KB and are cached with the game for offline playback; credits and source details are in `docs/assets/SOUND-LICENSE.txt`. The sound mix uses gentle compression ahead of the final silence gate, keeps the pressure drone near the ambience level, and softens gunshots and the sound-on tone. Rapid shots have limited overlap so repeated clicks cannot build a loud burst. The source recordings are unchanged.
 
+## Publish on itch.io
+
+The [Game checks and itch.io deployment workflow](.github/workflows/checks.yml) uploads `docs/` to **`versking/debrief:web-html`** after `npm test` and `npm run check` pass on each push to `main`. Butler packages the complete browser game and sends only changed data on later uploads. No build or manual ZIP upload is needed. Pull requests run checks without deploying, and GitHub Pages continues to publish from `docs/`.
+
+One-time setup:
+
+1. Get an itch.io API key from [your API keys settings](https://itch.io/user/settings/api-keys). If using `butler login`, the generated key is listed with source `wharf`; see [Butler authentication](https://itch.io/docs/butler/login.html).
+2. Add it as an Actions repository secret named **`BUTLER_API_KEY`** in [GitHub repository settings](https://github.com/ryanlmelvin/debrief-corn-game/settings/secrets/actions/new). Keep the key out of files, commits, and chat messages.
+3. In [GitHub Actions](https://github.com/ryanlmelvin/debrief-corn-game/actions/workflows/checks.yml), choose **Run workflow → main** for the first upload, or push a change to `main`.
+4. After the first upload finishes processing, edit [Debrief on itch.io](https://versking.itch.io/debrief): set **Kind of project** to **HTML**, mark the `web-html` upload as **This file will be played in the browser**, and save. Enable **Mobile friendly** and **Click to launch in fullscreen** for the game's responsive layout. These upload settings only need to be set once; later uploads replace the same channel. See [itch.io's HTML game guide](https://itch.io/docs/creators/html5) and [Butler's browser-game instructions](https://itch.io/docs/butler/pushing.html#html--playable-in-browser-games).
+
+Uploads are serialized, and rerunning an older commit skips deployment if `main` has advanced. A missing secret or failed upload fails the deployment job with an error; use **Re-run failed jobs** after correcting the setup.
+
+GitHub Pages and itch.io keep separate browser saves. Use **Menu → Back up / restore** to move progress between them. Game navigation uses explicit `index.html` filenames because itch.io's HTML CDN does not serve directory URLs.
+
 ## Phone and desktop play
 
 The game stays within the visible screen in portrait and landscape, including short phone screens with browser controls showing. Briefings, notebook entries, installation help, and records use readable pages with Back/Next controls instead of scrolling. Decision screens keep the situation, a concise notebook reminder, costs, and every response on one screen. Full interview wording remains in the saved transcript. Optional documents can be closed from their header; the notebook has a direct entry selector.
