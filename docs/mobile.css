@@ -11,12 +11,13 @@ main, .game-shell, .playing .game-shell { height: 100dvh; min-height: 0; }
 .statusbar { flex-shrink: 0; padding-bottom: max(8px, env(safe-area-inset-bottom)); }
 /* Keep the field behind the entire start screen, without letterboxing. */
 body:not(.playing) #field { position: absolute; inset: 0; width: 100%; height: 100%; aspect-ratio: auto; object-fit: cover; }
-.welcome { overflow-y: auto; justify-content: flex-start; padding: clamp(20px, 5vw, 60px); }
+.welcome { overflow-y: auto; justify-content: flex-start; padding: 20px clamp(20px, 5vw, 60px); }
 .welcome-content { flex-shrink: 0; margin-block: auto; max-width: 600px; }
 .welcome-meta { font-size: 10px; line-height: 1.8; letter-spacing: .4px; color: #d1d4ba; margin: 18px 0 0; }
 .start-options { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; margin-top: 16px; }
 .welcome .start-options .difficulty { flex-direction: column; align-items: flex-start; gap: 6px; margin: 0; }
-#start-install { min-height: 44px; padding: 10px 7px; text-align: left; }
+#start-install { min-height: 44px; padding: 10px 14px; border: 1px solid #a2ac8b; background: #253323; color: var(--stock); font-size: 12px; font-weight: 700; text-align: left; }
+#start-install:hover { background: #35452a; border-color: var(--stock); }
 .difficulty select { min-height: 44px; }
 .touch-help { display: none; }
 @media (pointer: coarse), (max-width: 760px) {
@@ -113,7 +114,7 @@ body[data-phase="guide"] .sidebar .controls { display: block; max-width: 520px; 
   .welcome .difficulty select { min-width: 0; max-width: 100%; }
   .welcome-meta { font-size: 9px; letter-spacing: 0; }
 }
-@media (max-height: 650px) and (min-width: 761px), (max-height: 500px) and (min-width: 480px) {
+@media (max-height: 700px) and (min-width: 761px), (max-height: 500px) and (min-width: 480px) {
   .welcome { padding: 12px 28px; }
   .welcome-content { display: grid; grid-template-columns: 1fr 1fr; column-gap: 32px; width: 100%; max-width: 900px; align-items: center; }
   .welcome-content::before { grid-column: 1; font-size: 8px; margin: 0; padding: 4px 8px; }
